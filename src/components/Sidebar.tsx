@@ -3,10 +3,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { X } from "lucide-react";
-import { NAV } from "@/lib/nav";
+import { navFor } from "@/lib/nav";
+import { useAuth } from "@/lib/auth";
 
 export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const pathname = usePathname();
+  const { user } = useAuth();
+  const items = navFor(user?.rol ?? "Operador");
 
   return (
     <>
@@ -34,7 +37,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
         </div>
 
         <nav className="flex flex-col gap-0.5 overflow-y-auto p-3" style={{ height: "calc(100% - 4rem)" }}>
-          {NAV.map((item) => {
+          {items.map((item) => {
             const active = pathname === item.href;
             const Icon = item.icon;
             return (
