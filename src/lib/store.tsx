@@ -1,9 +1,11 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react";
 import {
   VEHICULOS, CONDUCTORES, ORDENES, REPUESTOS, NEUMATICOS, VIAJES, FACTURAS, EMPLEADOS, USUARIOS,
 } from "./mock-data";
+import { api, getToken, ApiError } from "./api";
+import { useAuth } from "./auth";
 import type {
   Vehiculo, Conductor, OrdenTrabajo, Repuesto, Neumatico, Viaje, Factura, Empleado, Usuario,
 } from "./types";
@@ -21,92 +23,122 @@ interface DataState {
 }
 
 interface DataCtx extends DataState {
-  ready: boolean;
-  addVehiculo: (v: Omit<Vehiculo, "id">) => void;
-  addConductor: (c: Omit<Conductor, "id">) => void;
-  addOrden: (o: Omit<OrdenTrabajo, "id">) => void;
-  addRepuesto: (r: Omit<Repuesto, "id">) => void;
-  addNeumatico: (n: Omit<Neumatico, "id">) => void;
-  addViaje: (v: Omit<Viaje, "id">) => void;
-  addFactura: (f: Omit<Factura, "id">) => void;
-  addEmpleado: (e: Omit<Empleado, "id">) => void;
-  addUsuario: (u: Omit<Usuario, "id">) => void;
-  reset: () => void;
+  loading: boolean;
+  offline: boolean;
+  addVehiculo: (v: Omit<Vehiculo, "id">) => Promise<void>;
+  addConductor: (c: Omit<Conductor, "id">) => Promise<void>;
+  addOrden: (o: Omit<OrdenTrabajo, "id">) => Promise<void>;
+  addRepuesto: (r: Omit<Repuesto, "id">) => Promise<void>;
+  addNeumatico: (n: Omit<Neumatico, "id">) => Promise<void>;
+  addViaje: (v: Omit<Viaje, "id">) => Promise<void>;
+  addFactura: (f: Omit<Factura, "id">) => Promise<void>;
+  addEmpleado: (e: Omit<Empleado, "id">) => Promise<void>;
+  addUsuario: (u: Omit<Usuario, "id">) => Promise<void>;
+  reload: () => void;
 }
 
-const STORAGE_KEY = "ft_data_v2";
+const KEYS: { key: keyof DataState; path: string }[] = [
+  { key: "vehiculos", path: "/vehiculos" },
+  { key: "conductores", path: "/conductores" },
+  { key: "ordenes", path: "/ordenes" },
+  { key: "repuestos", path: "/repuestos" },
+  { key: "neumaticos", path: "/neumaticos" },
+  { key: "viajes", path: "/viajes" },
+  { key: "facturas", path: "/facturas" },
+  { key: "empleados", path: "/empleados" },
+  { key: "usuarios", path: "/usuarios" },
+];
 
-function seed(): DataState {
+const EMPTY: DataState = {
+  vehiculos: [], conductores: [], ordenes: [], repuestos: [],
+  neumaticos: [], viajes: [], facturas: [], empleados: [], usuarios: [],
+};
+
+function mockState(): DataState {
   return {
-    vehiculos: VEHICULOS,
-    conductores: CONDUCTORES,
-    ordenes: ORDENES,
-    repuestos: REPUESTOS,
-    neumaticos: NEUMATICOS,
-    viajes: VIAJES,
-    facturas: FACTURAS,
-    empleados: EMPLEADOS,
-    usuarios: USUARIOS,
+    vehiculos: VEHICULOS, conductores: CONDUCTORES, ordenes: ORDENES, repuestos: REPUESTOS,
+    neumaticos: NEUMATICOS, viajes: VIAJES, facturas: FACTURAS, empleados: EMPLEADOS, usuarios: USUARIOS,
   };
 }
 
 function newId() {
-  try {
-    return crypto.randomUUID();
-  } catch {
-    return "id-" + Math.round(performance.now()).toString(36) + Math.floor(Math.random() * 1e6).toString(36);
-  }
+  try { return crypto.randomUUID(); } catch { return "id-" + Math.floor(Math.random() * 1e9).toString(36); }
 }
 
 const Ctx = createContext<DataCtx | null>(null);
 
 export function DataProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<DataState>(seed);
-  const [ready, setReady] = useState(false);
+  const { user, ready } = useAuth();
+  const [state, setState] = useState<DataState>(EMPTY);
+  const [loading, setLoading] = useState(false);
+  const [offline, setOffline] = useState(false);
 
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) setState(JSON.parse(raw));
-    } catch {
-      /* ignore */
+  const loadAll = useCallback(async () => {
+    // Sin token → modo demo con datos mock (login offline).
+    if (!getToken()) {
+      setState(mockState());
+      setOffline(true);
+      return;
     }
-    setReady(true);
+    setLoading(true);
+    const results = await Promise.allSettled(KEYS.map((k) => api.get<any[]>(k.path)));
+    const networkDown = results.some((r) => r.status === "rejected" && (r.reason as ApiError)?.network);
+    if (networkDown) {
+      setState(mockState());
+      setOffline(true);
+      setLoading(false);
+      return;
+    }
+    const next = { ...EMPTY } as DataState;
+    results.forEach((r, i) => {
+      (next as any)[KEYS[i].key] = r.status === "fulfilled" ? r.value : [];
+    });
+    setState(next);
+    setOffline(false);
+    setLoading(false);
   }, []);
 
   useEffect(() => {
     if (!ready) return;
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    } catch {
-      /* ignore */
-    }
-  }, [state, ready]);
+    if (user) loadAll();
+    else setState(EMPTY);
+  }, [ready, user, loadAll]);
 
-  function prepend<K extends keyof DataState>(key: K, item: DataState[K][number]) {
-    setState((s) => ({ ...s, [key]: [item, ...(s[key] as unknown[])] } as DataState));
-  }
+  const prepend = useCallback((key: keyof DataState, item: any) => {
+    setState((s) => ({ ...s, [key]: [item, ...(s[key] as any[])] }));
+  }, []);
+
+  const add = useCallback(
+    async (key: keyof DataState, path: string, body: any) => {
+      if (!getToken() || offline) {
+        prepend(key, { ...body, id: newId() });
+        return;
+      }
+      try {
+        const created = await api.post<any>(path, body);
+        prepend(key, created);
+      } catch {
+        // Si falla el POST, refleja localmente para no perder la acción en demo.
+        prepend(key, { ...body, id: newId() });
+      }
+    },
+    [offline, prepend],
+  );
 
   const value: DataCtx = {
     ...state,
-    ready,
-    addVehiculo: (v) => prepend("vehiculos", { ...v, id: newId() }),
-    addConductor: (c) => prepend("conductores", { ...c, id: newId() }),
-    addOrden: (o) => prepend("ordenes", { ...o, id: newId() }),
-    addRepuesto: (r) => prepend("repuestos", { ...r, id: newId() }),
-    addNeumatico: (n) => prepend("neumaticos", { ...n, id: newId() }),
-    addViaje: (v) => prepend("viajes", { ...v, id: newId() }),
-    addFactura: (f) => prepend("facturas", { ...f, id: newId() }),
-    addEmpleado: (e) => prepend("empleados", { ...e, id: newId() }),
-    addUsuario: (u) => prepend("usuarios", { ...u, id: newId() }),
-    reset: () => {
-      setState(seed());
-      try {
-        localStorage.removeItem(STORAGE_KEY);
-      } catch {
-        /* ignore */
-      }
-    },
+    loading,
+    offline,
+    addVehiculo: (v) => add("vehiculos", "/vehiculos", v),
+    addConductor: (c) => add("conductores", "/conductores", c),
+    addOrden: (o) => add("ordenes", "/ordenes", o),
+    addRepuesto: (r) => add("repuestos", "/repuestos", r),
+    addNeumatico: (n) => add("neumaticos", "/neumaticos", n),
+    addViaje: (v) => add("viajes", "/viajes", v),
+    addFactura: (f) => add("facturas", "/facturas", f),
+    addEmpleado: (e) => add("empleados", "/empleados", e),
+    addUsuario: (u) => add("usuarios", "/usuarios", u),
+    reload: loadAll,
   };
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

@@ -12,14 +12,18 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (ready && user) router.replace("/dashboard");
   }, [ready, user, router]);
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
-    const res = login(email, password);
+    setError("");
+    setLoading(true);
+    const res = await login(email, password);
+    setLoading(false);
     if (!res.ok) {
       setError(res.error || "No se pudo iniciar sesión.");
       return;
@@ -108,9 +112,10 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+              disabled={loading}
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500/40 disabled:opacity-60"
             >
-              <LogIn size={16} /> Entrar
+              <LogIn size={16} /> {loading ? "Ingresando…" : "Entrar"}
             </button>
           </form>
 

@@ -1,95 +1,112 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Truck, Container, CalendarClock, ReceiptText, AlertTriangle, ArrowRight, Wrench } from "lucide-react";
+import { Truck, Container, CalendarClock, ReceiptText, AlertTriangle, ArrowRight, Wrench, WifiOff } from "lucide-react";
 import { Card, StatCard, Badge, PageHeader } from "@/components/ui";
 import { BarChart, Donut, ChartCard, type Slice } from "@/components/charts";
 import { useData } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
+import { api } from "@/lib/api";
 import { soles, fecha, diasRestantes, estadoDocumento } from "@/lib/format";
 
-const COL = {
-  steel: "#2C5C8A", brand: "#E5641C", green: "#1E9B67", amber: "#C98A00",
-  rose: "#CF4646", slate: "#94A3B8",
-};
+const COL = { steel: "#2C5C8A", brand: "#E5641C", green: "#1E9B67", amber: "#C98A00", rose: "#CF4646", slate: "#94A3B8" };
+
+interface Resumen {
+  kpis: {
+    vehiculos: number; operativos: number; conductores: number; empleados: number;
+    viajesTotal: number; viajesEnCurso: number; documentosAlerta: number;
+    ventasFacturadas: number; porCobrar: number; gastoMantenimiento: number; planillaNeta: number;
+  };
+  mantenimientoPorTipo: { label: string; value: number }[];
+  facturasPorEstado: { label: string; value: number }[];
+  viajesPorEstado: { label: string; value: number }[];
+  ventasPorCliente: { label: string; value: number }[];
+  documentosAlerta: { conductor: string; tipo: string; vencimiento: string; estado: string; dias: number }[];
+  devoluciones: { contenedor: string; cliente: string; placaTracto: string; devolucion: string; fechaLimite: string; dias: number }[];
+}
+
+function computeLocal(c: ReturnType<typeof useData>): Resumen {
+  const operativos = c.vehiculos.filter((v) => v.estado === "Operativo").length;
+  const documentosAlerta = c.conductores
+    .flatMap((k) => k.documentos.map((d) => ({ conductor: k.nombre, tipo: d.tipo, vencimiento: d.vencimiento, estado: estadoDocumento(d.vencimiento), dias: diasRestantes(d.vencimiento) })))
+    .filter((d) => d.estado !== "Vigente").sort((a, b) => a.dias - b.dias);
+  const devoluciones = c.viajes
+    .filter((v) => v.estado !== "Culminado" && v.estado !== "Devuelto")
+    .map((v) => ({ contenedor: v.contenedor, cliente: v.cliente, placaTracto: v.placaTracto, devolucion: v.devolucion, fechaLimite: v.fechaLimite, dias: diasRestantes(v.fechaLimite) }))
+    .sort((a, b) => a.dias - b.dias);
+  const ventasMap = c.facturas.filter((f) => f.estadoSunat !== "Anulada").reduce<Record<string, number>>((a, f) => ((a[f.cliente] = (a[f.cliente] ?? 0) + f.monto + f.igv), a), {});
+  return {
+    kpis: {
+      vehiculos: c.vehiculos.length, operativos, conductores: c.conductores.length, empleados: c.empleados.length,
+      viajesTotal: c.viajes.length, viajesEnCurso: c.viajes.filter((v) => v.estado === "En curso").length,
+      documentosAlerta: documentosAlerta.length,
+      ventasFacturadas: c.facturas.filter((f) => f.estadoSunat !== "Anulada").reduce((s, f) => s + f.monto + f.igv, 0),
+      porCobrar: c.facturas.filter((f) => f.estadoSunat === "Emitida" || f.estadoSunat === "Aceptada").reduce((s, f) => s + f.monto + f.igv, 0),
+      gastoMantenimiento: c.ordenes.reduce((s, o) => s + o.costo, 0),
+      planillaNeta: c.empleados.reduce((s, e) => s + e.sueldoBase + e.bonos - e.descuentos, 0),
+    },
+    mantenimientoPorTipo: ["Preventivo", "Correctivo", "Predictivo"].map((label) => ({ label, value: c.ordenes.filter((o) => o.tipo === label).reduce((s, o) => s + o.costo, 0) })),
+    facturasPorEstado: ["Emitida", "Aceptada", "Pagada", "Anulada"].map((label) => ({ label, value: c.facturas.filter((f) => f.estadoSunat === label).length })),
+    viajesPorEstado: ["Programado", "En curso", "Culminado", "Devuelto"].map((label) => ({ label, value: c.viajes.filter((v) => v.estado === label).length })),
+    ventasPorCliente: Object.entries(ventasMap).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([label, value]) => ({ label, value })),
+    documentosAlerta, devoluciones,
+  };
+}
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const { vehiculos, conductores, viajes, facturas, ordenes, empleados } = useData();
+  const data = useData();
+  const [resumen, setResumen] = useState<Resumen | null>(null);
 
-  const operativos = vehiculos.filter((v) => v.estado === "Operativo").length;
-  const enCurso = viajes.filter((v) => v.estado === "En curso").length;
+  useEffect(() => {
+    let alive = true;
+    api.get<Resumen>("/dashboard/resumen").then((r) => alive && setResumen(r)).catch(() => alive && setResumen(null));
+    return () => { alive = false; };
+  }, [data.vehiculos.length, data.viajes.length, data.facturas.length]);
 
-  const docsAlerta = conductores.flatMap((c) =>
-    c.documentos.map((d) => ({ conductor: c.nombre, ...d, estado: estadoDocumento(d.vencimiento), dias: diasRestantes(d.vencimiento) })),
-  ).filter((d) => d.estado !== "Vigente").sort((a, b) => a.dias - b.dias);
+  const d = resumen ?? computeLocal(data);
+  const k = d.kpis;
 
-  const devoluciones = viajes
-    .filter((v) => v.estado !== "Culminado" && v.estado !== "Devuelto")
-    .map((v) => ({ ...v, dias: diasRestantes(v.fechaLimite) }))
-    .sort((a, b) => a.dias - b.dias);
-
-  const porCobrar = facturas.filter((f) => f.estadoSunat === "Emitida" || f.estadoSunat === "Aceptada").reduce((s, f) => s + f.monto + f.igv, 0);
-  const ventasMes = facturas.filter((f) => f.estadoSunat !== "Anulada").reduce((s, f) => s + f.monto + f.igv, 0);
-  const gastoMant = ordenes.reduce((s, o) => s + o.costo, 0);
-  const planillaNeta = empleados.reduce((s, e) => s + e.sueldoBase + e.bonos - e.descuentos, 0);
-
-  // Gráficos
-  const mantPorTipo: Slice[] = [
-    { label: "Preventivo", value: ordenes.filter((o) => o.tipo === "Preventivo").reduce((s, o) => s + o.costo, 0), color: COL.steel },
-    { label: "Correctivo", value: ordenes.filter((o) => o.tipo === "Correctivo").reduce((s, o) => s + o.costo, 0), color: COL.rose },
-    { label: "Predictivo", value: ordenes.filter((o) => o.tipo === "Predictivo").reduce((s, o) => s + o.costo, 0), color: COL.brand },
-  ];
-
-  const facturaEstados: Slice[] = [
-    { label: "Emitida", value: facturas.filter((f) => f.estadoSunat === "Emitida").length, color: COL.amber },
-    { label: "Aceptada", value: facturas.filter((f) => f.estadoSunat === "Aceptada").length, color: COL.steel },
-    { label: "Pagada", value: facturas.filter((f) => f.estadoSunat === "Pagada").length, color: COL.green },
-    { label: "Anulada", value: facturas.filter((f) => f.estadoSunat === "Anulada").length, color: COL.rose },
-  ];
-
-  const viajesEstado: Slice[] = [
-    { label: "Programado", value: viajes.filter((v) => v.estado === "Programado").length, color: COL.slate },
-    { label: "En curso", value: viajes.filter((v) => v.estado === "En curso").length, color: COL.brand },
-    { label: "Culminado", value: viajes.filter((v) => v.estado === "Culminado").length, color: COL.steel },
-    { label: "Devuelto", value: viajes.filter((v) => v.estado === "Devuelto").length, color: COL.green },
-  ];
-
-  const ventasPorCliente: Slice[] = Object.entries(
-    facturas.filter((f) => f.estadoSunat !== "Anulada").reduce<Record<string, number>>((acc, f) => {
-      acc[f.cliente] = (acc[f.cliente] ?? 0) + f.monto + f.igv;
-      return acc;
-    }, {}),
-  ).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([label, value]) => ({ label, value, color: COL.steel }));
+  const mantSlices: Slice[] = d.mantenimientoPorTipo.map((s, i) => ({ ...s, color: [COL.steel, COL.rose, COL.brand][i] }));
+  const factSlices: Slice[] = d.facturasPorEstado.map((s, i) => ({ ...s, color: [COL.amber, COL.steel, COL.green, COL.rose][i] }));
+  const viajeSlices: Slice[] = d.viajesPorEstado.map((s, i) => ({ ...s, color: [COL.slate, COL.brand, COL.steel, COL.green][i] }));
+  const clienteSlices: Slice[] = d.ventasPorCliente.map((s) => ({ ...s, color: COL.steel }));
 
   return (
     <div>
-      <PageHeader title={`Hola, ${user?.nombre?.split(" ")[0] ?? ""}`} subtitle="Resumen de tu operación, con las alertas e indicadores que requieren atención hoy." />
+      <PageHeader
+        title={`Hola, ${user?.nombre?.split(" ")[0] ?? ""}`}
+        subtitle="Resumen de tu operación, con las alertas e indicadores que requieren atención hoy."
+        action={data.offline ? (
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700 ring-1 ring-inset ring-amber-200">
+            <WifiOff size={13} /> Modo demo (sin backend)
+          </span>
+        ) : null}
+      />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Flota operativa" value={`${operativos}/${vehiculos.length}`} icon={Truck} tone="blue" hint="unidades disponibles" />
-        <StatCard label="Viajes en curso" value={enCurso} icon={Container} tone="orange" hint={`${viajes.length} viajes en total`} />
-        <StatCard label="Documentos en alerta" value={docsAlerta.length} icon={CalendarClock} tone="amber" hint="por vencer o vencidos" />
-        <StatCard label="Ventas facturadas" value={soles(ventasMes)} icon={ReceiptText} tone="green" hint={`${soles(porCobrar)} por cobrar`} />
+        <StatCard label="Flota operativa" value={`${k.operativos}/${k.vehiculos}`} icon={Truck} tone="blue" hint="unidades disponibles" />
+        <StatCard label="Viajes en curso" value={k.viajesEnCurso} icon={Container} tone="orange" hint={`${k.viajesTotal} viajes en total`} />
+        <StatCard label="Documentos en alerta" value={k.documentosAlerta} icon={CalendarClock} tone="amber" hint="por vencer o vencidos" />
+        <StatCard label="Ventas facturadas" value={soles(k.ventasFacturadas)} icon={ReceiptText} tone="green" hint={`${soles(k.porCobrar)} por cobrar`} />
       </div>
 
-      {/* Gráficos */}
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <ChartCard title="Gasto de mantenimiento por tipo" subtitle={`Total ${soles(gastoMant)}`}>
-          <BarChart data={mantPorTipo} format={soles} />
+        <ChartCard title="Gasto de mantenimiento por tipo" subtitle={`Total ${soles(k.gastoMantenimiento)}`}>
+          <BarChart data={mantSlices} format={soles} />
         </ChartCard>
-        <ChartCard title="Comprobantes por estado SUNAT" subtitle={`${facturas.length} comprobantes`}>
-          <Donut data={facturaEstados} centerLabel="facturas" />
+        <ChartCard title="Comprobantes por estado SUNAT" subtitle="Distribución de facturas">
+          <Donut data={factSlices} centerLabel="facturas" />
         </ChartCard>
-        <ChartCard title="Viajes por estado" subtitle={`${viajes.length} viajes registrados`}>
-          <BarChart data={viajesEstado} />
+        <ChartCard title="Viajes por estado" subtitle={`${k.viajesTotal} viajes registrados`}>
+          <BarChart data={viajeSlices} />
         </ChartCard>
         <ChartCard title="Top clientes por facturación" subtitle="Ventas facturadas (con IGV)">
-          {ventasPorCliente.length ? <BarChart data={ventasPorCliente} format={soles} /> : <p className="text-sm text-slate-400">Sin datos</p>}
+          {clienteSlices.length ? <BarChart data={clienteSlices} format={soles} /> : <p className="text-sm text-slate-400">Sin datos</p>}
         </ChartCard>
       </div>
 
-      {/* Alertas */}
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card className="p-5">
           <div className="mb-4 flex items-center justify-between">
@@ -100,16 +117,16 @@ export default function DashboardPage() {
             <Link href="/conductores" className="flex items-center gap-1 text-xs font-semibold text-brand-600 hover:underline">Ver todos <ArrowRight size={13} /></Link>
           </div>
           <ul className="divide-y divide-slate-100">
-            {docsAlerta.slice(0, 6).map((d, i) => (
+            {d.documentosAlerta.slice(0, 6).map((doc, i) => (
               <li key={i} className="flex items-center justify-between gap-3 py-2.5">
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-medium text-slate-800">{d.conductor}</div>
-                  <div className="truncate text-xs text-slate-500">{d.tipo} · vence {fecha(d.vencimiento)}</div>
+                  <div className="truncate text-sm font-medium text-slate-800">{doc.conductor}</div>
+                  <div className="truncate text-xs text-slate-500">{doc.tipo} · vence {fecha(doc.vencimiento)}</div>
                 </div>
-                {d.estado === "Vencido" ? <Badge tone="red">Vencido hace {Math.abs(d.dias)} d</Badge> : <Badge tone="amber">En {d.dias} d</Badge>}
+                {doc.estado === "Vencido" ? <Badge tone="red">Vencido hace {Math.abs(doc.dias)} d</Badge> : <Badge tone="amber">En {doc.dias} d</Badge>}
               </li>
             ))}
-            {docsAlerta.length === 0 ? <li className="py-6 text-center text-sm text-slate-400">Sin documentos en alerta 🎉</li> : null}
+            {d.documentosAlerta.length === 0 ? <li className="py-6 text-center text-sm text-slate-400">Sin documentos en alerta 🎉</li> : null}
           </ul>
         </Card>
 
@@ -122,8 +139,8 @@ export default function DashboardPage() {
             <Link href="/operaciones" className="flex items-center gap-1 text-xs font-semibold text-brand-600 hover:underline">Ver operaciones <ArrowRight size={13} /></Link>
           </div>
           <ul className="divide-y divide-slate-100">
-            {devoluciones.slice(0, 6).map((v) => (
-              <li key={v.id} className="flex items-center justify-between gap-3 py-2.5">
+            {d.devoluciones.slice(0, 6).map((v, i) => (
+              <li key={i} className="flex items-center justify-between gap-3 py-2.5">
                 <div className="min-w-0">
                   <div className="truncate text-sm font-medium text-slate-800">{v.contenedor} · {v.cliente}</div>
                   <div className="truncate text-xs text-slate-500">{v.placaTracto} · devolver en {v.devolucion} · {fecha(v.fechaLimite)}</div>
@@ -134,15 +151,15 @@ export default function DashboardPage() {
                   : <Badge tone="green">{v.dias} días</Badge>}
               </li>
             ))}
-            {devoluciones.length === 0 ? <li className="py-6 text-center text-sm text-slate-400">Sin devoluciones pendientes</li> : null}
+            {d.devoluciones.length === 0 ? <li className="py-6 text-center text-sm text-slate-400">Sin devoluciones pendientes</li> : null}
           </ul>
         </Card>
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatCard label="Gasto de mantenimiento" value={soles(gastoMant)} icon={Wrench} tone="orange" hint={`${ordenes.length} órdenes`} />
-        <StatCard label="Planilla neta" value={soles(planillaNeta)} icon={ReceiptText} tone="blue" hint={`${empleados.length} trabajadores`} />
-        <StatCard label="Conductores" value={conductores.length} icon={Truck} tone="gray" hint="registrados" />
+        <StatCard label="Gasto de mantenimiento" value={soles(k.gastoMantenimiento)} icon={Wrench} tone="orange" />
+        <StatCard label="Planilla neta" value={soles(k.planillaNeta)} icon={ReceiptText} tone="blue" hint={`${k.empleados} trabajadores`} />
+        <StatCard label="Conductores" value={k.conductores} icon={Truck} tone="gray" hint="registrados" />
       </div>
     </div>
   );
