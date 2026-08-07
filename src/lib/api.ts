@@ -74,6 +74,17 @@ export const api = {
   del: <T>(path: string) => request<T>("DELETE", path),
 };
 
-export async function apiLogin(email: string, password: string) {
-  return request<{ access_token: string; user: any }>("POST", "/auth/login", { email, password });
+export interface Sede {
+  id: string;
+  codigo: string;
+  nombre: string;
+  ruc: string;
+}
+
+export async function apiGetSedes() {
+  return request<Sede[]>("GET", "/sedes");
+}
+
+export async function apiLogin(email: string, password: string, sedeId: string) {
+  return request<{ access_token: string; user: any }>("POST", "/auth/login", { email, password, sedeId });
 }

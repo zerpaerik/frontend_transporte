@@ -6,6 +6,8 @@ import { Menu, LogOut, ChevronDown } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { NAV } from "@/lib/nav";
 
+const LOGO: Record<string, string> = { mgr: "/sedes/mgr.jpg", mjg: "/sedes/mjg.jpg" };
+
 export function Topbar({ onMenu }: { onMenu: () => void }) {
   const { user, logout } = useAuth();
   const router = useRouter();
@@ -31,6 +33,15 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
           <Menu size={20} />
         </button>
         <div className="text-sm font-semibold text-slate-700">{current?.label ?? "Panel"}</div>
+        {user?.sede ? (
+          <div className="ml-1 hidden items-center gap-2 border-l border-slate-200 pl-3 sm:flex">
+            {LOGO[user.sede.codigo] ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={LOGO[user.sede.codigo]} alt={user.sede.nombre} className="h-6 w-6 rounded object-contain" />
+            ) : null}
+            <span className="max-w-[220px] truncate text-xs font-medium text-slate-500">{user.sede.nombre}</span>
+          </div>
+        ) : null}
       </div>
 
       <div className="relative">

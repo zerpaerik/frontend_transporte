@@ -22,6 +22,14 @@ const int = (r: () => number, a: number, b: number) => a + Math.floor(r() * (b -
 const pad = (n: number, w = 5) => String(n).padStart(w, "0");
 
 // ---------------------------------------------------------------------------
+// Sedes (fallback para el login si el backend no responde).
+// ---------------------------------------------------------------------------
+export const SEDES_DEMO = [
+  { id: "mgr", codigo: "mgr", nombre: "Transportes y Servicios MGR S.A.C.", ruc: "20608118153" },
+  { id: "mjg", codigo: "mjg", nombre: "MJG Transportes S.A.C.", ruc: "20614975831" },
+];
+
+// ---------------------------------------------------------------------------
 // Usuarios de prueba (autenticación mock, solo frontend).
 // ---------------------------------------------------------------------------
 export const USUARIOS: Usuario[] = [

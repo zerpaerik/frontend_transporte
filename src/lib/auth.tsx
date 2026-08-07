@@ -1,17 +1,17 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { USUARIOS } from "./mock-data";
-import { apiLogin, setToken, clearToken, ApiError } from "./api";
+import { USUARIOS, SEDES_DEMO } from "./mock-data";
+import { apiLogin, setToken, clearToken, ApiError, type Sede } from "./api";
 import type { Usuario } from "./types";
 
-type SafeUser = Omit<Usuario, "password">;
+type SafeUser = Omit<Usuario, "password"> & { sede?: Sede };
 
 interface AuthCtx {
   user: SafeUser | null;
   ready: boolean;
   offline: boolean;
-  login: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>;
+  login: (email: string, password: string, sedeId: string) => Promise<{ ok: boolean; error?: string }>;
   logout: () => void;
 }
 
@@ -42,9 +42,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  async function login(email: string, password: string) {
+  async function login(email: string, password: string, sedeId: string) {
     try {
-      const res = await apiLogin(email, password);
+      const res = await apiLogin(email, password, sedeId);
       setToken(res.access_token);
       setOffline(false);
       persist(res.user);
@@ -59,8 +59,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (found) {
           setOffline(true);
           clearToken();
+          const sede = SEDES_DEMO.find((s) => s.id === sedeId || s.codigo === sedeId) ?? SEDES_DEMO[0];
           const { password: _pw, ...safe } = found;
-          persist(safe);
+          persist({ ...safe, sede });
           return { ok: true };
         }
         return { ok: false, error: "No hay conexión con el servidor y las credenciales no coinciden con el modo demo." };
