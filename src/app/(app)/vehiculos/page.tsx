@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Truck, Paperclip } from "lucide-react";
+import { Plus, Truck, Paperclip, Pencil } from "lucide-react";
 import { PageHeader, StatCard, Badge } from "@/components/ui";
 import { DataTable, type Column, type Filter } from "@/components/DataTable";
 import { FormModal, type Field, type FormValues } from "@/components/FormModal";
@@ -10,15 +10,17 @@ import { useData } from "@/lib/store";
 import { km } from "@/lib/format";
 import type { Vehiculo } from "@/lib/types";
 
-const fields: Field[] = [
-  { name: "placa", label: "Placa", type: "text", required: true, placeholder: "AAT-843" },
-  { name: "tipo", label: "Tipo", type: "select", options: ["Tracto", "Carreta"] },
-  { name: "marca", label: "Marca", type: "text", required: true, placeholder: "Volvo" },
-  { name: "modelo", label: "Modelo", type: "text", placeholder: "FH 460" },
-  { name: "anio", label: "Año", type: "number", default: 2022 },
-  { name: "kilometraje", label: "Kilometraje", type: "number", default: 0 },
-  { name: "estado", label: "Estado", type: "select", options: ["Operativo", "En taller", "Inactivo"], full: true },
-];
+function buildFields(v?: Vehiculo): Field[] {
+  return [
+    { name: "placa", label: "Placa", type: "text", required: true, placeholder: "AAT-843", default: v?.placa },
+    { name: "tipo", label: "Tipo", type: "select", options: ["Tracto", "Carreta"], default: v?.tipo },
+    { name: "marca", label: "Marca", type: "text", required: true, placeholder: "Volvo", default: v?.marca },
+    { name: "modelo", label: "Modelo", type: "text", placeholder: "FH 460", default: v?.modelo },
+    { name: "anio", label: "Año", type: "number", default: v?.anio ?? 2022 },
+    { name: "kilometraje", label: "Kilometraje", type: "number", default: v?.kilometraje ?? 0 },
+    { name: "estado", label: "Estado", type: "select", options: ["Operativo", "En taller", "Inactivo"], full: true, default: v?.estado },
+  ];
+}
 
 const columns: Column<Vehiculo>[] = [
   { key: "placa", header: "Placa", sortable: true, render: (v) => <span className="font-semibold text-slate-900">{v.placa}</span> },
@@ -30,37 +32,45 @@ const columns: Column<Vehiculo>[] = [
   { key: "estado", header: "Estado", sortable: true, render: (v) => <Badge tone={v.estado === "Operativo" ? "green" : v.estado === "En taller" ? "amber" : "gray"}>{v.estado}</Badge> },
 ];
 
-function docsColumn(onOpen: (v: Vehiculo) => void): Column<Vehiculo> {
-  return {
-    key: "docs", header: "Documentos",
-    render: (v) => (
-      <button onClick={() => onOpen(v)} className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:border-brand-300 hover:text-brand-600">
-        <Paperclip size={13} /> {((v as any).documentos?.length ?? 0)} doc.
-      </button>
-    ),
-  };
-}
-
 const filters: Filter<Vehiculo>[] = [
   { key: "tipo", label: "Tipo", value: (v) => v.tipo },
   { key: "estado", label: "Estado", value: (v) => v.estado },
 ];
 
+function accionesColumn(onEdit: (v: Vehiculo) => void, onDocs: (v: Vehiculo) => void): Column<Vehiculo> {
+  return {
+    key: "acciones", header: "Acciones",
+    render: (v) => (
+      <div className="flex items-center gap-1.5">
+        <button onClick={() => onEdit(v)} title="Editar vehículo" className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:border-brand-300 hover:text-brand-600">
+          <Pencil size={13} /> Editar
+        </button>
+        <button onClick={() => onDocs(v)} title="Documentos" className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:border-brand-300 hover:text-brand-600">
+          <Paperclip size={13} /> {((v as any).documentos?.length ?? 0)}
+        </button>
+      </div>
+    ),
+  };
+}
+
 export default function VehiculosPage() {
-  const { vehiculos, addVehiculo, reload } = useData();
+  const { vehiculos, addVehiculo, updateVehiculo, reload } = useData();
   const [open, setOpen] = useState(false);
+  const [editVeh, setEditVeh] = useState<Vehiculo | null>(null);
   const [docVeh, setDocVeh] = useState<Vehiculo | null>(null);
 
   const tractos = vehiculos.filter((v) => v.tipo === "Tracto").length;
   const carretas = vehiculos.filter((v) => v.tipo === "Carreta").length;
   const enTaller = vehiculos.filter((v) => v.estado === "En taller").length;
 
-  function guardar(v: FormValues) {
-    addVehiculo({
+  function toDto(v: FormValues) {
+    return {
       placa: String(v.placa).toUpperCase(), tipo: v.tipo as Vehiculo["tipo"], marca: String(v.marca),
       modelo: String(v.modelo), anio: Number(v.anio), kilometraje: Number(v.kilometraje), estado: v.estado as Vehiculo["estado"],
-    });
+    };
   }
+  function guardar(v: FormValues) { addVehiculo(toDto(v)); }
+  function guardarEdit(v: FormValues) { if (editVeh) updateVehiculo(editVeh.id, toDto(v)); }
 
   return (
     <div>
@@ -76,7 +86,7 @@ export default function VehiculosPage() {
       <DataTable
         title="Flota de vehículos"
         exportName="flota-vehiculos"
-        columns={[...columns, docsColumn((v) => setDocVeh(v))]}
+        columns={[...columns, accionesColumn((v) => setEditVeh(v), (v) => setDocVeh(v))]}
         rows={vehiculos}
         filters={filters}
         searchPlaceholder="Buscar por placa, marca, modelo…"
@@ -87,7 +97,19 @@ export default function VehiculosPage() {
         }
       />
 
-      <FormModal open={open} title="Nuevo vehículo" subtitle="Registra un tracto o carreta en la flota." fields={fields} onSubmit={guardar} onClose={() => setOpen(false)} />
+      <FormModal open={open} title="Nuevo vehículo" subtitle="Registra un tracto o carreta en la flota." fields={buildFields()} onSubmit={guardar} onClose={() => setOpen(false)} />
+
+      {editVeh ? (
+        <FormModal
+          open
+          title={`Editar vehículo — ${editVeh.placa}`}
+          subtitle="Modifica los datos de la unidad."
+          fields={buildFields(editVeh)}
+          submitLabel="Guardar cambios"
+          onSubmit={guardarEdit}
+          onClose={() => setEditVeh(null)}
+        />
+      ) : null}
 
       {docVeh ? (
         <DocumentosModal

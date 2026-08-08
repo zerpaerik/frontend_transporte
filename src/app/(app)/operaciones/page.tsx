@@ -29,6 +29,7 @@ const columns: Column<Viaje>[] = [
   { key: "carreta", header: "Carreta" },
   { key: "conductor", header: "Conductor", sortable: true, render: (v) => <span className="whitespace-nowrap">{v.conductor}</span> },
   { key: "cliente", header: "Cliente", sortable: true, render: (v) => <Badge tone="blue">{v.cliente}</Badge> },
+  { key: "nOrden", header: "N° Orden", sortable: true, value: (v) => v.nOrden, render: (v) => v.nOrden ? <span className="tabular whitespace-nowrap">{v.nOrden}</span> : <span className="text-slate-300">—</span> },
   { key: "operacion", header: "Op.", render: (v) => <span className="text-xs font-semibold text-slate-500">{v.operacion}</span> },
   { key: "contenedor", header: "Contenedor", sortable: true, render: (v) => <span className="tabular">{v.contenedor}</span> },
   { key: "tamanio", header: "Tam." },
@@ -36,8 +37,9 @@ const columns: Column<Viaje>[] = [
   { key: "devolucion", header: "Devolución" },
   { key: "fechaLimite", header: "F. límite", sortable: true, value: (v) => v.fechaLimite, render: (v) => <span className="tabular whitespace-nowrap">{fecha(v.fechaLimite)}</span> },
   { key: "semaforo", header: "Devolver", value: (v) => diasRestantes(v.fechaLimite), render: (v) => <Semaforo iso={v.fechaLimite} estado={v.estado} /> },
+  { key: "greRemitente", header: "N° Guía", value: (v) => v.greRemitente, render: (v) => v.greRemitente ? <span className="tabular whitespace-nowrap">{v.greRemitente}</span> : <span className="text-slate-300">—</span> },
+  { key: "facturado", header: "Facturado", value: (v) => (v.factura ? "Sí" : "No"), render: (v) => v.factura ? <Badge tone="green">Facturado · {v.factura}</Badge> : <Badge tone="amber">No facturado</Badge> },
   { key: "estado", header: "Estado", sortable: true, render: (v) => <Badge tone={estadoTone[v.estado]}>{v.estado}</Badge> },
-  { key: "factura", header: "Factura", render: (v) => v.factura ? <span className="font-medium text-emerald-600">{v.factura}</span> : <span className="text-rose-500">Pendiente</span> },
 ];
 
 const filters: Filter<Viaje>[] = [
@@ -112,7 +114,7 @@ export default function OperacionesPage() {
         columns={columns}
         rows={viajes}
         filters={filters}
-        minWidth="min-w-[1200px]"
+        minWidth="min-w-[1500px]"
         pageSize={9}
         searchPlaceholder="Buscar por contenedor, cliente, conductor…"
         toolbar={

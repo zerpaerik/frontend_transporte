@@ -34,6 +34,7 @@ interface DataCtx extends DataState {
   addFactura: (f: Omit<Factura, "id">) => Promise<void>;
   addEmpleado: (e: Omit<Empleado, "id">) => Promise<void>;
   addUsuario: (u: Omit<Usuario, "id">) => Promise<void>;
+  updateVehiculo: (id: string, body: Partial<Vehiculo>) => Promise<void>;
   reload: () => void;
 }
 
@@ -125,10 +126,26 @@ export function DataProvider({ children }: { children: ReactNode }) {
     [offline, prepend],
   );
 
+  const patchLocal = useCallback((key: keyof DataState, id: string, body: any) => {
+    setState((s) => ({ ...s, [key]: (s[key] as any[]).map((it) => (it.id === id ? { ...it, ...body } : it)) }));
+  }, []);
+
+  const updateItem = useCallback(
+    async (key: keyof DataState, path: string, id: string, body: any) => {
+      if (!getToken() || offline) { patchLocal(key, id, body); return; }
+      try {
+        const updated = await api.patch<any>(`${path}/${id}`, body);
+        setState((s) => ({ ...s, [key]: (s[key] as any[]).map((it) => (it.id === id ? updated : it)) }));
+      } catch { patchLocal(key, id, body); }
+    },
+    [offline, patchLocal],
+  );
+
   const value: DataCtx = {
     ...state,
     loading,
     offline,
+    updateVehiculo: (id, body) => updateItem("vehiculos", "/vehiculos", id, body),
     addVehiculo: (v) => add("vehiculos", "/vehiculos", v),
     addConductor: (c) => add("conductores", "/conductores", c),
     addOrden: (o) => add("ordenes", "/ordenes", o),
