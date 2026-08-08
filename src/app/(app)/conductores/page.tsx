@@ -1,9 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Plus, IdCard, Phone, AlertTriangle, Search, FileSpreadsheet, FileText, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, IdCard, Phone, AlertTriangle, Search, FileSpreadsheet, FileText, ChevronLeft, ChevronRight, FolderOpen } from "lucide-react";
 import { PageHeader, StatCard, Card, Badge } from "@/components/ui";
 import { FormModal, type Field, type FormValues } from "@/components/FormModal";
+import { DocumentosModal } from "@/components/DocumentosModal";
 import { useData } from "@/lib/store";
 import { fecha, diasRestantes, estadoDocumento } from "@/lib/format";
 import { exportCSV, exportPDF } from "@/lib/export";
@@ -20,10 +21,11 @@ const fields: Field[] = [
 const PAGE = 6;
 
 export default function ConductoresPage() {
-  const { conductores, addConductor } = useData();
+  const { conductores, addConductor, reload } = useData();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
+  const [docCond, setDocCond] = useState<any | null>(null);
 
   const docsEstados = conductores.flatMap((c) => c.documentos.map((d) => estadoDocumento(d.vencimiento)));
   const porVencer = docsEstados.filter((e) => e === "Por vencer").length;
@@ -120,6 +122,10 @@ export default function ConductoresPage() {
                 );
               })}
             </div>
+
+            <button onClick={() => setDocCond(c)} className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-600 hover:border-brand-300 hover:text-brand-600">
+              <FolderOpen size={15} /> Gestionar documentos ({c.documentos.length})
+            </button>
           </Card>
         ))}
       </div>
@@ -140,6 +146,19 @@ export default function ConductoresPage() {
       </div>
 
       <FormModal open={open} title="Nuevo conductor" subtitle="Registra al conductor con su primer documento y fecha de vencimiento." fields={fields} onSubmit={guardar} onClose={() => setOpen(false)} />
+
+      {docCond ? (
+        <DocumentosModal
+          open
+          base="conductores"
+          entityId={docCond.id}
+          title={`Documentos — ${docCond.nombre}`}
+          subtitle={`Licencia ${docCond.licencia}`}
+          documentos={docCond.documentos ?? []}
+          onChanged={(u) => setDocCond(u)}
+          onClose={() => { setDocCond(null); reload(); }}
+        />
+      ) : null}
     </div>
   );
 }

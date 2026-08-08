@@ -88,3 +88,46 @@ export async function apiGetSedes() {
 export async function apiLogin(email: string, password: string, sedeId: string) {
   return request<{ access_token: string; user: any }>("POST", "/auth/login", { email, password, sedeId });
 }
+
+// --- Tipos de operación ---
+export interface TipoOperacion { id: string; nombre: string; activo: boolean; }
+export const apiTipos = {
+  list: () => api.get<TipoOperacion[]>("/tipos-operacion"),
+  create: (nombre: string) => api.post<TipoOperacion>("/tipos-operacion", { nombre }),
+};
+
+// --- Documentos (conductores / vehículos) ---
+export interface DocumentoInput {
+  tipo: string; numero?: string; vencimiento: string;
+  archivoBase64?: string; archivoNombre?: string; archivoMime?: string;
+}
+export const apiDocs = {
+  add: (base: string, id: string, body: DocumentoInput) => api.post<any>(`/${base}/${id}/documentos`, body),
+  renovar: (base: string, id: string, docId: string, body: Partial<DocumentoInput>) => api.patch<any>(`/${base}/${id}/documentos/${docId}`, body),
+  remove: (base: string, id: string, docId: string) => api.del<any>(`/${base}/${id}/documentos/${docId}`),
+  archivo: (base: string, id: string, docId: string) => api.get<{ nombre: string; mime: string; base64: string }>(`/${base}/${id}/documentos/${docId}/archivo`),
+};
+
+export function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result).split(",")[1] ?? "");
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
+
+export function downloadBase64(nombre: string, mime: string, base64: string) {
+  const bin = atob(base64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  const blob = new Blob([bytes], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = nombre;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}

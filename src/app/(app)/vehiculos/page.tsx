@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Truck } from "lucide-react";
+import { Plus, Truck, Paperclip } from "lucide-react";
 import { PageHeader, StatCard, Badge } from "@/components/ui";
 import { DataTable, type Column, type Filter } from "@/components/DataTable";
 import { FormModal, type Field, type FormValues } from "@/components/FormModal";
+import { DocumentosModal } from "@/components/DocumentosModal";
 import { useData } from "@/lib/store";
 import { km } from "@/lib/format";
 import type { Vehiculo } from "@/lib/types";
@@ -29,14 +30,26 @@ const columns: Column<Vehiculo>[] = [
   { key: "estado", header: "Estado", sortable: true, render: (v) => <Badge tone={v.estado === "Operativo" ? "green" : v.estado === "En taller" ? "amber" : "gray"}>{v.estado}</Badge> },
 ];
 
+function docsColumn(onOpen: (v: Vehiculo) => void): Column<Vehiculo> {
+  return {
+    key: "docs", header: "Documentos",
+    render: (v) => (
+      <button onClick={() => onOpen(v)} className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:border-brand-300 hover:text-brand-600">
+        <Paperclip size={13} /> {((v as any).documentos?.length ?? 0)} doc.
+      </button>
+    ),
+  };
+}
+
 const filters: Filter<Vehiculo>[] = [
   { key: "tipo", label: "Tipo", value: (v) => v.tipo },
   { key: "estado", label: "Estado", value: (v) => v.estado },
 ];
 
 export default function VehiculosPage() {
-  const { vehiculos, addVehiculo } = useData();
+  const { vehiculos, addVehiculo, reload } = useData();
   const [open, setOpen] = useState(false);
+  const [docVeh, setDocVeh] = useState<Vehiculo | null>(null);
 
   const tractos = vehiculos.filter((v) => v.tipo === "Tracto").length;
   const carretas = vehiculos.filter((v) => v.tipo === "Carreta").length;
@@ -63,7 +76,7 @@ export default function VehiculosPage() {
       <DataTable
         title="Flota de vehículos"
         exportName="flota-vehiculos"
-        columns={columns}
+        columns={[...columns, docsColumn((v) => setDocVeh(v))]}
         rows={vehiculos}
         filters={filters}
         searchPlaceholder="Buscar por placa, marca, modelo…"
@@ -75,6 +88,19 @@ export default function VehiculosPage() {
       />
 
       <FormModal open={open} title="Nuevo vehículo" subtitle="Registra un tracto o carreta en la flota." fields={fields} onSubmit={guardar} onClose={() => setOpen(false)} />
+
+      {docVeh ? (
+        <DocumentosModal
+          open
+          base="vehiculos"
+          entityId={docVeh.id}
+          title={`Documentos — ${docVeh.placa}`}
+          subtitle={`${docVeh.marca} ${docVeh.modelo}`}
+          documentos={(docVeh as any).documentos ?? []}
+          onChanged={(u) => setDocVeh(u)}
+          onClose={() => { setDocVeh(null); reload(); }}
+        />
+      ) : null}
     </div>
   );
 }

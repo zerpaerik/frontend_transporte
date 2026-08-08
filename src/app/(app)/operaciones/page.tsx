@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { Plus, Container, ArrowDownToLine, ArrowUpFromLine } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Plus, Container, ArrowDownToLine, ArrowUpFromLine, Settings2 } from "lucide-react";
 import { PageHeader, StatCard, Badge } from "@/components/ui";
 import { DataTable, type Column, type Filter } from "@/components/DataTable";
 import { FormModal, type Field, type FormValues } from "@/components/FormModal";
 import { useData } from "@/lib/store";
+import { useAuth } from "@/lib/auth";
+import { apiTipos } from "@/lib/api";
 import { fecha, diasRestantes } from "@/lib/format";
 import type { EstadoViaje, Viaje } from "@/lib/types";
 
@@ -46,7 +48,15 @@ const filters: Filter<Viaje>[] = [
 
 export default function OperacionesPage() {
   const { viajes, vehiculos, conductores, addViaje } = useData();
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
+  const [tipoOpen, setTipoOpen] = useState(false);
+  const [tipos, setTipos] = useState<string[]>(["IMPO", "EXPO"]);
+
+  function cargarTipos() {
+    apiTipos.list().then((ts) => { if (ts.length) setTipos(ts.map((t) => t.nombre)); }).catch(() => setTipos(["IMPO", "EXPO"]));
+  }
+  useEffect(() => { cargarTipos(); }, []);
 
   const enCurso = viajes.filter((v) => v.estado === "En curso").length;
   const impo = viajes.filter((v) => v.operacion === "IMPO").length;
@@ -57,7 +67,9 @@ export default function OperacionesPage() {
     { name: "carreta", label: "Carreta", type: "select", options: vehiculos.filter((v) => v.tipo === "Carreta").map((v) => v.placa) },
     { name: "conductor", label: "Conductor", type: "select", options: conductores.map((c) => c.nombre) },
     { name: "cliente", label: "Cliente", type: "text", required: true, placeholder: "ULOG" },
-    { name: "operacion", label: "Operación", type: "select", options: ["IMPO", "EXPO"] },
+    { name: "nOrden", label: "Orden", type: "text", placeholder: "26/03000251" },
+    { name: "greRemitente", label: "Guía de remisión", type: "text", placeholder: "T001-26916" },
+    { name: "operacion", label: "Tipo de operación", type: "select", options: tipos },
     { name: "contenedor", label: "Contenedor", type: "text", required: true, placeholder: "PCIU6111486" },
     { name: "tamanio", label: "Tamaño", type: "select", options: ["20'", "40'", "40' HC"] },
     { name: "tipoCarga", label: "Tipo de carga", type: "text", default: "GRAL" },
@@ -75,8 +87,12 @@ export default function OperacionesPage() {
       operacion: v.operacion as Viaje["operacion"], contenedor: String(v.contenedor).toUpperCase(), tamanio: String(v.tamanio),
       tipoCarga: String(v.tipoCarga), horaCita: String(v.horaCita), origen: String(v.origen), destino: String(v.destino),
       devolucion: String(v.devolucion), fechaLimite: String(v.fechaLimite), estado: v.estado as Viaje["estado"],
-      nOrden: "", greRemitente: "", greTransporte: "", factura: "",
+      nOrden: String(v.nOrden || ""), greRemitente: String(v.greRemitente || ""), greTransporte: "", factura: "",
     });
+  }
+
+  async function guardarTipo(v: FormValues) {
+    try { await apiTipos.create(String(v.nombre)); cargarTipos(); } catch { /* offline demo */ }
   }
 
   return (
@@ -100,13 +116,30 @@ export default function OperacionesPage() {
         pageSize={9}
         searchPlaceholder="Buscar por contenedor, cliente, conductor…"
         toolbar={
-          <button onClick={() => setOpen(true)} className="flex items-center gap-2 rounded-lg bg-brand-500 px-3.5 py-2 text-sm font-semibold text-white hover:bg-brand-600">
-            <Plus size={16} /> Nuevo viaje
-          </button>
+          <>
+            {user?.rol === "Administrador" ? (
+              <button onClick={() => setTipoOpen(true)} className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:border-brand-300 hover:text-brand-600">
+                <Settings2 size={15} /> Tipos
+              </button>
+            ) : null}
+            <button onClick={() => setOpen(true)} className="flex items-center gap-2 rounded-lg bg-brand-500 px-3.5 py-2 text-sm font-semibold text-white hover:bg-brand-600">
+              <Plus size={16} /> Nuevo viaje
+            </button>
+          </>
         }
       />
 
       <FormModal open={open} title="Nuevo viaje / despacho" subtitle="Registra el viaje del contenedor. Los documentos (GRE, factura) se completan luego." fields={fields} onSubmit={guardar} onClose={() => setOpen(false)} />
+
+      <FormModal
+        open={tipoOpen}
+        title="Nuevo tipo de operación"
+        subtitle="Crea un tipo de operación para tu empresa (ej. IMPO, EXPO, TRÁNSITO)."
+        fields={[{ name: "nombre", label: "Nombre del tipo", type: "text", required: true, placeholder: "TRÁNSITO", full: true }]}
+        submitLabel="Crear tipo"
+        onSubmit={guardarTipo}
+        onClose={() => setTipoOpen(false)}
+      />
     </div>
   );
 }
