@@ -6,7 +6,7 @@ import { Menu, LogOut, ChevronDown } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { NAV } from "@/lib/nav";
 
-const LOGO: Record<string, string> = { mgr: "/sedes/mgr.jpg", mjg: "/sedes/mjg.jpg" };
+const LOGO: Record<string, string> = { mgr: "/sedes/mgr.jpg", mjg: "/sedes/mjg.jpg", mgrsi: "/sedes/mgr.jpg" };
 
 export function Topbar({ onMenu }: { onMenu: () => void }) {
   const { user, logout } = useAuth();

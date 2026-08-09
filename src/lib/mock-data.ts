@@ -27,6 +27,7 @@ const pad = (n: number, w = 5) => String(n).padStart(w, "0");
 export const SEDES_DEMO = [
   { id: "mgr", codigo: "mgr", nombre: "Transportes y Servicios MGR S.A.C.", ruc: "20608118153" },
   { id: "mjg", codigo: "mjg", nombre: "MJG Transportes S.A.C.", ruc: "20614975831" },
+  { id: "mgrsi", codigo: "mgrsi", nombre: "MGR Servicios Integrados S.A.C.", ruc: "20616110340" },
 ];
 
 // ---------------------------------------------------------------------------

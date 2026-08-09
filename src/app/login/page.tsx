@@ -7,7 +7,7 @@ import { useAuth } from "@/lib/auth";
 import { USUARIOS, SEDES_DEMO } from "@/lib/mock-data";
 import { apiGetSedes, type Sede } from "@/lib/api";
 
-const LOGO: Record<string, string> = { mgr: "/sedes/mgr.jpg", mjg: "/sedes/mjg.jpg" };
+const LOGO: Record<string, string> = { mgr: "/sedes/mgr.jpg", mjg: "/sedes/mjg.jpg", mgrsi: "/sedes/mgr.jpg" };
 
 export default function LoginPage() {
   const { user, ready, login } = useAuth();
