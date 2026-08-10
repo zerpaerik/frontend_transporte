@@ -1,0 +1,108 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { FolderCog, Plus, Trash2, Building2, Anchor, Tags } from "lucide-react";
+import { PageHeader, Card } from "@/components/ui";
+import { apiClientes, apiPuertos, apiTipos, type Cliente, type Puerto, type TipoOperacion } from "@/lib/api";
+
+export default function CatalogosPage() {
+  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [puertos, setPuertos] = useState<Puerto[]>([]);
+  const [tipos, setTipos] = useState<TipoOperacion[]>([]);
+  const [cNombre, setCNombre] = useState("");
+  const [cRuc, setCRuc] = useState("");
+  const [pNombre, setPNombre] = useState("");
+  const [tNombre, setTNombre] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  function cargar() {
+    apiClientes.list().then(setClientes).catch(() => setClientes([]));
+    apiPuertos.list().then(setPuertos).catch(() => setPuertos([]));
+    apiTipos.list().then(setTipos).catch(() => setTipos([]));
+  }
+  useEffect(() => { cargar(); }, []);
+
+  async function addCliente(e: React.FormEvent) {
+    e.preventDefault(); if (!cNombre.trim()) return; setBusy(true);
+    try { await apiClientes.create({ nombre: cNombre.trim(), ruc: cRuc.trim() }); setCNombre(""); setCRuc(""); cargar(); } finally { setBusy(false); }
+  }
+  async function addPuerto(e: React.FormEvent) {
+    e.preventDefault(); if (!pNombre.trim()) return; setBusy(true);
+    try { await apiPuertos.create({ nombre: pNombre.trim() }); setPNombre(""); cargar(); } finally { setBusy(false); }
+  }
+  async function addTipo(e: React.FormEvent) {
+    e.preventDefault(); if (!tNombre.trim()) return; setBusy(true);
+    try { await apiTipos.create(tNombre.trim()); setTNombre(""); cargar(); } finally { setBusy(false); }
+  }
+
+  const inp = "rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500";
+  const addBtn = "flex items-center gap-1.5 rounded-lg bg-brand-500 px-3.5 py-2 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-50";
+  const delBtn = "rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600";
+
+  return (
+    <div>
+      <PageHeader title="Catálogos" subtitle="Listas maestras que alimentan los formularios (clientes, puertos y tipos de operación)." />
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+
+        {/* Clientes */}
+        <Card className="flex flex-col p-5">
+          <div className="mb-4 flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-lg bg-steel-50 text-steel-600"><Building2 size={16} /></span><h2 className="font-bold text-slate-800">Clientes</h2><span className="ml-auto text-xs text-slate-400">{clientes.length}</span></div>
+          <form onSubmit={addCliente} className="mb-3 space-y-2">
+            <input value={cNombre} onChange={(e) => setCNombre(e.target.value)} placeholder="Nombre del cliente" className={`${inp} w-full`} />
+            <div className="flex gap-2">
+              <input value={cRuc} onChange={(e) => setCRuc(e.target.value)} placeholder="RUC" className={`${inp} flex-1`} />
+              <button type="submit" disabled={busy} className={addBtn}><Plus size={15} /></button>
+            </div>
+          </form>
+          <ul className="max-h-80 divide-y divide-slate-100 overflow-y-auto">
+            {clientes.map((c) => (
+              <li key={c.id} className="flex items-center justify-between gap-2 py-2">
+                <div className="min-w-0"><div className="truncate text-sm font-medium text-slate-800">{c.nombre}</div><div className="text-xs text-slate-400">RUC {c.ruc || "—"}</div></div>
+                <button onClick={() => { if (confirm(`¿Eliminar ${c.nombre}?`)) apiClientes.remove(c.id).then(cargar); }} className={delBtn}><Trash2 size={15} /></button>
+              </li>
+            ))}
+            {clientes.length === 0 ? <li className="py-4 text-center text-sm text-slate-400">Sin clientes</li> : null}
+          </ul>
+        </Card>
+
+        {/* Puertos */}
+        <Card className="flex flex-col p-5">
+          <div className="mb-4 flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-lg bg-brand-50 text-brand-600"><Anchor size={16} /></span><h2 className="font-bold text-slate-800">Puertos</h2><span className="ml-auto text-xs text-slate-400">{puertos.length}</span></div>
+          <form onSubmit={addPuerto} className="mb-3 flex gap-2">
+            <input value={pNombre} onChange={(e) => setPNombre(e.target.value)} placeholder="Nombre del puerto / depósito" className={`${inp} flex-1`} />
+            <button type="submit" disabled={busy} className={addBtn}><Plus size={15} /></button>
+          </form>
+          <ul className="max-h-80 divide-y divide-slate-100 overflow-y-auto">
+            {puertos.map((p) => (
+              <li key={p.id} className="flex items-center justify-between gap-2 py-2">
+                <span className="truncate text-sm font-medium text-slate-800">{p.nombre}</span>
+                <button onClick={() => { if (confirm(`¿Eliminar ${p.nombre}?`)) apiPuertos.remove(p.id).then(cargar); }} className={delBtn}><Trash2 size={15} /></button>
+              </li>
+            ))}
+            {puertos.length === 0 ? <li className="py-4 text-center text-sm text-slate-400">Sin puertos</li> : null}
+          </ul>
+        </Card>
+
+        {/* Tipos de operación */}
+        <Card className="flex flex-col p-5">
+          <div className="mb-4 flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-lg bg-amber-50 text-amber-600"><Tags size={16} /></span><h2 className="font-bold text-slate-800">Tipos de operación</h2><span className="ml-auto text-xs text-slate-400">{tipos.length}</span></div>
+          <form onSubmit={addTipo} className="mb-3 flex gap-2">
+            <input value={tNombre} onChange={(e) => setTNombre(e.target.value)} placeholder="Ej. IMPO, EXPO, Carga suelta" className={`${inp} flex-1`} />
+            <button type="submit" disabled={busy} className={addBtn}><Plus size={15} /></button>
+          </form>
+          <ul className="max-h-80 divide-y divide-slate-100 overflow-y-auto">
+            {tipos.map((t) => (
+              <li key={t.id} className="flex items-center justify-between gap-2 py-2">
+                <span className="truncate text-sm font-medium text-slate-800">{t.nombre}</span>
+                <button onClick={() => { if (confirm(`¿Eliminar ${t.nombre}?`)) apiTipos.remove(t.id).then(cargar); }} className={delBtn}><Trash2 size={15} /></button>
+              </li>
+            ))}
+            {tipos.length === 0 ? <li className="py-4 text-center text-sm text-slate-400">Sin tipos</li> : null}
+          </ul>
+        </Card>
+      </div>
+
+      <div className="mt-5 flex items-center gap-1.5 text-xs text-slate-400"><FolderCog size={12} /> Estos catálogos aparecen como opciones en el formulario de Operaciones.</div>
+    </div>
+  );
+}

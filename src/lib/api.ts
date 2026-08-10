@@ -89,12 +89,29 @@ export async function apiLogin(email: string, password: string, sedeId: string) 
   return request<{ access_token: string; user: any }>("POST", "/auth/login", { email, password, sedeId });
 }
 
-// --- Tipos de operación ---
+// --- Catálogos (menú Archivo) ---
 export interface TipoOperacion { id: string; nombre: string; activo: boolean; }
 export const apiTipos = {
   list: () => api.get<TipoOperacion[]>("/tipos-operacion"),
   create: (nombre: string) => api.post<TipoOperacion>("/tipos-operacion", { nombre }),
+  remove: (id: string) => api.del<void>(`/tipos-operacion/${id}`),
 };
+
+export interface Cliente { id: string; nombre: string; ruc: string; }
+export const apiClientes = {
+  list: () => api.get<Cliente[]>("/clientes"),
+  create: (b: { nombre: string; ruc?: string }) => api.post<Cliente>("/clientes", b),
+  remove: (id: string) => api.del<void>(`/clientes/${id}`),
+};
+
+export interface Puerto { id: string; nombre: string; }
+export const apiPuertos = {
+  list: () => api.get<Puerto[]>("/puertos"),
+  create: (b: { nombre: string }) => api.post<Puerto>("/puertos", b),
+  remove: (id: string) => api.del<void>(`/puertos/${id}`),
+};
+
+export const apiViajePorCodigo = (codigo: string) => api.get<any>(`/viajes/codigo/${encodeURIComponent(codigo)}`);
 
 // --- Comisiones / Bonos ---
 export interface Tarifa { id: string; destino: string; gral: number; imo: number; reefer: number; }

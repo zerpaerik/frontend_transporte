@@ -27,6 +27,7 @@ const alignCls = { left: "text-left", right: "text-right", center: "text-center"
 export function DataTable<T extends { id: string }>({
   title, columns, rows, filters = [], searchPlaceholder = "Buscar…",
   pageSize = 8, exportName = "export", minWidth = "min-w-[720px]", toolbar,
+  dateField, dateLabel = "Fecha",
 }: {
   title: string;
   columns: Column<T>[];
@@ -37,11 +38,15 @@ export function DataTable<T extends { id: string }>({
   exportName?: string;
   minWidth?: string;
   toolbar?: ReactNode;
+  dateField?: (row: T) => string | null | undefined;
+  dateLabel?: string;
 }) {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState<Record<string, string>>({});
   const [sort, setSort] = useState<{ key: string; dir: 1 | -1 } | null>(null);
   const [page, setPage] = useState(1);
+  const [desde, setDesde] = useState("");
+  const [hasta, setHasta] = useState("");
 
   const cellValue = (row: T, c: Column<T>): Cell =>
     c.value ? c.value(row) : ((row as Record<string, unknown>)[c.key] as Cell) ?? "";
@@ -61,11 +66,17 @@ export function DataTable<T extends { id: string }>({
         const sel = active[f.key];
         if (sel && sel !== "__all__" && f.value(r) !== sel) return false;
       }
+      if (dateField && (desde || hasta)) {
+        const d = (dateField(r) || "").slice(0, 10);
+        if (!d) return false;
+        if (desde && d < desde) return false;
+        if (hasta && d > hasta) return false;
+      }
       if (!q) return true;
       return columns.some((c) => String(cellValue(r, c)).toLowerCase().includes(q));
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, query, active, filters, columns]);
+  }, [rows, query, active, filters, columns, desde, hasta]);
 
   const sorted = useMemo(() => {
     if (!sort) return filtered;
@@ -123,6 +134,16 @@ export function DataTable<T extends { id: string }>({
             ))}
           </select>
         ))}
+
+        {dateField ? (
+          <div className="flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2 py-1 text-sm text-slate-600">
+            <span className="text-xs text-slate-400">{dateLabel}:</span>
+            <input type="date" value={desde} onChange={(e) => { setDesde(e.target.value); setPage(1); }} className="rounded border-0 text-sm outline-none" />
+            <span className="text-slate-300">→</span>
+            <input type="date" value={hasta} onChange={(e) => { setHasta(e.target.value); setPage(1); }} className="rounded border-0 text-sm outline-none" />
+            {(desde || hasta) ? <button onClick={() => { setDesde(""); setHasta(""); }} className="text-xs text-slate-400 hover:text-rose-600">✕</button> : null}
+          </div>
+        ) : null}
 
         <div className="ml-auto flex items-center gap-2">
           <button onClick={() => doExport("csv")} title="Exportar a Excel (CSV)"
