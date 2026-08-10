@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Truck, IdCard, Wrench, Package, CircleDot,
-  Container, ReceiptText, Wallet, UserCog, type LucideIcon,
+  Container, ReceiptText, Wallet, UserCog, Coins, type LucideIcon,
 } from "lucide-react";
 import type { Rol } from "./types";
 
@@ -24,6 +24,7 @@ export const NAV: NavItem[] = [
   { href: "/operaciones", label: "Operaciones", icon: Container, modulo: "06", roles: ["Administrador", "Operador"] },
   { href: "/facturacion", label: "Facturación SUNAT", icon: ReceiptText, modulo: "09", roles: ["Administrador", "Operador"] },
   { href: "/planilla", label: "Planilla", icon: Wallet, modulo: "10", roles: ["Administrador"] },
+  { href: "/comisiones", label: "Comisiones", icon: Coins, modulo: "11", roles: ["Administrador"] },
   { href: "/usuarios", label: "Usuarios", icon: UserCog, modulo: "08", roles: ["Administrador"] },
 ];
 

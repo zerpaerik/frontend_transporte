@@ -96,6 +96,20 @@ export const apiTipos = {
   create: (nombre: string) => api.post<TipoOperacion>("/tipos-operacion", { nombre }),
 };
 
+// --- Comisiones / Bonos ---
+export interface Tarifa { id: string; destino: string; gral: number; imo: number; reefer: number; }
+export interface ResumenViaje { id: string; codigo: string; destino: string; tipoCarga: string; comisionChofer: number; comisionPagada: boolean; comisionFechaPago: string | null; createdAt: string; }
+export interface ResumenChofer { conductor: string; pendiente: number; pagado: number; viajes: ResumenViaje[]; }
+export const apiComisiones = {
+  tarifario: () => api.get<Tarifa[]>("/comisiones"),
+  crearTarifa: (b: { destino: string; gral?: number; imo?: number; reefer?: number }) => api.post<Tarifa>("/comisiones", b),
+  actualizarTarifa: (id: string, b: Partial<Tarifa>) => api.patch<Tarifa>(`/comisiones/${id}`, b),
+  borrarTarifa: (id: string) => api.del<void>(`/comisiones/${id}`),
+  resumen: () => api.get<ResumenChofer[]>("/comisiones/resumen"),
+  pagarViaje: (viajeId: string) => api.post<any>(`/comisiones/pagar/${viajeId}`, {}),
+  pagarConductor: (conductor: string) => api.post<{ pagados: number }>("/comisiones/pagar-conductor", { conductor }),
+};
+
 // --- Documentos (conductores / vehículos) ---
 export interface DocumentoInput {
   tipo: string; numero?: string; vencimiento: string;
