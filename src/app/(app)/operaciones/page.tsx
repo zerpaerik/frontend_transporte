@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Container, ArrowDownToLine, ArrowUpFromLine, Settings2 } from "lucide-react";
+import { Plus, Container, ArrowDownToLine, ArrowUpFromLine, Settings2, FileText } from "lucide-react";
 import Link from "next/link";
 import { PageHeader, StatCard, Badge } from "@/components/ui";
 import { DataTable, type Column, type Filter } from "@/components/DataTable";
@@ -9,7 +9,8 @@ import { FormModal, type Field, type FormValues } from "@/components/FormModal";
 import { useData } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { apiTipos, apiClientes, apiPuertos } from "@/lib/api";
-import { fecha, diasRestantes } from "@/lib/format";
+import { exportPDF } from "@/lib/export";
+import { fecha, diasRestantes, soles } from "@/lib/format";
 import type { EstadoViaje, Viaje } from "@/lib/types";
 
 const estadoTone: Record<EstadoViaje, "gray" | "blue" | "green" | "orange"> = {
@@ -52,6 +53,48 @@ const filters: Filter<Viaje>[] = [
   { key: "estado", label: "Estado", value: (v) => v.estado },
   { key: "cliente", label: "Cliente", value: (v) => v.cliente },
 ];
+
+// Genera un PDF con la ficha completa del viaje (todos los campos registrados).
+function fichaViajePDF(v: Viaje) {
+  const a = v as any;
+  const rows: [string, string][] = [
+    ["Código", a.codigo || "—"],
+    ["Fecha de registro", fecha((a.createdAt || "").slice(0, 10))],
+    ["Estado", v.estado],
+    ["Tracto", v.placaTracto],
+    ["Carreta", v.carreta || "—"],
+    ["Conductor", v.conductor || "—"],
+    ["Cliente", v.cliente],
+    ["RUC", a.clienteRuc || "—"],
+    ["Tipo de operación", v.operacion],
+    ["Tipo de carga", v.tipoCarga || "—"],
+    ["Contenedor", v.contenedor],
+    ["Tamaño", v.tamanio || "—"],
+    ["Origen", v.origen || "—"],
+    ["Destino", v.destino || "—"],
+    ["Punto de devolución", v.devolucion || "—"],
+    ["Ubicación", a.ubicacion || "—"],
+    ["Hora de cita", v.horaCita || "—"],
+    ["Fecha límite devolución", v.fechaLimite ? fecha(v.fechaLimite) : "—"],
+    ["N° Orden", v.nOrden || "—"],
+    ["Guía de remisión", v.greRemitente || "—"],
+    ["Factura", v.factura || "—"],
+    ["Comisión del chofer", soles(a.comisionChofer || 0)],
+  ];
+  exportPDF(`Registro de viaje ${a.codigo || ""}`.trim(), ["Campo", "Valor"], rows, `${v.cliente} · ${v.contenedor}`);
+}
+
+function accionesColumn(): Column<Viaje> {
+  return {
+    key: "acciones", header: "",
+    render: (v) => (
+      <button onClick={() => fichaViajePDF(v)} title="Ver / descargar PDF del viaje"
+        className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:border-brand-300 hover:text-brand-600">
+        <FileText size={13} /> PDF
+      </button>
+    ),
+  };
+}
 
 export default function OperacionesPage() {
   const { viajes, vehiculos, conductores, addViaje } = useData();
@@ -133,7 +176,7 @@ export default function OperacionesPage() {
       <DataTable
         title="Operaciones y despachos"
         exportName="operaciones-despachos"
-        columns={columns}
+        columns={[...columns, accionesColumn()]}
         rows={viajes}
         filters={filters}
         dateField={(v) => (v as any).createdAt}
