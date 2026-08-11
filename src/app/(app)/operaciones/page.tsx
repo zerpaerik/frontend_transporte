@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Container, ArrowDownToLine, ArrowUpFromLine, Settings2, FileText } from "lucide-react";
+import { Plus, Container, ArrowDownToLine, ArrowUpFromLine, Settings2, FileText, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { PageHeader, StatCard, Badge } from "@/components/ui";
 import { DataTable, type Column, type Filter } from "@/components/DataTable";
 import { FormModal, type Field, type FormValues } from "@/components/FormModal";
 import { useData } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
-import { apiTipos, apiClientes, apiPuertos } from "@/lib/api";
+import { apiTipos, apiClientes, apiPuertos, apiComisiones } from "@/lib/api";
 import { exportPDF } from "@/lib/export";
 import { fecha, diasRestantes, soles } from "@/lib/format";
 import type { EstadoViaje, Viaje } from "@/lib/types";
@@ -29,6 +29,7 @@ function Semaforo({ iso, estado }: { iso?: string; estado: EstadoViaje }) {
 
 const columns: Column<Viaje>[] = [
   { key: "codigo", header: "Código", sortable: true, render: (v) => <span className="font-semibold text-brand-700">{(v as any).codigo || "—"}</span> },
+  { key: "registro", header: "Registro", sortable: true, value: (v) => (v as any).createdAt || "", render: (v) => <span className="tabular whitespace-nowrap text-slate-500">{fecha(((v as any).createdAt || "").slice(0, 10))}</span> },
   { key: "placaTracto", header: "Tracto", sortable: true, render: (v) => <span className="font-semibold text-slate-900">{v.placaTracto}</span> },
   { key: "conductor", header: "Conductor", sortable: true, render: (v) => <span className="whitespace-nowrap">{v.conductor || "—"}</span> },
   { key: "cliente", header: "Cliente", sortable: true, render: (v) => <Badge tone="blue">{v.cliente}</Badge> },
@@ -45,7 +46,6 @@ const columns: Column<Viaje>[] = [
   { key: "greRemitente", header: "N° Guía", value: (v) => v.greRemitente, render: (v) => v.greRemitente ? <span className="tabular whitespace-nowrap">{v.greRemitente}</span> : <span className="text-slate-300">—</span> },
   { key: "facturado", header: "Facturado", value: (v) => (v.factura ? "Sí" : "No"), render: (v) => v.factura ? <Badge tone="green">Facturado · {v.factura}</Badge> : <Badge tone="amber">No facturado</Badge> },
   { key: "estado", header: "Estado", sortable: true, render: (v) => <Badge tone={estadoTone[v.estado]}>{v.estado}</Badge> },
-  { key: "registro", header: "Registro", sortable: true, value: (v) => (v as any).createdAt || "", render: (v) => <span className="tabular whitespace-nowrap text-slate-500">{fecha(((v as any).createdAt || "").slice(0, 10))}</span> },
 ];
 
 const filters: Filter<Viaje>[] = [
@@ -84,33 +84,46 @@ function fichaViajePDF(v: Viaje) {
   exportPDF(`Registro de viaje ${a.codigo || ""}`.trim(), ["Campo", "Valor"], rows, `${v.cliente} · ${v.contenedor}`);
 }
 
-function accionesColumn(): Column<Viaje> {
+function accionesColumn(onDelete: (v: Viaje) => void): Column<Viaje> {
   return {
     key: "acciones", header: "",
     render: (v) => (
-      <button onClick={() => fichaViajePDF(v)} title="Ver / descargar PDF del viaje"
-        className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:border-brand-300 hover:text-brand-600">
-        <FileText size={13} /> PDF
-      </button>
+      <div className="flex items-center gap-1.5">
+        <button onClick={() => fichaViajePDF(v)} title="Ver / descargar PDF del viaje"
+          className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:border-brand-300 hover:text-brand-600">
+          <FileText size={13} /> PDF
+        </button>
+        <button onClick={() => onDelete(v)} title="Eliminar viaje"
+          className="rounded-md border border-slate-200 p-1.5 text-slate-500 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-600">
+          <Trash2 size={13} />
+        </button>
+      </div>
     ),
   };
 }
 
 export default function OperacionesPage() {
-  const { viajes, vehiculos, conductores, addViaje } = useData();
+  const { viajes, vehiculos, conductores, addViaje, removeViaje } = useData();
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [tipoOpen, setTipoOpen] = useState(false);
   const [tipos, setTipos] = useState<string[]>(["IMPO", "EXPO"]);
   const [clientes, setClientes] = useState<string[]>([]);
   const [puertos, setPuertos] = useState<string[]>([]);
+  const [distritos, setDistritos] = useState<string[]>([]);
 
   function cargarCatalogos() {
     apiTipos.list().then((ts) => { if (ts.length) setTipos(ts.map((t) => t.nombre)); }).catch(() => {});
     apiClientes.list().then((cs) => setClientes(cs.map((c) => c.nombre))).catch(() => {});
     apiPuertos.list().then((ps) => setPuertos(ps.map((p) => p.nombre))).catch(() => {});
+    apiComisiones.tarifario().then((ts) => setDistritos(ts.map((t) => t.destino))).catch(() => {});
   }
   useEffect(() => { cargarCatalogos(); }, []);
+
+  function eliminarViaje(v: Viaje) {
+    const cod = (v as any).codigo || v.contenedor;
+    if (confirm(`¿Eliminar el viaje ${cod}? Esta acción no se puede deshacer.`)) removeViaje(v.id);
+  }
 
   const enCurso = viajes.filter((v) => v.estado === "En curso").length;
   const impo = viajes.filter((v) => v.operacion === "IMPO").length;
@@ -132,7 +145,7 @@ export default function OperacionesPage() {
     { name: "tamanio", label: "Tamaño", type: "select", options: ["", "20'", "40'", "40' HC"] },
     { name: "horaCita", label: "Hora de cita", type: "text", placeholder: "08:00" },
     { name: "origen", label: "Origen (puerto)", type: "select", options: puertoOpts },
-    { name: "destino", label: "Destino (distrito)", type: "text", placeholder: "Cercado de Lima" },
+    { name: "destino", label: "Destino (distrito)", type: "select", options: distritos.length ? ["", ...distritos] : [""] },
     { name: "devolucion", label: "Punto de devolución", type: "select", options: puertoOpts },
     { name: "ubicacion", label: "Ubicación", type: "text", full: true, placeholder: "Referencia / dirección de entrega" },
     { name: "fechaLimite", label: "Fecha límite devolución (opcional)", type: "date" },
@@ -176,7 +189,7 @@ export default function OperacionesPage() {
       <DataTable
         title="Operaciones y despachos"
         exportName="operaciones-despachos"
-        columns={[...columns, accionesColumn()]}
+        columns={[...columns, accionesColumn(eliminarViaje)]}
         rows={viajes}
         filters={filters}
         dateField={(v) => (v as any).createdAt}

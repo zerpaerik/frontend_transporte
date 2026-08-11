@@ -97,10 +97,10 @@ export const apiTipos = {
   remove: (id: string) => api.del<void>(`/tipos-operacion/${id}`),
 };
 
-export interface Cliente { id: string; nombre: string; ruc: string; }
+export interface Cliente { id: string; nombre: string; ruc: string; email?: string; telefono?: string; contacto?: string; }
 export const apiClientes = {
   list: () => api.get<Cliente[]>("/clientes"),
-  create: (b: { nombre: string; ruc?: string }) => api.post<Cliente>("/clientes", b),
+  create: (b: { nombre: string; ruc?: string; email?: string; telefono?: string; contacto?: string }) => api.post<Cliente>("/clientes", b),
   remove: (id: string) => api.del<void>(`/clientes/${id}`),
 };
 

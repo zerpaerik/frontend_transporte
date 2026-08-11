@@ -11,6 +11,9 @@ export default function CatalogosPage() {
   const [tipos, setTipos] = useState<TipoOperacion[]>([]);
   const [cNombre, setCNombre] = useState("");
   const [cRuc, setCRuc] = useState("");
+  const [cEmail, setCEmail] = useState("");
+  const [cTel, setCTel] = useState("");
+  const [cContacto, setCContacto] = useState("");
   const [pNombre, setPNombre] = useState("");
   const [tNombre, setTNombre] = useState("");
   const [busy, setBusy] = useState(false);
@@ -24,7 +27,10 @@ export default function CatalogosPage() {
 
   async function addCliente(e: React.FormEvent) {
     e.preventDefault(); if (!cNombre.trim()) return; setBusy(true);
-    try { await apiClientes.create({ nombre: cNombre.trim(), ruc: cRuc.trim() }); setCNombre(""); setCRuc(""); cargar(); } finally { setBusy(false); }
+    try {
+      await apiClientes.create({ nombre: cNombre.trim(), ruc: cRuc.trim(), email: cEmail.trim(), telefono: cTel.trim(), contacto: cContacto.trim() });
+      setCNombre(""); setCRuc(""); setCEmail(""); setCTel(""); setCContacto(""); cargar();
+    } finally { setBusy(false); }
   }
   async function addPuerto(e: React.FormEvent) {
     e.preventDefault(); if (!pNombre.trim()) return; setBusy(true);
@@ -49,15 +55,22 @@ export default function CatalogosPage() {
           <div className="mb-4 flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-lg bg-steel-50 text-steel-600"><Building2 size={16} /></span><h2 className="font-bold text-slate-800">Clientes</h2><span className="ml-auto text-xs text-slate-400">{clientes.length}</span></div>
           <form onSubmit={addCliente} className="mb-3 space-y-2">
             <input value={cNombre} onChange={(e) => setCNombre(e.target.value)} placeholder="Nombre del cliente" className={`${inp} w-full`} />
+            <input value={cRuc} onChange={(e) => setCRuc(e.target.value)} placeholder="RUC" className={`${inp} w-full`} />
+            <input value={cEmail} onChange={(e) => setCEmail(e.target.value)} placeholder="Correo" className={`${inp} w-full`} />
             <div className="flex gap-2">
-              <input value={cRuc} onChange={(e) => setCRuc(e.target.value)} placeholder="RUC" className={`${inp} flex-1`} />
+              <input value={cTel} onChange={(e) => setCTel(e.target.value)} placeholder="Teléfono" className={`${inp} w-28`} />
+              <input value={cContacto} onChange={(e) => setCContacto(e.target.value)} placeholder="Persona de contacto" className={`${inp} flex-1`} />
               <button type="submit" disabled={busy} className={addBtn}><Plus size={15} /></button>
             </div>
           </form>
           <ul className="max-h-80 divide-y divide-slate-100 overflow-y-auto">
             {clientes.map((c) => (
-              <li key={c.id} className="flex items-center justify-between gap-2 py-2">
-                <div className="min-w-0"><div className="truncate text-sm font-medium text-slate-800">{c.nombre}</div><div className="text-xs text-slate-400">RUC {c.ruc || "—"}</div></div>
+              <li key={c.id} className="flex items-start justify-between gap-2 py-2">
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-medium text-slate-800">{c.nombre}</div>
+                  <div className="text-xs text-slate-400">RUC {c.ruc || "—"}{c.contacto ? ` · ${c.contacto}` : ""}</div>
+                  {(c.telefono || c.email) ? <div className="truncate text-xs text-slate-400">{[c.telefono, c.email].filter(Boolean).join(" · ")}</div> : null}
+                </div>
                 <button onClick={() => { if (confirm(`¿Eliminar ${c.nombre}?`)) apiClientes.remove(c.id).then(cargar); }} className={delBtn}><Trash2 size={15} /></button>
               </li>
             ))}

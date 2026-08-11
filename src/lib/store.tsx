@@ -35,6 +35,7 @@ interface DataCtx extends DataState {
   addEmpleado: (e: Omit<Empleado, "id">) => Promise<void>;
   addUsuario: (u: Omit<Usuario, "id">) => Promise<void>;
   updateVehiculo: (id: string, body: Partial<Vehiculo>) => Promise<void>;
+  removeViaje: (id: string) => Promise<void>;
   reload: () => void;
 }
 
@@ -141,11 +142,21 @@ export function DataProvider({ children }: { children: ReactNode }) {
     [offline, patchLocal],
   );
 
+  const removeItem = useCallback(
+    async (key: keyof DataState, path: string, id: string) => {
+      const del = () => setState((s) => ({ ...s, [key]: (s[key] as any[]).filter((it) => it.id !== id) }));
+      if (!getToken() || offline) { del(); return; }
+      try { await api.del(`${path}/${id}`); del(); } catch { del(); }
+    },
+    [offline],
+  );
+
   const value: DataCtx = {
     ...state,
     loading,
     offline,
     updateVehiculo: (id, body) => updateItem("vehiculos", "/vehiculos", id, body),
+    removeViaje: (id) => removeItem("viajes", "/viajes", id),
     addVehiculo: (v) => add("vehiculos", "/vehiculos", v),
     addConductor: (c) => add("conductores", "/conductores", c),
     addOrden: (o) => add("ordenes", "/ordenes", o),
