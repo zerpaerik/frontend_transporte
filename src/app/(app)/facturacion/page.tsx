@@ -33,7 +33,7 @@ const filters: Filter<Factura>[] = [
   { key: "cliente", label: "Cliente", value: (f) => f.cliente },
 ];
 
-interface Prefill { cliente?: string; ruc?: string; viaje?: string; }
+interface Prefill { cliente?: string; ruc?: string; viaje?: string; direccion?: string; }
 
 export default function FacturacionPage() {
   const { facturas, viajes, addFactura } = useData();
@@ -51,6 +51,7 @@ export default function FacturacionPage() {
     { name: "tipo", label: "Tipo de comprobante", type: "select", options: ["Factura", "Boleta", "N. Crédito"] },
     { name: "cliente", label: "Cliente", type: "text", required: true, placeholder: "ULOG", default: prefill.cliente },
     { name: "ruc", label: "RUC", type: "text", placeholder: "20512345671", default: prefill.ruc },
+    { name: "direccion", label: "Dirección", type: "text", full: true, placeholder: "Dirección fiscal del cliente", default: prefill.direccion },
     { name: "fecha", label: "Fecha de emisión", type: "date", required: true },
     { name: "viaje", label: "Contenedor / viaje", type: "select", options: ["-", ...viajes.map((v) => v.contenedor)], default: prefill.viaje },
     { name: "monto", label: "Monto neto (S/)", type: "number", default: 0 },
@@ -60,7 +61,7 @@ export default function FacturacionPage() {
   function guardar(v: FormValues) {
     const monto = Number(v.monto);
     addFactura({
-      serie: String(v.serie), tipo: v.tipo as Factura["tipo"], cliente: String(v.cliente), ruc: String(v.ruc) || "-",
+      serie: String(v.serie), tipo: v.tipo as Factura["tipo"], cliente: String(v.cliente), ruc: String(v.ruc) || "-", direccion: String(v.direccion || ""),
       fecha: String(v.fecha), viaje: String(v.viaje), monto, igv: Math.round(monto * 0.18 * 100) / 100, estadoSunat: v.estadoSunat as Factura["estadoSunat"],
     });
   }
@@ -70,7 +71,7 @@ export default function FacturacionPage() {
     setLookMsg("");
     try {
       const v = await apiViajePorCodigo(codigo.trim());
-      setPrefill({ cliente: v.cliente, ruc: v.clienteRuc || "", viaje: v.contenedor });
+      setPrefill({ cliente: v.cliente, ruc: v.clienteRuc || "", viaje: v.contenedor, direccion: v.clienteDireccion || "" });
       setOpen(true);
       setCodigo("");
     } catch {

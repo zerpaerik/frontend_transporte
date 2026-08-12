@@ -1,16 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Container, ArrowDownToLine, ArrowUpFromLine, Settings2, FileText, Trash2 } from "lucide-react";
+import { Plus, Container, ArrowDownToLine, ArrowUpFromLine, Settings2, FileText, Trash2, Pencil } from "lucide-react";
 import Link from "next/link";
 import { PageHeader, StatCard, Badge } from "@/components/ui";
 import { DataTable, type Column, type Filter } from "@/components/DataTable";
 import { FormModal, type Field, type FormValues } from "@/components/FormModal";
+import { TicketViaje } from "@/components/TicketViaje";
 import { useData } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { apiTipos, apiClientes, apiPuertos, apiComisiones } from "@/lib/api";
-import { exportPDF } from "@/lib/export";
-import { fecha, diasRestantes, soles } from "@/lib/format";
+import { fecha, diasRestantes } from "@/lib/format";
 import type { EstadoViaje, Viaje } from "@/lib/types";
 
 const estadoTone: Record<EstadoViaje, "gray" | "blue" | "green" | "orange"> = {
@@ -54,44 +54,18 @@ const filters: Filter<Viaje>[] = [
   { key: "cliente", label: "Cliente", value: (v) => v.cliente },
 ];
 
-// Genera un PDF con la ficha completa del viaje (todos los campos registrados).
-function fichaViajePDF(v: Viaje) {
-  const a = v as any;
-  const rows: [string, string][] = [
-    ["Código", a.codigo || "—"],
-    ["Fecha de registro", fecha((a.createdAt || "").slice(0, 10))],
-    ["Estado", v.estado],
-    ["Tracto", v.placaTracto],
-    ["Carreta", v.carreta || "—"],
-    ["Conductor", v.conductor || "—"],
-    ["Cliente", v.cliente],
-    ["RUC", a.clienteRuc || "—"],
-    ["Tipo de operación", v.operacion],
-    ["Tipo de carga", v.tipoCarga || "—"],
-    ["Contenedor", v.contenedor],
-    ["Tamaño", v.tamanio || "—"],
-    ["Origen", v.origen || "—"],
-    ["Destino", v.destino || "—"],
-    ["Punto de devolución", v.devolucion || "—"],
-    ["Ubicación", a.ubicacion || "—"],
-    ["Hora de cita", v.horaCita || "—"],
-    ["Fecha límite devolución", v.fechaLimite ? fecha(v.fechaLimite) : "—"],
-    ["N° Orden", v.nOrden || "—"],
-    ["Guía de remisión", v.greRemitente || "—"],
-    ["Factura", v.factura || "—"],
-    ["Comisión del chofer", soles(a.comisionChofer || 0)],
-  ];
-  exportPDF(`Registro de viaje ${a.codigo || ""}`.trim(), ["Campo", "Valor"], rows, `${v.cliente} · ${v.contenedor}`);
-}
-
-function accionesColumn(onDelete: (v: Viaje) => void): Column<Viaje> {
+function accionesColumn(onTicket: (v: Viaje) => void, onEdit: (v: Viaje) => void, onDelete: (v: Viaje) => void): Column<Viaje> {
   return {
     key: "acciones", header: "",
     render: (v) => (
       <div className="flex items-center gap-1.5">
-        <button onClick={() => fichaViajePDF(v)} title="Ver / descargar PDF del viaje"
+        <button onClick={() => onTicket(v)} title="Ver ticket / PDF / WhatsApp"
           className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:border-brand-300 hover:text-brand-600">
-          <FileText size={13} /> PDF
+          <FileText size={13} /> Ticket
+        </button>
+        <button onClick={() => onEdit(v)} title="Editar viaje"
+          className="rounded-md border border-slate-200 p-1.5 text-slate-500 hover:border-brand-300 hover:text-brand-600">
+          <Pencil size={13} />
         </button>
         <button onClick={() => onDelete(v)} title="Eliminar viaje"
           className="rounded-md border border-slate-200 p-1.5 text-slate-500 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-600">
@@ -103,10 +77,12 @@ function accionesColumn(onDelete: (v: Viaje) => void): Column<Viaje> {
 }
 
 export default function OperacionesPage() {
-  const { viajes, vehiculos, conductores, addViaje, removeViaje } = useData();
+  const { viajes, vehiculos, conductores, addViaje, updateViaje, removeViaje } = useData();
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [tipoOpen, setTipoOpen] = useState(false);
+  const [editViaje, setEditViaje] = useState<Viaje | null>(null);
+  const [ticketViaje, setTicketViaje] = useState<Viaje | null>(null);
   const [tipos, setTipos] = useState<string[]>(["IMPO", "EXPO"]);
   const [clientes, setClientes] = useState<string[]>([]);
   const [puertos, setPuertos] = useState<string[]>([]);
@@ -129,41 +105,51 @@ export default function OperacionesPage() {
   const impo = viajes.filter((v) => v.operacion === "IMPO").length;
   const expo = viajes.filter((v) => v.operacion === "EXPO").length;
 
-  const clienteOpts = clientes;
   const puertoOpts = ["", ...puertos];
+  const distritoOpts = distritos.length ? ["", ...distritos] : [""];
 
-  const fields: Field[] = [
-    { name: "placaTracto", label: "Placa tracto", type: "select", options: vehiculos.filter((v) => v.tipo === "Tracto").map((v) => v.placa) },
-    { name: "carreta", label: "Carreta", type: "select", options: ["", ...vehiculos.filter((v) => v.tipo === "Carreta").map((v) => v.placa)] },
-    { name: "conductor", label: "Conductor", type: "select", options: ["", ...conductores.map((c) => c.nombre)] },
-    { name: "cliente", label: "Cliente", type: "select", options: clienteOpts, required: true },
-    { name: "nOrden", label: "Orden", type: "text", placeholder: "26/03000251" },
-    { name: "greRemitente", label: "Guía de remisión", type: "text", placeholder: "T001-26916" },
-    { name: "operacion", label: "Tipo de operación", type: "select", options: tipos },
-    { name: "contenedor", label: "Contenedor", type: "text", required: true, placeholder: "PCIU6111486 (o S/N en carga suelta)" },
-    { name: "tipoCarga", label: "Tipo de carga", type: "select", options: ["GENERAL", "IMO", "REEFER"] },
-    { name: "tamanio", label: "Tamaño", type: "select", options: ["", "20'", "40'", "40' HC"] },
-    { name: "horaCita", label: "Hora de cita", type: "text", placeholder: "08:00" },
-    { name: "origen", label: "Origen (puerto)", type: "select", options: puertoOpts },
-    { name: "destino", label: "Destino (distrito)", type: "select", options: distritos.length ? ["", ...distritos] : [""] },
-    { name: "devolucion", label: "Punto de devolución", type: "select", options: puertoOpts },
-    { name: "ubicacion", label: "Ubicación", type: "text", full: true, placeholder: "Referencia / dirección de entrega" },
-    { name: "fechaLimite", label: "Fecha límite devolución (opcional)", type: "date" },
-    { name: "estado", label: "Estado", type: "select", options: ["Programado", "En curso", "Culminado", "Devuelto"] },
-  ];
+  // Campos del viaje. En "carga suelta", origen y punto de devolución pasan a texto libre.
+  const buildFields = (vals: Record<string, string>, v?: any): Field[] => {
+    const suelta = String(vals.operacion || "").toLowerCase().includes("suelta");
+    const g = (k: string, fallback = "") => (v ? (v[k] ?? fallback) : fallback);
+    return [
+      { name: "placaTracto", label: "Placa tracto", type: "select", options: vehiculos.filter((x) => x.tipo === "Tracto").map((x) => x.placa), default: g("placaTracto") },
+      { name: "carreta", label: "Carreta", type: "select", options: ["", ...vehiculos.filter((x) => x.tipo === "Carreta").map((x) => x.placa)], default: g("carreta") },
+      { name: "conductor", label: "Conductor", type: "select", options: ["", ...conductores.map((c) => c.nombre)], default: g("conductor") },
+      { name: "cliente", label: "Cliente", type: "select", options: clientes, required: true, default: g("cliente") },
+      { name: "nOrden", label: "Orden", type: "text", placeholder: "26/03000251", default: g("nOrden") },
+      { name: "greRemitente", label: "Guía de remisión", type: "text", placeholder: "T001-26916", default: g("greRemitente") },
+      { name: "operacion", label: "Tipo de operación", type: "select", options: tipos, default: g("operacion", tipos[0]) },
+      { name: "contenedor", label: "Contenedor", type: "text", required: true, placeholder: "PCIU6111486 (o S/N en carga suelta)", default: g("contenedor") },
+      { name: "tipoCarga", label: "Tipo de carga", type: "select", options: ["GENERAL", "IMO", "REEFER"], default: g("tipoCarga", "GENERAL") },
+      { name: "tamanio", label: "Tamaño", type: "select", options: ["", "20'", "40'", "40' HC"], default: g("tamanio") },
+      { name: "horaCita", label: "Hora de cita", type: "text", placeholder: "08:00", default: g("horaCita") },
+      suelta
+        ? { name: "origen", label: "Origen (texto libre)", type: "text", placeholder: "Escribe el origen", default: g("origen") }
+        : { name: "origen", label: "Origen (puerto)", type: "select", options: puertoOpts, default: g("origen") },
+      { name: "destino", label: "Destino (distrito)", type: "select", options: distritoOpts, default: g("destino") },
+      suelta
+        ? { name: "devolucion", label: "Punto de devolución (texto libre)", type: "text", placeholder: "Escribe el punto de devolución", default: g("devolucion") }
+        : { name: "devolucion", label: "Punto de devolución", type: "select", options: puertoOpts, default: g("devolucion") },
+      { name: "ubicacion", label: "Ubicación", type: "text", full: true, placeholder: "Dirección / link de Maps de la entrega", default: g("ubicacion") },
+      { name: "fechaLimite", label: "Fecha límite devolución (opcional)", type: "date", default: g("fechaLimite") },
+      { name: "estado", label: "Estado", type: "select", options: ["Programado", "En curso", "Culminado", "Devuelto"], default: g("estado", "Programado") },
+    ];
+  };
 
-  function guardar(v: FormValues) {
+  function toBody(v: FormValues) {
     const body: any = {
       placaTracto: String(v.placaTracto), carreta: String(v.carreta || ""), conductor: String(v.conductor || ""), cliente: String(v.cliente),
       operacion: String(v.operacion), contenedor: String(v.contenedor).toUpperCase(), tamanio: String(v.tamanio || ""),
       tipoCarga: String(v.tipoCarga || "GENERAL"), horaCita: String(v.horaCita || ""), origen: String(v.origen || ""),
       destino: String(v.destino || ""), devolucion: String(v.devolucion || ""), ubicacion: String(v.ubicacion || ""),
       estado: String(v.estado || "Programado"), nOrden: String(v.nOrden || ""), greRemitente: String(v.greRemitente || ""),
-      greTransporte: "", factura: "",
+      fechaLimite: v.fechaLimite ? String(v.fechaLimite) : undefined,
     };
-    if (v.fechaLimite) body.fechaLimite = String(v.fechaLimite);
-    addViaje(body);
+    return body;
   }
+  function guardar(v: FormValues) { addViaje({ ...toBody(v), greTransporte: "", factura: "" }); }
+  function guardarEdit(v: FormValues) { if (editViaje) updateViaje(editViaje.id, toBody(v)); }
 
   async function guardarTipo(v: FormValues) {
     try { await apiTipos.create(String(v.nombre)); cargarCatalogos(); } catch { /* offline demo */ }
@@ -189,7 +175,7 @@ export default function OperacionesPage() {
       <DataTable
         title="Operaciones y despachos"
         exportName="operaciones-despachos"
-        columns={[...columns, accionesColumn(eliminarViaje)]}
+        columns={[...columns, accionesColumn(setTicketViaje, setEditViaje, eliminarViaje)]}
         rows={viajes}
         filters={filters}
         dateField={(v) => (v as any).createdAt}
@@ -211,7 +197,19 @@ export default function OperacionesPage() {
         }
       />
 
-      <FormModal open={open} title="Nuevo viaje / despacho" subtitle="En carga suelta, origen y punto de devolución pueden quedar en blanco." fields={fields} onSubmit={guardar} onClose={() => setOpen(false)} />
+      <FormModal open={open} title="Nuevo viaje / despacho" subtitle="En carga suelta, origen y punto de devolución se escriben libremente." fields={(vals) => buildFields(vals)} onSubmit={guardar} onClose={() => setOpen(false)} />
+
+      {editViaje ? (
+        <FormModal
+          open
+          title={`Editar viaje — ${(editViaje as any).codigo || editViaje.contenedor}`}
+          subtitle="Actualiza los datos del viaje (p. ej. la fecha de devolución cuando ya se conozca)."
+          fields={(vals) => buildFields(vals, editViaje)}
+          submitLabel="Guardar cambios"
+          onSubmit={guardarEdit}
+          onClose={() => setEditViaje(null)}
+        />
+      ) : null}
 
       <FormModal
         open={tipoOpen}
@@ -222,6 +220,8 @@ export default function OperacionesPage() {
         onSubmit={guardarTipo}
         onClose={() => setTipoOpen(false)}
       />
+
+      {ticketViaje ? <TicketViaje viaje={ticketViaje} onClose={() => setTicketViaje(null)} /> : null}
     </div>
   );
 }

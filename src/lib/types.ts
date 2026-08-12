@@ -111,6 +111,7 @@ export interface Factura {
   tipo: "Factura" | "Boleta" | "N. Crédito";
   cliente: string;
   ruc: string;
+  direccion?: string;
   fecha: string;
   viaje: string;
   monto: number;

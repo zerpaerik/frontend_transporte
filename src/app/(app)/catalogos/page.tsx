@@ -14,6 +14,7 @@ export default function CatalogosPage() {
   const [cEmail, setCEmail] = useState("");
   const [cTel, setCTel] = useState("");
   const [cContacto, setCContacto] = useState("");
+  const [cDireccion, setCDireccion] = useState("");
   const [pNombre, setPNombre] = useState("");
   const [tNombre, setTNombre] = useState("");
   const [busy, setBusy] = useState(false);
@@ -28,8 +29,8 @@ export default function CatalogosPage() {
   async function addCliente(e: React.FormEvent) {
     e.preventDefault(); if (!cNombre.trim()) return; setBusy(true);
     try {
-      await apiClientes.create({ nombre: cNombre.trim(), ruc: cRuc.trim(), email: cEmail.trim(), telefono: cTel.trim(), contacto: cContacto.trim() });
-      setCNombre(""); setCRuc(""); setCEmail(""); setCTel(""); setCContacto(""); cargar();
+      await apiClientes.create({ nombre: cNombre.trim(), ruc: cRuc.trim(), email: cEmail.trim(), telefono: cTel.trim(), contacto: cContacto.trim(), direccion: cDireccion.trim() });
+      setCNombre(""); setCRuc(""); setCEmail(""); setCTel(""); setCContacto(""); setCDireccion(""); cargar();
     } finally { setBusy(false); }
   }
   async function addPuerto(e: React.FormEvent) {
@@ -57,6 +58,7 @@ export default function CatalogosPage() {
             <input value={cNombre} onChange={(e) => setCNombre(e.target.value)} placeholder="Nombre del cliente" className={`${inp} w-full`} />
             <input value={cRuc} onChange={(e) => setCRuc(e.target.value)} placeholder="RUC" className={`${inp} w-full`} />
             <input value={cEmail} onChange={(e) => setCEmail(e.target.value)} placeholder="Correo" className={`${inp} w-full`} />
+            <input value={cDireccion} onChange={(e) => setCDireccion(e.target.value)} placeholder="Dirección (para facturar)" className={`${inp} w-full`} />
             <div className="flex gap-2">
               <input value={cTel} onChange={(e) => setCTel(e.target.value)} placeholder="Teléfono" className={`${inp} w-28`} />
               <input value={cContacto} onChange={(e) => setCContacto(e.target.value)} placeholder="Persona de contacto" className={`${inp} flex-1`} />
@@ -70,6 +72,7 @@ export default function CatalogosPage() {
                   <div className="truncate text-sm font-medium text-slate-800">{c.nombre}</div>
                   <div className="text-xs text-slate-400">RUC {c.ruc || "—"}{c.contacto ? ` · ${c.contacto}` : ""}</div>
                   {(c.telefono || c.email) ? <div className="truncate text-xs text-slate-400">{[c.telefono, c.email].filter(Boolean).join(" · ")}</div> : null}
+                  {c.direccion ? <div className="truncate text-xs text-slate-400">📍 {c.direccion}</div> : null}
                 </div>
                 <button onClick={() => { if (confirm(`¿Eliminar ${c.nombre}?`)) apiClientes.remove(c.id).then(cargar); }} className={delBtn}><Trash2 size={15} /></button>
               </li>

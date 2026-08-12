@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Coins, Wallet, Users, Check, ChevronDown, ChevronRight, Plus, Trash2, Save } from "lucide-react";
+import { Coins, Wallet, Users, Check, ChevronDown, ChevronRight, Plus, Trash2, Save, FileText } from "lucide-react";
 import { PageHeader, StatCard, Card, Badge } from "@/components/ui";
 import { apiComisiones, type Tarifa, type ResumenChofer } from "@/lib/api";
+import { exportPDF } from "@/lib/export";
 import { soles, fecha } from "@/lib/format";
 
 export default function ComisionesPage() {
@@ -26,6 +27,15 @@ export default function ComisionesPage() {
 
   const totalPendiente = resumen.reduce((s, r) => s + r.pendiente, 0);
   const totalPagado = resumen.reduce((s, r) => s + r.pagado, 0);
+
+  function liquidacionPDF(r: ResumenChofer) {
+    const headers = ["Fecha", "Viaje", "Origen", "Destino", "Tipo carga", "Monto", "Estado"];
+    const rows: (string | number)[][] = r.viajes.map((v) => [
+      fecha((v.createdAt || "").slice(0, 10)), v.codigo || "—", v.origen || "—", v.destino || "—", v.tipoCarga || "—", soles(v.comisionChofer), v.comisionPagada ? "Pagado" : "Pendiente",
+    ]);
+    rows.push(["", "", "", "", "TOTAL", soles(r.pendiente + r.pagado), ""]);
+    exportPDF(`Liquidación de comisiones — ${r.conductor}`, headers, rows, `Pendiente ${soles(r.pendiente)} · Pagado ${soles(r.pagado)}`);
+  }
 
   async function pagarChofer(conductor: string) {
     if (!confirm(`¿Marcar como pagadas todas las comisiones pendientes de ${conductor}?`)) return;
@@ -96,6 +106,10 @@ export default function ComisionesPage() {
                     <div className="text-xs text-slate-400">Pagado</div>
                     <div className="text-sm font-semibold tabular text-emerald-600">{soles(r.pagado)}</div>
                   </div>
+                  <button onClick={() => liquidacionPDF(r)} title="Descargar liquidación (PDF)"
+                    className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:border-brand-300 hover:text-brand-600">
+                    <FileText size={14} /> PDF
+                  </button>
                   <button disabled={busy || r.pendiente <= 0} onClick={() => pagarChofer(r.conductor)}
                     className="rounded-lg bg-brand-500 px-3.5 py-2 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-40">
                     Pagar pendiente

@@ -97,10 +97,10 @@ export const apiTipos = {
   remove: (id: string) => api.del<void>(`/tipos-operacion/${id}`),
 };
 
-export interface Cliente { id: string; nombre: string; ruc: string; email?: string; telefono?: string; contacto?: string; }
+export interface Cliente { id: string; nombre: string; ruc: string; email?: string; telefono?: string; contacto?: string; direccion?: string; }
 export const apiClientes = {
   list: () => api.get<Cliente[]>("/clientes"),
-  create: (b: { nombre: string; ruc?: string; email?: string; telefono?: string; contacto?: string }) => api.post<Cliente>("/clientes", b),
+  create: (b: { nombre: string; ruc?: string; email?: string; telefono?: string; contacto?: string; direccion?: string }) => api.post<Cliente>("/clientes", b),
   remove: (id: string) => api.del<void>(`/clientes/${id}`),
 };
 
@@ -115,7 +115,7 @@ export const apiViajePorCodigo = (codigo: string) => api.get<any>(`/viajes/codig
 
 // --- Comisiones / Bonos ---
 export interface Tarifa { id: string; destino: string; gral: number; imo: number; reefer: number; }
-export interface ResumenViaje { id: string; codigo: string; destino: string; tipoCarga: string; comisionChofer: number; comisionPagada: boolean; comisionFechaPago: string | null; createdAt: string; }
+export interface ResumenViaje { id: string; codigo: string; origen: string; destino: string; tipoCarga: string; comisionChofer: number; comisionPagada: boolean; comisionFechaPago: string | null; createdAt: string; }
 export interface ResumenChofer { conductor: string; pendiente: number; pagado: number; viajes: ResumenViaje[]; }
 export const apiComisiones = {
   tarifario: () => api.get<Tarifa[]>("/comisiones"),

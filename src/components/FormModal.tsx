@@ -25,17 +25,18 @@ export function FormModal({
   open: boolean;
   title: string;
   subtitle?: string;
-  fields: Field[];
+  fields: Field[] | ((values: Record<string, string>) => Field[]);
   submitLabel?: string;
   onSubmit: (values: FormValues) => void;
   onClose: () => void;
 }) {
-  const [values, setValues] = useState<Record<string, string>>(() => initial(fields));
+  const resolve = (vals: Record<string, string>) => (typeof fields === "function" ? fields(vals) : fields);
+  const [values, setValues] = useState<Record<string, string>>(() => initial(resolve({})));
   const [error, setError] = useState("");
 
   useEffect(() => {
     if (open) {
-      setValues(initial(fields));
+      setValues(initial(resolve({})));
       setError("");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -43,20 +44,23 @@ export function FormModal({
 
   if (!open) return null;
 
+  const flds = resolve(values);
+
   function set(name: string, v: string) {
     setValues((s) => ({ ...s, [name]: v }));
   }
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    for (const f of fields) {
+    const current = resolve(values);
+    for (const f of current) {
       if (f.required && !String(values[f.name] ?? "").trim()) {
         setError(`El campo "${f.label}" es obligatorio.`);
         return;
       }
     }
     const out: FormValues = {};
-    for (const f of fields) {
+    for (const f of current) {
       const raw = values[f.name] ?? "";
       out[f.name] = f.type === "number" ? Number(raw || 0) : raw;
     }
@@ -79,7 +83,7 @@ export function FormModal({
 
         <form onSubmit={submit}>
           <div className="grid grid-cols-1 gap-4 px-6 py-5 sm:grid-cols-2">
-            {fields.map((f) => (
+            {flds.map((f) => (
               <div key={f.name} className={f.full ? "sm:col-span-2" : ""}>
                 <label className="mb-1 block text-sm font-medium text-slate-700">
                   {f.label} {f.required ? <span className="text-brand-600">*</span> : null}

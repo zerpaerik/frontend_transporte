@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Plus, IdCard, Phone, AlertTriangle, Search, FileSpreadsheet, FileText, ChevronLeft, ChevronRight, FolderOpen } from "lucide-react";
+import { Plus, IdCard, Phone, AlertTriangle, Search, FileSpreadsheet, FileText, ChevronLeft, ChevronRight, FolderOpen, Pencil } from "lucide-react";
 import { PageHeader, StatCard, Card, Badge } from "@/components/ui";
 import { FormModal, type Field, type FormValues } from "@/components/FormModal";
 import { DocumentosModal } from "@/components/DocumentosModal";
@@ -21,11 +21,22 @@ const fields: Field[] = [
 const PAGE = 6;
 
 export default function ConductoresPage() {
-  const { conductores, addConductor, reload } = useData();
+  const { conductores, addConductor, updateConductor, reload } = useData();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [docCond, setDocCond] = useState<any | null>(null);
+  const [editCond, setEditCond] = useState<any | null>(null);
+
+  const editFields = (c: any): Field[] => [
+    { name: "nombre", label: "Nombre completo", type: "text", required: true, full: true, default: c?.nombre },
+    { name: "licencia", label: "N° de licencia", type: "text", required: true, default: c?.licencia },
+    { name: "categoria", label: "Categoría", type: "select", options: ["A-IIIC", "A-IIIB", "A-IIIA", "A-IIB"], default: c?.categoria },
+    { name: "telefono", label: "Teléfono", type: "text", default: c?.telefono },
+  ];
+  function guardarEdit(v: FormValues) {
+    if (editCond) updateConductor(editCond.id, { nombre: String(v.nombre), licencia: String(v.licencia), categoria: String(v.categoria), telefono: String(v.telefono) });
+  }
 
   const docsEstados = conductores.flatMap((c) => c.documentos.map((d) => estadoDocumento(d.vencimiento)));
   const porVencer = docsEstados.filter((e) => e === "Por vencer").length;
@@ -99,9 +110,14 @@ export default function ConductoresPage() {
                   <div className="text-xs text-slate-500">Licencia {c.licencia} · Cat. {c.categoria}</div>
                 </div>
               </div>
-              <a href={`tel:${c.telefono.replace(/\s/g, "")}`} className="flex items-center gap-1 text-xs text-slate-500 hover:text-brand-600">
-                <Phone size={13} /> {c.telefono}
-              </a>
+              <div className="flex items-center gap-2">
+                <a href={`tel:${c.telefono.replace(/\s/g, "")}`} className="flex items-center gap-1 text-xs text-slate-500 hover:text-brand-600">
+                  <Phone size={13} /> {c.telefono}
+                </a>
+                <button onClick={() => setEditCond(c)} title="Editar conductor" className="rounded-md border border-slate-200 p-1.5 text-slate-500 hover:border-brand-300 hover:text-brand-600">
+                  <Pencil size={13} />
+                </button>
+              </div>
             </div>
 
             <div className="mt-4 space-y-2">
@@ -146,6 +162,10 @@ export default function ConductoresPage() {
       </div>
 
       <FormModal open={open} title="Nuevo conductor" subtitle="Registra al conductor con su primer documento y fecha de vencimiento." fields={fields} onSubmit={guardar} onClose={() => setOpen(false)} />
+
+      {editCond ? (
+        <FormModal open title={`Editar conductor — ${editCond.nombre}`} subtitle="Modifica los datos del conductor." fields={editFields(editCond)} submitLabel="Guardar cambios" onSubmit={guardarEdit} onClose={() => setEditCond(null)} />
+      ) : null}
 
       {docCond ? (
         <DocumentosModal

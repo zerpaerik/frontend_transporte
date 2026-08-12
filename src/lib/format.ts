@@ -1,8 +1,8 @@
 import type { EstadoDocumento } from "./types";
 
-// Fecha de referencia del demo. Los datos de ejemplo giran alrededor de
-// esta fecha para que las alertas de vencimiento/devolución sean coherentes.
-export const HOY = new Date("2026-08-03T12:00:00");
+// Fecha de referencia = hoy (tiempo real), para que las alertas de vencimiento
+// y devolución reflejen la situación actual.
+export const HOY = new Date();
 
 export function soles(n: number): string {
   return "S/ " + n.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -23,7 +23,7 @@ export function diasRestantes(iso: string): number {
   return Math.round((d.getTime() - HOY.getTime()) / 86_400_000);
 }
 
-export function estadoDocumento(iso: string, umbral = 20): EstadoDocumento {
+export function estadoDocumento(iso: string, umbral = 30): EstadoDocumento {
   const dias = diasRestantes(iso);
   if (dias < 0) return "Vencido";
   if (dias <= umbral) return "Por vencer";
