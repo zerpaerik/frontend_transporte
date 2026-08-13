@@ -33,7 +33,7 @@ const filters: Filter<Factura>[] = [
   { key: "cliente", label: "Cliente", value: (f) => f.cliente },
 ];
 
-interface Prefill { cliente?: string; ruc?: string; viaje?: string; direccion?: string; }
+interface Prefill { cliente?: string; ruc?: string; viaje?: string; direccion?: string; monto?: number; }
 
 export default function FacturacionPage() {
   const { facturas, viajes, addFactura } = useData();
@@ -54,7 +54,7 @@ export default function FacturacionPage() {
     { name: "direccion", label: "Dirección", type: "text", full: true, placeholder: "Dirección fiscal del cliente", default: prefill.direccion },
     { name: "fecha", label: "Fecha de emisión", type: "date", required: true },
     { name: "viaje", label: "Contenedor / viaje", type: "select", options: ["-", ...viajes.map((v) => v.contenedor)], default: prefill.viaje },
-    { name: "monto", label: "Monto neto (S/)", type: "number", default: 0 },
+    { name: "monto", label: "Monto neto (S/)", type: "number", default: prefill.monto ?? 0 },
     { name: "estadoSunat", label: "Estado SUNAT", type: "select", options: ["Emitida", "Aceptada", "Pagada", "Anulada"] },
   ];
 
@@ -71,7 +71,7 @@ export default function FacturacionPage() {
     setLookMsg("");
     try {
       const v = await apiViajePorCodigo(codigo.trim());
-      setPrefill({ cliente: v.cliente, ruc: v.clienteRuc || "", viaje: v.contenedor, direccion: v.clienteDireccion || "" });
+      setPrefill({ cliente: v.cliente, ruc: v.clienteRuc || "", viaje: v.contenedor, direccion: v.clienteDireccion || "", monto: v.tarifa || 0 });
       setOpen(true);
       setCodigo("");
     } catch {

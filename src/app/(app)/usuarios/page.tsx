@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, UserCog } from "lucide-react";
+import { Plus, UserCog, Trash2 } from "lucide-react";
 import { PageHeader, StatCard, Badge } from "@/components/ui";
 import { DataTable, type Column, type Filter } from "@/components/DataTable";
 import { FormModal, type Field, type FormValues } from "@/components/FormModal";
 import { useData } from "@/lib/store";
+import { useAuth } from "@/lib/auth";
 import type { Rol, Usuario } from "@/lib/types";
 
 const rolTone: Record<Rol, "orange" | "blue" | "gray"> = {
@@ -33,7 +34,8 @@ const filters: Filter<Usuario>[] = [
 ];
 
 export default function UsuariosPage() {
-  const { usuarios, addUsuario } = useData();
+  const { usuarios, addUsuario, removeUsuario } = useData();
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
 
   function guardar(v: FormValues) {
@@ -42,6 +44,20 @@ export default function UsuariosPage() {
       rol: v.rol as Rol, activo: v.estado === "Activo",
     });
   }
+
+  const accionesColumn: Column<Usuario> = {
+    key: "acciones", header: "",
+    render: (u) => (
+      u.email === user?.email ? (
+        <span className="text-xs text-slate-300">tu cuenta</span>
+      ) : (
+        <button onClick={() => { if (confirm(`¿Eliminar al usuario ${u.nombre} (${u.email})?`)) removeUsuario(u.id); }}
+          title="Eliminar usuario" className="rounded-md border border-slate-200 p-1.5 text-slate-500 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-600">
+          <Trash2 size={14} />
+        </button>
+      )
+    ),
+  };
 
   return (
     <div>
@@ -56,7 +72,7 @@ export default function UsuariosPage() {
       <DataTable
         title="Usuarios del sistema"
         exportName="usuarios"
-        columns={columns}
+        columns={[...columns, accionesColumn]}
         rows={usuarios}
         filters={filters}
         minWidth="min-w-[720px]"

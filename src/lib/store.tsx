@@ -38,6 +38,7 @@ interface DataCtx extends DataState {
   updateConductor: (id: string, body: Partial<Conductor>) => Promise<void>;
   updateViaje: (id: string, body: Partial<Viaje>) => Promise<void>;
   removeViaje: (id: string) => Promise<void>;
+  removeUsuario: (id: string) => Promise<void>;
   reload: () => void;
 }
 
@@ -161,6 +162,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     updateConductor: (id, body) => updateItem("conductores", "/conductores", id, body),
     updateViaje: (id, body) => updateItem("viajes", "/viajes", id, body),
     removeViaje: (id) => removeItem("viajes", "/viajes", id),
+    removeUsuario: (id) => removeItem("usuarios", "/usuarios", id),
     addVehiculo: (v) => add("vehiculos", "/vehiculos", v),
     addConductor: (c) => add("conductores", "/conductores", c),
     addOrden: (o) => add("ordenes", "/ordenes", o),

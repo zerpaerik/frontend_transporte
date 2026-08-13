@@ -36,6 +36,7 @@ export function TicketViaje({ viaje, onClose }: { viaje: any; onClose: () => voi
     ["Fecha límite devolución", v.fechaLimite ? fecha(v.fechaLimite) : "—"],
     ["N° Orden", v.nOrden || "—"],
     ["Guía de remisión", v.greRemitente || "—"],
+    ["Tarifa", soles(v.tarifa || 0)],
   ];
 
   const texto = [
