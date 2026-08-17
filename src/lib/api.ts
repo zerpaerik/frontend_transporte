@@ -127,6 +127,46 @@ export const apiComisiones = {
   pagarConductor: (conductor: string) => api.post<{ pagados: number }>("/comisiones/pagar-conductor", { conductor }),
 };
 
+// --- Planilla semanal por conductor ---
+export interface PlanillaLinea {
+  id?: string;
+  fecha: string;
+  cliente: string;
+  origen: string;
+  destino: string;
+  sueldoDia: number;
+  comision: number;
+  viaticos: number;
+  concepto: string;
+  viajeId: string;
+  orden: number;
+}
+export interface Planilla {
+  id: string;
+  conductor: string;
+  semanaDesde: string;
+  semanaHasta: string;
+  sueldoDia: number;
+  descuentoPlanilla: number;
+  estado: "Borrador" | "Generada" | "Pagada";
+  lineas: PlanillaLinea[];
+  totalSueldo: number;
+  totalComision: number;
+  totalViaticos: number;
+  totalPagar: number;
+  aDepositar: number;
+}
+export const apiPlanillas = {
+  config: () => api.get<{ sueldoDia: number }>("/planillas/config"),
+  setConfig: (sueldoDia: number) => api.patch<{ sueldoDia: number }>("/planillas/config", { sueldoDia }),
+  list: () => api.get<Planilla[]>("/planillas"),
+  get: (id: string) => api.get<Planilla>(`/planillas/${id}`),
+  generar: (b: { conductor: string; semanaDesde: string; semanaHasta: string }) => api.post<Planilla>("/planillas/generar", b),
+  update: (id: string, b: Partial<{ sueldoDia: number; descuentoPlanilla: number; estado: string; lineas: PlanillaLinea[] }>) => api.patch<Planilla>(`/planillas/${id}`, b),
+  pagar: (id: string) => api.post<Planilla>(`/planillas/${id}/pagar`, {}),
+  remove: (id: string) => api.del<void>(`/planillas/${id}`),
+};
+
 // --- Documentos (conductores / vehículos) ---
 export interface DocumentoInput {
   tipo: string; numero?: string; vencimiento: string;

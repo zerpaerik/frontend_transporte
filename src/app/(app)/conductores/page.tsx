@@ -14,6 +14,7 @@ const fields: Field[] = [
   { name: "licencia", label: "N° de licencia", type: "text", required: true, placeholder: "Q40128761" },
   { name: "categoria", label: "Categoría", type: "select", options: ["A-IIIC", "A-IIIB", "A-IIIA", "A-IIB"] },
   { name: "telefono", label: "Teléfono", type: "text", placeholder: "987 654 321" },
+  { name: "descuentoMensual", label: "Descuento de planilla mensual (S/)", type: "number", default: 0 },
   { name: "docTipo", label: "Documento inicial", type: "select", options: ["Licencia de conducir", "Certificado MTC", "Examen médico", "SCTR"] },
   { name: "docVencimiento", label: "Vence el", type: "date", required: true },
 ];
@@ -33,9 +34,10 @@ export default function ConductoresPage() {
     { name: "licencia", label: "N° de licencia", type: "text", required: true, default: c?.licencia },
     { name: "categoria", label: "Categoría", type: "select", options: ["A-IIIC", "A-IIIB", "A-IIIA", "A-IIB"], default: c?.categoria },
     { name: "telefono", label: "Teléfono", type: "text", default: c?.telefono },
+    { name: "descuentoMensual", label: "Descuento de planilla mensual (S/)", type: "number", default: c?.descuentoMensual ?? 0 },
   ];
   function guardarEdit(v: FormValues) {
-    if (editCond) updateConductor(editCond.id, { nombre: String(v.nombre), licencia: String(v.licencia), categoria: String(v.categoria), telefono: String(v.telefono) });
+    if (editCond) updateConductor(editCond.id, { nombre: String(v.nombre), licencia: String(v.licencia), categoria: String(v.categoria), telefono: String(v.telefono), descuentoMensual: Number(v.descuentoMensual) });
   }
 
   const docsEstados = conductores.flatMap((c) => c.documentos.map((d) => estadoDocumento(d.vencimiento)));
@@ -54,7 +56,7 @@ export default function ConductoresPage() {
 
   function guardar(v: FormValues) {
     addConductor({
-      nombre: String(v.nombre), licencia: String(v.licencia), categoria: String(v.categoria), telefono: String(v.telefono),
+      nombre: String(v.nombre), licencia: String(v.licencia), categoria: String(v.categoria), telefono: String(v.telefono), descuentoMensual: Number(v.descuentoMensual),
       documentos: [{ tipo: String(v.docTipo), numero: String(v.licencia), vencimiento: String(v.docVencimiento) }],
     });
   }

@@ -36,6 +36,7 @@ export interface Conductor {
   licencia: string;
   categoria: string;
   telefono: string;
+  descuentoMensual?: number;
   documentos: DocumentoConductor[];
 }
 
