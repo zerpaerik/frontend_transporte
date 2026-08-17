@@ -122,9 +122,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
       try {
         const created = await api.post<any>(path, body);
         prepend(key, created);
-      } catch {
-        // Si falla el POST, refleja localmente para no perder la acción en demo.
-        prepend(key, { ...body, id: newId() });
+      } catch (e) {
+        const err = e as ApiError;
+        if (err?.network) {
+          // Backend no disponible → refleja localmente (modo demo offline).
+          prepend(key, { ...body, id: newId() });
+        } else if (typeof window !== "undefined") {
+          // El backend respondió con un error (p. ej. placa duplicada): avisar y NO agregar.
+          alert(err?.message || "No se pudo guardar el registro.");
+        }
       }
     },
     [offline, prepend],
