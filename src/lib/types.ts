@@ -78,6 +78,7 @@ export interface Neumatico {
   costo: number;
   tienda: string;
   estado: "Nuevo" | "En uso" | "Para rotar" | "Reencauche" | "Descartado";
+  createdAt?: string;
 }
 
 export type EstadoViaje = "Programado" | "En curso" | "Culminado" | "Devuelto";

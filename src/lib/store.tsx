@@ -37,8 +37,14 @@ interface DataCtx extends DataState {
   updateVehiculo: (id: string, body: Partial<Vehiculo>) => Promise<void>;
   updateConductor: (id: string, body: Partial<Conductor>) => Promise<void>;
   updateViaje: (id: string, body: Partial<Viaje>) => Promise<void>;
+  updateOrden: (id: string, body: Partial<OrdenTrabajo>) => Promise<void>;
+  updateRepuesto: (id: string, body: Partial<Repuesto>) => Promise<void>;
+  updateNeumatico: (id: string, body: Partial<Neumatico>) => Promise<void>;
   removeViaje: (id: string) => Promise<void>;
   removeUsuario: (id: string) => Promise<void>;
+  removeOrden: (id: string) => Promise<void>;
+  removeRepuesto: (id: string) => Promise<void>;
+  removeNeumatico: (id: string) => Promise<void>;
   reload: () => void;
 }
 
@@ -167,8 +173,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
     updateVehiculo: (id, body) => updateItem("vehiculos", "/vehiculos", id, body),
     updateConductor: (id, body) => updateItem("conductores", "/conductores", id, body),
     updateViaje: (id, body) => updateItem("viajes", "/viajes", id, body),
+    updateOrden: (id, body) => updateItem("ordenes", "/ordenes", id, body),
+    updateRepuesto: (id, body) => updateItem("repuestos", "/repuestos", id, body),
+    updateNeumatico: (id, body) => updateItem("neumaticos", "/neumaticos", id, body),
     removeViaje: (id) => removeItem("viajes", "/viajes", id),
     removeUsuario: (id) => removeItem("usuarios", "/usuarios", id),
+    removeOrden: (id) => removeItem("ordenes", "/ordenes", id),
+    removeRepuesto: (id) => removeItem("repuestos", "/repuestos", id),
+    removeNeumatico: (id) => removeItem("neumaticos", "/neumaticos", id),
     addVehiculo: (v) => add("vehiculos", "/vehiculos", v),
     addConductor: (c) => add("conductores", "/conductores", c),
     addOrden: (o) => add("ordenes", "/ordenes", o),

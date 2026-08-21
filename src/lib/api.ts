@@ -94,6 +94,7 @@ export interface TipoOperacion { id: string; nombre: string; activo: boolean; }
 export const apiTipos = {
   list: () => api.get<TipoOperacion[]>("/tipos-operacion"),
   create: (nombre: string) => api.post<TipoOperacion>("/tipos-operacion", { nombre }),
+  update: (id: string, nombre: string) => api.patch<TipoOperacion>(`/tipos-operacion/${id}`, { nombre }),
   remove: (id: string) => api.del<void>(`/tipos-operacion/${id}`),
 };
 
@@ -101,6 +102,7 @@ export interface Cliente { id: string; nombre: string; ruc: string; email?: stri
 export const apiClientes = {
   list: () => api.get<Cliente[]>("/clientes"),
   create: (b: { nombre: string; ruc?: string; email?: string; telefono?: string; contacto?: string; direccion?: string }) => api.post<Cliente>("/clientes", b),
+  update: (id: string, b: Partial<{ nombre: string; ruc: string; email: string; telefono: string; contacto: string; direccion: string }>) => api.patch<Cliente>(`/clientes/${id}`, b),
   remove: (id: string) => api.del<void>(`/clientes/${id}`),
 };
 
@@ -108,6 +110,7 @@ export interface Puerto { id: string; nombre: string; }
 export const apiPuertos = {
   list: () => api.get<Puerto[]>("/puertos"),
   create: (b: { nombre: string }) => api.post<Puerto>("/puertos", b),
+  update: (id: string, nombre: string) => api.patch<Puerto>(`/puertos/${id}`, { nombre }),
   remove: (id: string) => api.del<void>(`/puertos/${id}`),
 };
 

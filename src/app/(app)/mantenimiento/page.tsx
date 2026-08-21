@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Wrench } from "lucide-react";
+import { Plus, Wrench, Pencil, Trash2 } from "lucide-react";
 import { PageHeader, StatCard, Badge } from "@/components/ui";
 import { DataTable, type Column, type Filter } from "@/components/DataTable";
 import { FormModal, type Field, type FormValues } from "@/components/FormModal";
@@ -30,29 +30,32 @@ const filters: Filter<OrdenTrabajo>[] = [
 ];
 
 export default function MantenimientoPage() {
-  const { ordenes, vehiculos, conductores, addOrden } = useData();
+  const { ordenes, vehiculos, conductores, addOrden, updateOrden, removeOrden } = useData();
   const [open, setOpen] = useState(false);
+  const [edit, setEdit] = useState<OrdenTrabajo | null>(null);
 
   const abiertas = ordenes.filter((o) => o.estado !== "Cerrada").length;
   const gasto = ordenes.reduce((s, o) => s + o.costo, 0);
 
-  const fields: Field[] = [
-    { name: "fecha", label: "Fecha", type: "date", required: true },
-    { name: "placa", label: "Vehículo", type: "select", options: vehiculos.filter((v) => v.tipo === "Tracto").map((v) => v.placa) },
-    { name: "tipo", label: "Tipo de mantenimiento", type: "select", options: ["Preventivo", "Correctivo", "Predictivo"] },
-    { name: "descripcion", label: "Detalle técnico (falla / diagnóstico / solución)", type: "text", required: true, full: true, placeholder: "Cambio de pastillas y discos de freno" },
-    { name: "responsable", label: "Responsable (mecánico o taller)", type: "text", placeholder: "Taller Diesel Pro" },
-    { name: "conductor", label: "Conductor asignado", type: "select", options: conductores.map((c) => c.nombre) },
-    { name: "costo", label: "Costo (S/)", type: "number", default: 0 },
-    { name: "estado", label: "Estado", type: "select", options: ["Abierta", "En proceso", "Cerrada"] },
+  const fieldsFor = (o?: OrdenTrabajo): Field[] => [
+    { name: "fecha", label: "Fecha", type: "date", required: true, default: o?.fecha },
+    { name: "placa", label: "Vehículo", type: "select", options: vehiculos.filter((v) => v.tipo === "Tracto").map((v) => v.placa), default: o?.placa },
+    { name: "tipo", label: "Tipo de mantenimiento", type: "select", options: ["Preventivo", "Correctivo", "Predictivo"], default: o?.tipo },
+    { name: "descripcion", label: "Detalle técnico (falla / diagnóstico / solución)", type: "text", required: true, full: true, placeholder: "Cambio de pastillas y discos de freno", default: o?.descripcion },
+    { name: "responsable", label: "Responsable (mecánico o taller)", type: "text", placeholder: "Taller Diesel Pro", default: o?.responsable },
+    { name: "conductor", label: "Conductor asignado", type: "select", options: conductores.map((c) => c.nombre), default: o?.conductor },
+    { name: "costo", label: "Costo (S/)", type: "number", default: o?.costo ?? 0 },
+    { name: "estado", label: "Estado", type: "select", options: ["Abierta", "En proceso", "Cerrada"], default: o?.estado },
   ];
 
-  function guardar(v: FormValues) {
-    addOrden({
+  function toBody(v: FormValues) {
+    return {
       fecha: String(v.fecha), placa: String(v.placa), tipo: v.tipo as OrdenTrabajo["tipo"], descripcion: String(v.descripcion),
       responsable: String(v.responsable), conductor: String(v.conductor), costo: Number(v.costo), estado: v.estado as OrdenTrabajo["estado"],
-    });
+    };
   }
+  function guardar(v: FormValues) { addOrden(toBody(v)); }
+  function guardarEdit(v: FormValues) { if (edit) updateOrden(edit.id, toBody(v)); }
 
   return (
     <div>
@@ -70,8 +73,16 @@ export default function MantenimientoPage() {
         columns={columns}
         rows={ordenes}
         filters={filters}
+        dateField={(o) => o.fecha}
+        dateLabel="Fecha"
         minWidth="min-w-[900px]"
         searchPlaceholder="Buscar por placa, descripción, responsable…"
+        rowActions={(o) => (
+          <div className="flex items-center justify-end gap-1">
+            <button onClick={() => setEdit(o)} title="Editar" className="rounded-md p-1.5 text-slate-400 hover:bg-steel-50 hover:text-steel-600"><Pencil size={15} /></button>
+            <button onClick={() => { if (confirm(`¿Eliminar la orden de ${o.placa} (${fecha(o.fecha)})?`)) removeOrden(o.id); }} title="Eliminar" className="rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"><Trash2 size={15} /></button>
+          </div>
+        )}
         toolbar={
           <button onClick={() => setOpen(true)} className="flex items-center gap-2 rounded-lg bg-brand-500 px-3.5 py-2 text-sm font-semibold text-white hover:bg-brand-600">
             <Plus size={16} /> Nueva orden
@@ -79,7 +90,8 @@ export default function MantenimientoPage() {
         }
       />
 
-      <FormModal open={open} title="Nueva orden de trabajo" subtitle="Registra una reparación o mantenimiento con su costo y responsable." fields={fields} onSubmit={guardar} onClose={() => setOpen(false)} />
+      <FormModal open={open} title="Nueva orden de trabajo" subtitle="Registra una reparación o mantenimiento con su costo y responsable." fields={fieldsFor()} onSubmit={guardar} onClose={() => setOpen(false)} />
+      {edit ? <FormModal open title={`Editar orden — ${edit.placa}`} subtitle="Corrige los datos de la orden de trabajo." fields={fieldsFor(edit)} submitLabel="Guardar cambios" onSubmit={guardarEdit} onClose={() => setEdit(null)} /> : null}
     </div>
   );
 }

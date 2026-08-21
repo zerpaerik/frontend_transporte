@@ -14,6 +14,8 @@ function initial(fields: Field[]): Record<string, string> {
   const o: Record<string, string> = {};
   for (const f of fields) {
     if (f.type === "select") o[f.name] = f.default ?? f.options[0] ?? "";
+    // Los numéricos en 0 arrancan vacíos para no mostrar el "0" antes del número.
+    else if (f.type === "number") o[f.name] = f.default != null && f.default !== 0 ? String(f.default) : "";
     else o[f.name] = f.default != null ? String(f.default) : "";
   }
   return o;

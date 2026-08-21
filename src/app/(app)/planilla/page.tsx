@@ -27,6 +27,8 @@ function semanaActual() {
 type Draft = { lineas: PlanillaLinea[]; descuentoPlanilla: number };
 
 const num = (v: string) => Number(v.replace(",", ".") || 0);
+// Muestra vacío cuando el valor es 0, para que no aparezca el "0" antes del número.
+const dv = (n: number) => (n ? String(n) : "");
 
 export default function PlanillaPage() {
   const { conductores } = useData();
@@ -101,7 +103,11 @@ export default function PlanillaPage() {
     if (!sel) return;
     setBusy(true);
     try {
-      const lineas = draft.lineas.map((l, i) => ({ ...l, orden: i }));
+      const lineas = draft.lineas.map((l, i) => ({
+        fecha: l.fecha, cliente: l.cliente, origen: l.origen, destino: l.destino,
+        sueldoDia: l.sueldoDia, comision: l.comision, viaticos: l.viaticos,
+        concepto: l.concepto, viajeId: l.viajeId, orden: i,
+      }));
       const p = await apiPlanillas.update(sel.id, { descuentoPlanilla: draft.descuentoPlanilla, lineas });
       setPlanillas((s) => s.map((x) => (x.id === p.id ? p : x)));
       setSel(p);
@@ -204,9 +210,9 @@ export default function PlanillaPage() {
                     <td className="px-3 py-2"><input disabled={bloqueada} value={l.origen} onChange={(e) => setLinea(i, { origen: e.target.value })} className="w-28 rounded-md border border-slate-200 px-2 py-1 text-sm outline-none focus:border-brand-500 disabled:bg-slate-50" /></td>
                     <td className="px-3 py-2"><input disabled={bloqueada} value={l.destino} onChange={(e) => setLinea(i, { destino: e.target.value })} className="w-32 rounded-md border border-slate-200 px-2 py-1 text-sm outline-none focus:border-brand-500 disabled:bg-slate-50" /></td>
                     <td className="px-3 py-2"><input disabled={bloqueada} value={l.concepto} placeholder="Mantenimiento…" onChange={(e) => setLinea(i, { concepto: e.target.value })} className="w-32 rounded-md border border-slate-200 px-2 py-1 text-sm outline-none focus:border-brand-500 disabled:bg-slate-50" /></td>
-                    <td className="px-3 py-2 text-right"><input type="number" step="any" disabled={bloqueada} value={l.sueldoDia} onChange={(e) => setLinea(i, { sueldoDia: num(e.target.value) })} className="w-24 rounded-md border border-slate-200 px-2 py-1 text-right text-sm tabular outline-none focus:border-brand-500 disabled:bg-slate-50" /></td>
-                    <td className="px-3 py-2 text-right"><input type="number" step="any" disabled={bloqueada} value={l.comision} onChange={(e) => setLinea(i, { comision: num(e.target.value) })} className="w-24 rounded-md border border-slate-200 px-2 py-1 text-right text-sm tabular outline-none focus:border-brand-500 disabled:bg-slate-50" /></td>
-                    <td className="px-3 py-2 text-right"><input type="number" step="any" disabled={bloqueada} value={l.viaticos} onChange={(e) => setLinea(i, { viaticos: num(e.target.value) })} className="w-24 rounded-md border border-slate-200 px-2 py-1 text-right text-sm tabular outline-none focus:border-brand-500 disabled:bg-slate-50" /></td>
+                    <td className="px-3 py-2 text-right"><input type="number" step="any" min="0" disabled={bloqueada} value={dv(l.sueldoDia)} onChange={(e) => setLinea(i, { sueldoDia: num(e.target.value) })} className="w-24 rounded-md border border-slate-200 px-2 py-1 text-right text-sm tabular outline-none focus:border-brand-500 disabled:bg-slate-50" /></td>
+                    <td className="px-3 py-2 text-right"><input type="number" step="any" min="0" disabled={bloqueada} value={dv(l.comision)} onChange={(e) => setLinea(i, { comision: num(e.target.value) })} className="w-24 rounded-md border border-slate-200 px-2 py-1 text-right text-sm tabular outline-none focus:border-brand-500 disabled:bg-slate-50" /></td>
+                    <td className="px-3 py-2 text-right"><input type="number" step="any" min="0" disabled={bloqueada} value={dv(l.viaticos)} onChange={(e) => setLinea(i, { viaticos: num(e.target.value) })} className="w-24 rounded-md border border-slate-200 px-2 py-1 text-right text-sm tabular outline-none focus:border-brand-500 disabled:bg-slate-50" /></td>
                     <td className="px-3 py-2 text-right">{!bloqueada ? <button onClick={() => quitarLinea(i)} title="Quitar línea" className="rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"><Trash2 size={15} /></button> : null}</td>
                   </tr>
                 ))}
@@ -242,7 +248,7 @@ export default function PlanillaPage() {
               <div className="flex items-center justify-between">
                 <span className="text-slate-500">Descuento de planilla (cuota semanal)</span>
                 <span className="flex items-center gap-1 text-rose-500">−
-                  <input type="number" step="any" disabled={bloqueada} value={draft.descuentoPlanilla}
+                  <input type="number" step="any" min="0" disabled={bloqueada} value={dv(draft.descuentoPlanilla)}
                     onChange={(e) => setDraft((d) => ({ ...d, descuentoPlanilla: num(e.target.value) }))}
                     className="w-28 rounded-md border border-slate-200 px-2 py-1 text-right text-sm tabular outline-none focus:border-brand-500 disabled:bg-slate-50" />
                 </span>

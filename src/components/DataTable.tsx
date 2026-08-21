@@ -27,7 +27,7 @@ const alignCls = { left: "text-left", right: "text-right", center: "text-center"
 export function DataTable<T extends { id: string }>({
   title, columns, rows, filters = [], searchPlaceholder = "Buscar…",
   pageSize = 8, exportName = "export", minWidth = "min-w-[720px]", toolbar,
-  dateField, dateLabel = "Fecha",
+  dateField, dateLabel = "Fecha", rowActions,
 }: {
   title: string;
   columns: Column<T>[];
@@ -40,6 +40,7 @@ export function DataTable<T extends { id: string }>({
   toolbar?: ReactNode;
   dateField?: (row: T) => string | null | undefined;
   dateLabel?: string;
+  rowActions?: (row: T) => ReactNode;
 }) {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState<Record<string, string>>({});
@@ -176,11 +177,12 @@ export function DataTable<T extends { id: string }>({
                     </span>
                   </th>
                 ))}
+                {rowActions ? <th className="whitespace-nowrap border-b border-slate-200 bg-slate-50/80 px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Acciones</th> : null}
               </tr>
             </thead>
             <tbody>
               {pageRows.length === 0 ? (
-                <tr><td colSpan={columns.length} className="px-4 py-12 text-center text-sm text-slate-400">Sin resultados para el filtro actual</td></tr>
+                <tr><td colSpan={columns.length + (rowActions ? 1 : 0)} className="px-4 py-12 text-center text-sm text-slate-400">Sin resultados para el filtro actual</td></tr>
               ) : null}
               {pageRows.map((row) => (
                 <tr key={row.id} className="hover:bg-slate-50/60">
@@ -189,6 +191,7 @@ export function DataTable<T extends { id: string }>({
                       {c.render ? c.render(row) : String(cellValue(row, c))}
                     </td>
                   ))}
+                  {rowActions ? <td className="border-b border-slate-100 px-4 py-3 text-right align-middle">{rowActions(row)}</td> : null}
                 </tr>
               ))}
             </tbody>

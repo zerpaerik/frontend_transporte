@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Package } from "lucide-react";
+import { Plus, Package, Pencil, Trash2 } from "lucide-react";
 import { PageHeader, StatCard, Badge } from "@/components/ui";
 import { DataTable, type Column, type Filter } from "@/components/DataTable";
 import { FormModal, type Field, type FormValues } from "@/components/FormModal";
@@ -13,15 +13,15 @@ const calidadTone: Record<CalidadRepuesto, "green" | "blue" | "amber"> = {
   Original: "green", Alternativo: "blue", Remanufacturado: "amber",
 };
 
-const fields: Field[] = [
-  { name: "nombre", label: "Repuesto", type: "text", required: true, placeholder: "Pastillas de freno", full: true },
-  { name: "categoria", label: "Categoría", type: "select", options: ["Frenos", "Filtros", "Transmisión", "Eléctrico", "Motor", "Suspensión", "Refrigeración", "Otros"] },
-  { name: "calidad", label: "Calidad", type: "select", options: ["Original", "Alternativo", "Remanufacturado"] },
-  { name: "cantidad", label: "Cantidad", type: "number", default: 1 },
-  { name: "garantia", label: "Garantía", type: "text", placeholder: "12 meses" },
-  { name: "proveedor", label: "Proveedor / tienda", type: "text", placeholder: "Repuestos DP" },
-  { name: "costo", label: "Costo (S/)", type: "number", default: 0 },
-  { name: "fecha", label: "Fecha de compra", type: "date", required: true },
+const fieldsFor = (r?: Repuesto): Field[] => [
+  { name: "nombre", label: "Repuesto", type: "text", required: true, placeholder: "Pastillas de freno", full: true, default: r?.nombre },
+  { name: "categoria", label: "Categoría", type: "select", options: ["Frenos", "Filtros", "Transmisión", "Eléctrico", "Motor", "Suspensión", "Refrigeración", "Otros"], default: r?.categoria },
+  { name: "calidad", label: "Calidad", type: "select", options: ["Original", "Alternativo", "Remanufacturado"], default: r?.calidad },
+  { name: "cantidad", label: "Cantidad", type: "number", default: r?.cantidad ?? 1 },
+  { name: "garantia", label: "Garantía", type: "text", placeholder: "12 meses", default: r?.garantia },
+  { name: "proveedor", label: "Proveedor / tienda", type: "text", placeholder: "Repuestos DP", default: r?.proveedor },
+  { name: "costo", label: "Costo (S/)", type: "number", default: r?.costo ?? 0 },
+  { name: "fecha", label: "Fecha de compra", type: "date", required: true, default: r?.fecha },
 ];
 
 const columns: Column<Repuesto>[] = [
@@ -41,18 +41,21 @@ const filters: Filter<Repuesto>[] = [
 ];
 
 export default function RepuestosPage() {
-  const { repuestos, addRepuesto } = useData();
+  const { repuestos, addRepuesto, updateRepuesto, removeRepuesto } = useData();
   const [open, setOpen] = useState(false);
+  const [edit, setEdit] = useState<Repuesto | null>(null);
 
   const gasto = repuestos.reduce((s, r) => s + r.costo, 0);
   const unidades = repuestos.reduce((s, r) => s + r.cantidad, 0);
 
-  function guardar(v: FormValues) {
-    addRepuesto({
+  function toBody(v: FormValues) {
+    return {
       nombre: String(v.nombre), categoria: String(v.categoria), calidad: v.calidad as Repuesto["calidad"],
       cantidad: Number(v.cantidad), garantia: String(v.garantia), proveedor: String(v.proveedor), costo: Number(v.costo), fecha: String(v.fecha),
-    });
+    };
   }
+  function guardar(v: FormValues) { addRepuesto(toBody(v)); }
+  function guardarEdit(v: FormValues) { if (edit) updateRepuesto(edit.id, toBody(v)); }
 
   return (
     <div>
@@ -70,8 +73,16 @@ export default function RepuestosPage() {
         columns={columns}
         rows={repuestos}
         filters={filters}
+        dateField={(r) => r.fecha}
+        dateLabel="Fecha compra"
         minWidth="min-w-[860px]"
         searchPlaceholder="Buscar por repuesto, proveedor…"
+        rowActions={(r) => (
+          <div className="flex items-center justify-end gap-1">
+            <button onClick={() => setEdit(r)} title="Editar" className="rounded-md p-1.5 text-slate-400 hover:bg-steel-50 hover:text-steel-600"><Pencil size={15} /></button>
+            <button onClick={() => { if (confirm(`¿Eliminar "${r.nombre}"?`)) removeRepuesto(r.id); }} title="Eliminar" className="rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"><Trash2 size={15} /></button>
+          </div>
+        )}
         toolbar={
           <button onClick={() => setOpen(true)} className="flex items-center gap-2 rounded-lg bg-brand-500 px-3.5 py-2 text-sm font-semibold text-white hover:bg-brand-600">
             <Plus size={16} /> Nuevo repuesto
@@ -79,7 +90,8 @@ export default function RepuestosPage() {
         }
       />
 
-      <FormModal open={open} title="Nuevo repuesto" subtitle="Registra un repuesto o accesorio con su calidad, garantía y costo." fields={fields} onSubmit={guardar} onClose={() => setOpen(false)} />
+      <FormModal open={open} title="Nuevo repuesto" subtitle="Registra un repuesto o accesorio con su calidad, garantía y costo." fields={fieldsFor()} onSubmit={guardar} onClose={() => setOpen(false)} />
+      {edit ? <FormModal open title={`Editar repuesto — ${edit.nombre}`} subtitle="Corrige los datos del repuesto." fields={fieldsFor(edit)} submitLabel="Guardar cambios" onSubmit={guardarEdit} onClose={() => setEdit(null)} /> : null}
     </div>
   );
 }

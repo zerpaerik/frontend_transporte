@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { FolderCog, Plus, Trash2, Building2, Anchor, Tags } from "lucide-react";
+import { FolderCog, Plus, Trash2, Pencil, Building2, Anchor, Tags } from "lucide-react";
 import { PageHeader, Card } from "@/components/ui";
+import { FormModal, type Field, type FormValues } from "@/components/FormModal";
 import { apiClientes, apiPuertos, apiTipos, type Cliente, type Puerto, type TipoOperacion } from "@/lib/api";
 
 export default function CatalogosPage() {
@@ -18,6 +19,31 @@ export default function CatalogosPage() {
   const [pNombre, setPNombre] = useState("");
   const [tNombre, setTNombre] = useState("");
   const [busy, setBusy] = useState(false);
+  const [editC, setEditC] = useState<Cliente | null>(null);
+  const [editP, setEditP] = useState<Puerto | null>(null);
+  const [editT, setEditT] = useState<TipoOperacion | null>(null);
+
+  const clienteFields = (c: Cliente): Field[] => [
+    { name: "nombre", label: "Nombre del cliente", type: "text", required: true, full: true, default: c.nombre },
+    { name: "ruc", label: "RUC", type: "text", default: c.ruc },
+    { name: "email", label: "Correo", type: "text", default: c.email },
+    { name: "telefono", label: "Teléfono", type: "text", default: c.telefono },
+    { name: "contacto", label: "Persona de contacto", type: "text", default: c.contacto },
+    { name: "direccion", label: "Dirección (para facturar)", type: "text", full: true, default: c.direccion },
+  ];
+  async function guardarCliente(v: FormValues) {
+    if (!editC) return;
+    await apiClientes.update(editC.id, { nombre: String(v.nombre), ruc: String(v.ruc), email: String(v.email), telefono: String(v.telefono), contacto: String(v.contacto), direccion: String(v.direccion) });
+    cargar();
+  }
+  async function guardarPuerto(v: FormValues) {
+    if (!editP) return;
+    await apiPuertos.update(editP.id, String(v.nombre)); cargar();
+  }
+  async function guardarTipo(v: FormValues) {
+    if (!editT) return;
+    await apiTipos.update(editT.id, String(v.nombre)); cargar();
+  }
 
   function cargar() {
     apiClientes.list().then(setClientes).catch(() => setClientes([]));
@@ -45,6 +71,7 @@ export default function CatalogosPage() {
   const inp = "rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500";
   const addBtn = "flex items-center gap-1.5 rounded-lg bg-brand-500 px-3.5 py-2 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-50";
   const delBtn = "rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600";
+  const editBtn = "rounded-md p-1.5 text-slate-400 hover:bg-steel-50 hover:text-steel-600";
 
   return (
     <div>
@@ -74,7 +101,10 @@ export default function CatalogosPage() {
                   {(c.telefono || c.email) ? <div className="truncate text-xs text-slate-400">{[c.telefono, c.email].filter(Boolean).join(" · ")}</div> : null}
                   {c.direccion ? <div className="truncate text-xs text-slate-400">📍 {c.direccion}</div> : null}
                 </div>
-                <button onClick={() => { if (confirm(`¿Eliminar ${c.nombre}?`)) apiClientes.remove(c.id).then(cargar); }} className={delBtn}><Trash2 size={15} /></button>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => setEditC(c)} title="Editar" className={editBtn}><Pencil size={14} /></button>
+                  <button onClick={() => { if (confirm(`¿Eliminar ${c.nombre}?`)) apiClientes.remove(c.id).then(cargar); }} className={delBtn}><Trash2 size={15} /></button>
+                </div>
               </li>
             ))}
             {clientes.length === 0 ? <li className="py-4 text-center text-sm text-slate-400">Sin clientes</li> : null}
@@ -92,7 +122,10 @@ export default function CatalogosPage() {
             {puertos.map((p) => (
               <li key={p.id} className="flex items-center justify-between gap-2 py-2">
                 <span className="truncate text-sm font-medium text-slate-800">{p.nombre}</span>
-                <button onClick={() => { if (confirm(`¿Eliminar ${p.nombre}?`)) apiPuertos.remove(p.id).then(cargar); }} className={delBtn}><Trash2 size={15} /></button>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => setEditP(p)} title="Editar" className={editBtn}><Pencil size={14} /></button>
+                  <button onClick={() => { if (confirm(`¿Eliminar ${p.nombre}?`)) apiPuertos.remove(p.id).then(cargar); }} className={delBtn}><Trash2 size={15} /></button>
+                </div>
               </li>
             ))}
             {puertos.length === 0 ? <li className="py-4 text-center text-sm text-slate-400">Sin puertos</li> : null}
@@ -110,7 +143,10 @@ export default function CatalogosPage() {
             {tipos.map((t) => (
               <li key={t.id} className="flex items-center justify-between gap-2 py-2">
                 <span className="truncate text-sm font-medium text-slate-800">{t.nombre}</span>
-                <button onClick={() => { if (confirm(`¿Eliminar ${t.nombre}?`)) apiTipos.remove(t.id).then(cargar); }} className={delBtn}><Trash2 size={15} /></button>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => setEditT(t)} title="Editar" className={editBtn}><Pencil size={14} /></button>
+                  <button onClick={() => { if (confirm(`¿Eliminar ${t.nombre}?`)) apiTipos.remove(t.id).then(cargar); }} className={delBtn}><Trash2 size={15} /></button>
+                </div>
               </li>
             ))}
             {tipos.length === 0 ? <li className="py-4 text-center text-sm text-slate-400">Sin tipos</li> : null}
@@ -119,6 +155,10 @@ export default function CatalogosPage() {
       </div>
 
       <div className="mt-5 flex items-center gap-1.5 text-xs text-slate-400"><FolderCog size={12} /> Estos catálogos aparecen como opciones en el formulario de Operaciones.</div>
+
+      {editC ? <FormModal open title={`Editar cliente — ${editC.nombre}`} subtitle="Modifica los datos del cliente." fields={clienteFields(editC)} submitLabel="Guardar cambios" onSubmit={guardarCliente} onClose={() => setEditC(null)} /> : null}
+      {editP ? <FormModal open title="Editar puerto / depósito" fields={[{ name: "nombre", label: "Nombre del puerto / depósito", type: "text", required: true, full: true, default: editP.nombre }]} submitLabel="Guardar cambios" onSubmit={guardarPuerto} onClose={() => setEditP(null)} /> : null}
+      {editT ? <FormModal open title="Editar tipo de operación" fields={[{ name: "nombre", label: "Nombre del tipo", type: "text", required: true, full: true, default: editT.nombre }]} submitLabel="Guardar cambios" onSubmit={guardarTipo} onClose={() => setEditT(null)} /> : null}
     </div>
   );
 }
