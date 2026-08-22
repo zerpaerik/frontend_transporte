@@ -7,9 +7,10 @@ import {
 import { PageHeader, StatCard, Card, Badge } from "@/components/ui";
 import { FormModal, type Field, type FormValues } from "@/components/FormModal";
 import { useData } from "@/lib/store";
+import { useAuth } from "@/lib/auth";
 import { apiPlanillas, type Planilla, type PlanillaLinea } from "@/lib/api";
 import { soles, fecha } from "@/lib/format";
-import { exportPDF } from "@/lib/export";
+import { planillaPDF } from "@/lib/planilla-pdf";
 
 // Lunes y sábado de la semana actual (la semana cierra el sábado).
 function isoAdd(base: Date, days: number) {
@@ -32,6 +33,7 @@ const dv = (n: number) => (n ? String(n) : "");
 
 export default function PlanillaPage() {
   const { conductores } = useData();
+  const { user } = useAuth();
   const [planillas, setPlanillas] = useState<Planilla[]>([]);
   const [sueldoDia, setSueldoDia] = useState(0);
   const [sel, setSel] = useState<Planilla | null>(null);
@@ -130,16 +132,24 @@ export default function PlanillaPage() {
 
   function descargarPDF() {
     if (!sel) return;
-    const headers = ["Fecha", "Cliente", "Origen", "Destino", "Concepto", "Sueldo/día", "Comisión", "Viáticos"];
-    const rows: (string | number)[][] = draft.lineas.map((l) => [
-      fecha(l.fecha), l.cliente || "—", l.origen || "—", l.destino || "—", l.concepto || "—",
-      l.sueldoDia ? soles(l.sueldoDia) : "—", l.comision ? soles(l.comision) : "—", l.viaticos ? soles(l.viaticos) : "—",
-    ]);
-    rows.push(["", "", "", "", "TOTALES", soles(totales.totalSueldo), soles(totales.totalComision), soles(totales.totalViaticos)]);
-    rows.push(["", "", "", "", "TOTAL A PAGAR", "", "", soles(totales.totalPagar)]);
-    rows.push(["", "", "", "", "DESCUENTO PLANILLA", "", "", "− " + soles(draft.descuentoPlanilla)]);
-    rows.push(["", "", "", "", "A DEPOSITAR", "", "", soles(totales.aDepositar)]);
-    exportPDF(`Planilla semanal — ${sel.conductor}`, headers, rows, `Semana del ${fecha(sel.semanaDesde)} al ${fecha(sel.semanaHasta)} · ${sel.estado}`);
+    planillaPDF({
+      conductor: sel.conductor,
+      folio: "PL-" + sel.id.replace(/-/g, "").slice(-6).toUpperCase(),
+      semanaDesde: sel.semanaDesde,
+      semanaHasta: sel.semanaHasta,
+      estado: sel.estado,
+      lineas: draft.lineas.map((l) => ({
+        fecha: l.fecha, cliente: l.cliente, origen: l.origen, destino: l.destino,
+        concepto: l.concepto, sueldoDia: l.sueldoDia, comision: l.comision, viaticos: l.viaticos,
+      })),
+      totalSueldo: totales.totalSueldo,
+      totalComision: totales.totalComision,
+      totalViaticos: totales.totalViaticos,
+      totalPagar: totales.totalPagar,
+      descuentoPlanilla: draft.descuentoPlanilla,
+      aDepositar: totales.aDepositar,
+      empresa: user?.sede ? { nombre: user.sede.nombre, ruc: user.sede.ruc, codigo: user.sede.codigo } : undefined,
+    });
   }
 
   // ============ EDITOR ============
