@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  Plus, Wallet, Users, Settings2, ArrowLeft, Trash2, Save, FileText, Check, CalendarDays, Coins,
+  Plus, Users, Settings2, ArrowLeft, Trash2, Save, FileText, Check, CalendarDays, Coins, RefreshCw, FileCheck2, Undo2,
 } from "lucide-react";
 import { PageHeader, StatCard, Card, Badge } from "@/components/ui";
 import { FormModal, type Field, type FormValues } from "@/components/FormModal";
@@ -30,6 +30,8 @@ type Draft = { lineas: PlanillaLinea[]; descuentoPlanilla: number };
 const num = (v: string) => Number(v.replace(",", ".") || 0);
 // Muestra vacío cuando el valor es 0, para que no aparezca el "0" antes del número.
 const dv = (n: number) => (n ? String(n) : "");
+// Color del estado: Borrador (ámbar) · Generada (azul) · Pagada (verde).
+const toneEstado = (e: string): "green" | "blue" | "amber" => (e === "Pagada" ? "green" : e === "Generada" ? "blue" : "amber");
 
 export default function PlanillaPage() {
   const { conductores } = useData();
@@ -53,7 +55,10 @@ export default function PlanillaPage() {
     setDraft({ lineas: p.lineas.map((l) => ({ ...l })), descuentoPlanilla: p.descuentoPlanilla });
   }
 
-  const bloqueada = sel?.estado === "Pagada";
+  const esBorrador = sel?.estado === "Borrador";
+  const esGenerada = sel?.estado === "Generada";
+  // Solo se editan líneas en Borrador; Generada y Pagada quedan bloqueadas.
+  const bloqueada = !esBorrador;
 
   const totales = useMemo(() => {
     const totalSueldo = draft.lineas.reduce((s, l) => s + (l.sueldoDia || 0), 0);
@@ -74,7 +79,8 @@ export default function PlanillaPage() {
     setBusy(true);
     try {
       const p = await apiPlanillas.generar({ conductor: String(v.conductor), semanaDesde: String(v.semanaDesde), semanaHasta: String(v.semanaHasta) });
-      setPlanillas((s) => [p, ...s]);
+      // Puede devolver un borrador existente (mismo id): actualizarlo en la lista, no duplicar.
+      setPlanillas((s) => (s.some((x) => x.id === p.id) ? s.map((x) => (x.id === p.id ? p : x)) : [p, ...s]));
       abrir(p);
     } catch (e) { alert((e as Error).message || "No se pudo generar la planilla."); }
     finally { setBusy(false); }
@@ -123,6 +129,47 @@ export default function PlanillaPage() {
     try { const p = await apiPlanillas.pagar(sel.id); setPlanillas((s) => s.map((x) => (x.id === p.id ? p : x))); setSel(p); }
     finally { setBusy(false); }
   }
+
+  // Líneas del draft en el formato que espera el backend.
+  function lineasPayload() {
+    return draft.lineas.map((l, i) => ({
+      fecha: l.fecha, cliente: l.cliente, origen: l.origen, destino: l.destino,
+      sueldoDia: l.sueldoDia, comision: l.comision, viaticos: l.viaticos,
+      concepto: l.concepto, viajeId: l.viajeId, orden: i,
+    }));
+  }
+  function aplicar(p: Planilla) {
+    setPlanillas((s) => s.map((x) => (x.id === p.id ? p : x)));
+    setSel(p);
+    setDraft({ lineas: p.lineas.map((l) => ({ ...l })), descuentoPlanilla: p.descuentoPlanilla });
+  }
+
+  // Viernes: finaliza la semana (guarda + pasa a "Generada"). Queda lista para imprimir y pagar.
+  async function finalizar() {
+    if (!sel || !confirm(`¿Finalizar la planilla de ${sel.conductor}? Quedará lista para imprimir y pagar; para editarla de nuevo tendrás que reabrirla.`)) return;
+    setBusy(true);
+    try { aplicar(await apiPlanillas.update(sel.id, { descuentoPlanilla: draft.descuentoPlanilla, lineas: lineasPayload(), estado: "Generada" })); }
+    catch (e) { alert((e as Error).message || "No se pudo finalizar."); }
+    finally { setBusy(false); }
+  }
+  // Vuelve una planilla finalizada a Borrador para poder editarla otra vez.
+  async function reabrir() {
+    if (!sel) return;
+    setBusy(true);
+    try { aplicar(await apiPlanillas.update(sel.id, { estado: "Borrador" })); }
+    catch (e) { alert((e as Error).message || "No se pudo reabrir."); }
+    finally { setBusy(false); }
+  }
+  // Guarda lo actual y agrega al borrador los viajes nuevos de la semana (sin borrar lo editado).
+  async function traerViajes() {
+    if (!sel) return;
+    setBusy(true);
+    try {
+      await apiPlanillas.update(sel.id, { descuentoPlanilla: draft.descuentoPlanilla, lineas: lineasPayload() });
+      aplicar(await apiPlanillas.generar({ conductor: sel.conductor, semanaDesde: sel.semanaDesde, semanaHasta: sel.semanaHasta }));
+    } catch (e) { alert((e as Error).message || "No se pudieron traer los viajes."); }
+    finally { setBusy(false); }
+  }
   async function eliminar() {
     if (!sel || !confirm(`¿Eliminar la planilla de ${sel.conductor}?`)) return;
     setBusy(true);
@@ -164,7 +211,7 @@ export default function PlanillaPage() {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">{sel.conductor}</h1>
-              <Badge tone={sel.estado === "Pagada" ? "green" : "amber"}>{sel.estado}</Badge>
+              <Badge tone={toneEstado(sel.estado)}>{sel.estado}</Badge>
             </div>
             <p className="mt-1 flex items-center gap-1.5 text-sm text-slate-500">
               <CalendarDays size={15} /> Semana del {fecha(sel.semanaDesde)} al {fecha(sel.semanaHasta)}
@@ -174,16 +221,28 @@ export default function PlanillaPage() {
             <button onClick={descargarPDF} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:border-brand-300 hover:text-brand-600">
               <FileText size={15} /> PDF
             </button>
-            {!bloqueada ? (
+            {esBorrador ? (
               <>
+                <button disabled={busy} onClick={traerViajes} title="Guardar y traer los viajes nuevos de la semana" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:border-brand-300 hover:text-brand-600 disabled:opacity-50">
+                  <RefreshCw size={15} /> Traer viajes
+                </button>
                 <button disabled={busy} onClick={guardar} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-50">
                   <Save size={15} /> Guardar
                 </button>
-                <button disabled={busy} onClick={pagar} className="inline-flex items-center gap-1.5 rounded-lg bg-brand-500 px-3.5 py-2 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-50">
-                  <Check size={15} /> Marcar pagada
+                <button disabled={busy} onClick={finalizar} className="inline-flex items-center gap-1.5 rounded-lg bg-brand-500 px-3.5 py-2 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-50">
+                  <FileCheck2 size={15} /> Finalizar
                 </button>
                 <button disabled={busy} onClick={eliminar} title="Eliminar planilla" className="rounded-lg border border-slate-300 bg-white p-2 text-slate-500 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50">
                   <Trash2 size={15} />
+                </button>
+              </>
+            ) : esGenerada ? (
+              <>
+                <button disabled={busy} onClick={reabrir} title="Volver a borrador para editar" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:border-brand-300 hover:text-brand-600 disabled:opacity-50">
+                  <Undo2 size={15} /> Reabrir
+                </button>
+                <button disabled={busy} onClick={pagar} className="inline-flex items-center gap-1.5 rounded-lg bg-brand-500 px-3.5 py-2 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-50">
+                  <Check size={15} /> Marcar pagada
                 </button>
               </>
             ) : null}
@@ -282,7 +341,8 @@ export default function PlanillaPage() {
   }
 
   // ============ LISTA ============
-  const borradores = planillas.filter((p) => p.estado !== "Pagada").length;
+  const borradores = planillas.filter((p) => p.estado === "Borrador").length;
+  const generadas = planillas.filter((p) => p.estado === "Generada").length;
   const pagadas = planillas.filter((p) => p.estado === "Pagada").length;
 
   return (
@@ -291,8 +351,8 @@ export default function PlanillaPage() {
 
       <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard label="Sueldo por día" value={soles(sueldoDia)} icon={Coins} tone="orange" hint="igual para todos" />
-        <StatCard label="Planillas" value={planillas.length} icon={Wallet} tone="blue" />
         <StatCard label="En borrador" value={borradores} icon={Users} tone="amber" />
+        <StatCard label="Finalizadas" value={generadas} icon={FileCheck2} tone="blue" />
         <StatCard label="Pagadas" value={pagadas} icon={Check} tone="green" />
       </div>
 
@@ -325,14 +385,14 @@ export default function PlanillaPage() {
                 <div className="text-xs text-slate-400">A depositar</div>
                 <div className="text-lg font-extrabold tabular text-slate-900">{soles(p.aDepositar)}</div>
               </div>
-              <Badge tone={p.estado === "Pagada" ? "green" : "amber"}>{p.estado}</Badge>
+              <Badge tone={toneEstado(p.estado)}>{p.estado}</Badge>
               <button onClick={() => abrir(p)} className="rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-600 hover:border-brand-300 hover:text-brand-600">Abrir</button>
             </div>
           </Card>
         ))}
       </div>
 
-      <FormModal open={openGen} title="Generar planilla semanal" subtitle="Selecciona el conductor y la semana. Se arma automáticamente desde sus viajes registrados."
+      <FormModal open={openGen} title="Generar planilla semanal" subtitle="Selecciona el conductor y la semana. Si ya hay un borrador de esa semana, se le agregan los viajes nuevos sin borrar lo editado."
         fields={genFields} submitLabel="Generar" onSubmit={generar} onClose={() => setOpenGen(false)} />
 
       {openCfg ? (
