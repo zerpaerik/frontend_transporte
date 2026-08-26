@@ -133,8 +133,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
         if (err?.network) {
           // Backend no disponible → refleja localmente (modo demo offline).
           prepend(key, { ...body, id: newId() });
-        } else if (typeof window !== "undefined") {
+        } else if (err?.status !== 401 && typeof window !== "undefined") {
           // El backend respondió con un error (p. ej. placa duplicada): avisar y NO agregar.
+          // El 401 (sesión expirada) no se avisa: ya se está redirigiendo al login.
           alert(err?.message || "No se pudo guardar el registro.");
         }
       }

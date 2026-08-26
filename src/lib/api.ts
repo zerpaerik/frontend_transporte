@@ -26,6 +26,18 @@ export function clearToken() {
   }
 }
 
+const USER_KEY = "ft_user";
+
+// Sesión inválida o expirada (401): limpia la sesión y manda al login,
+// en vez de dejar al usuario en una pantalla vacía con un error suelto.
+function handleUnauthorized() {
+  clearToken();
+  try { localStorage.removeItem(USER_KEY); } catch { /* ignore */ }
+  if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
+    window.location.replace("/login?expirado=1");
+  }
+}
+
 export class ApiError extends Error {
   status: number;
   network: boolean;
@@ -53,6 +65,8 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   }
 
   if (!res.ok) {
+    // Token vencido/ inválido en cualquier llamada (menos el propio login): cerrar sesión.
+    if (res.status === 401 && path !== "/auth/login") handleUnauthorized();
     let msg = `Error ${res.status}`;
     try {
       const data = await res.json();

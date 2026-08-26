@@ -20,10 +20,15 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [expirado, setExpirado] = useState(false);
 
   useEffect(() => {
     if (ready && user) router.replace(homeFor(user.rol));
   }, [ready, user, router]);
+
+  useEffect(() => {
+    try { setExpirado(new URLSearchParams(window.location.search).get("expirado") === "1"); } catch { /* ignore */ }
+  }, []);
 
   useEffect(() => {
     apiGetSedes().then(setSedes).catch(() => setSedes(SEDES_DEMO));
@@ -137,6 +142,7 @@ export default function LoginPage() {
                     className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30" />
                 </div>
 
+                {expirado && !error ? <div className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700 ring-1 ring-inset ring-amber-200">Tu sesión expiró. Vuelve a iniciar sesión para continuar.</div> : null}
                 {error ? <div className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700 ring-1 ring-inset ring-rose-200">{error}</div> : null}
 
                 <button type="submit" disabled={loading}
