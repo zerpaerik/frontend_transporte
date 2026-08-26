@@ -32,7 +32,7 @@ const columns: Column<Viaje>[] = [
   { key: "registro", header: "Registro", sortable: true, value: (v) => (v as any).createdAt || "", render: (v) => <span className="tabular whitespace-nowrap text-slate-500">{fecha(((v as any).createdAt || "").slice(0, 10))}</span> },
   { key: "placaTracto", header: "Tracto", sortable: true, render: (v) => <span className="font-semibold text-slate-900">{v.placaTracto}</span> },
   { key: "conductor", header: "Conductor", sortable: true, render: (v) => <span className="whitespace-nowrap">{v.conductor || "—"}</span> },
-  { key: "cliente", header: "Cliente", sortable: true, render: (v) => <Badge tone="blue">{v.cliente}</Badge> },
+  { key: "cliente", header: "Cliente", sortable: true, render: (v) => <span className="block max-w-[180px] truncate font-medium text-slate-700" title={v.cliente}>{v.cliente || "—"}</span> },
   { key: "nOrden", header: "N° Orden", sortable: true, value: (v) => v.nOrden, render: (v) => v.nOrden ? <span className="tabular whitespace-nowrap">{v.nOrden}</span> : <span className="text-slate-300">—</span> },
   { key: "operacion", header: "Op.", render: (v) => <span className="text-xs font-semibold text-slate-500">{v.operacion}</span> },
   { key: "tipoCarga", header: "Carga", sortable: true, render: (v) => <span className="text-xs">{v.tipoCarga || "—"}</span> },
