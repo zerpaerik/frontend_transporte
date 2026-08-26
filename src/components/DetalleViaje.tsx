@@ -41,7 +41,7 @@ export function DetalleViaje({ viaje, onClose }: { viaje: Viaje; onClose: () => 
               <Badge tone="blue">{v.operacion}</Badge>
               <Badge tone={estadoTone[viaje.estado]}>{viaje.estado}</Badge>
             </div>
-            <p className="mt-0.5 text-sm text-slate-500">Registro {fecha((v.createdAt || "").slice(0, 10))}</p>
+            <p className="mt-0.5 text-sm text-slate-500">Registro {fecha(v.createdAt || "")}</p>
           </div>
           <button onClick={onClose} className="rounded-md p-1 text-slate-400 hover:bg-slate-100" aria-label="Cerrar"><X size={20} /></button>
         </div>

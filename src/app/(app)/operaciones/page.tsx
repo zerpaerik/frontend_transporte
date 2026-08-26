@@ -31,7 +31,7 @@ function Semaforo({ iso, estado }: { iso?: string; estado: EstadoViaje }) {
 // Columnas esenciales para escanear. El resto de datos vive en el detalle (clic en la fila).
 const columns: Column<Viaje>[] = [
   { key: "codigo", header: "Código", sortable: true, thClass: "sticky left-0 z-20", tdClass: "sticky left-0 z-10 bg-white", render: (v) => <span className="font-semibold text-brand-700">{(v as any).codigo || "—"}</span> },
-  { key: "registro", header: "Registro", sortable: true, value: (v) => (v as any).createdAt || "", render: (v) => <span className="tabular whitespace-nowrap text-slate-500">{fecha(((v as any).createdAt || "").slice(0, 10))}</span> },
+  { key: "registro", header: "Registro", sortable: true, value: (v) => (v as any).createdAt || "", render: (v) => <span className="tabular whitespace-nowrap text-slate-500">{fecha((v as any).createdAt || "")}</span> },
   { key: "placaTracto", header: "Tracto", sortable: true, render: (v) => <span className="font-semibold text-slate-900">{v.placaTracto}</span> },
   { key: "conductor", header: "Conductor", sortable: true, render: (v) => <span className="block max-w-[150px] truncate" title={v.conductor}>{v.conductor || "—"}</span> },
   { key: "cliente", header: "Cliente", sortable: true, render: (v) => <span className="block max-w-[190px] truncate font-medium text-slate-700" title={v.cliente}>{v.cliente || "—"}</span> },

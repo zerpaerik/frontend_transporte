@@ -9,20 +9,20 @@ import { FormModal, type Field, type FormValues } from "@/components/FormModal";
 import { useData } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { apiPlanillas, type Planilla, type PlanillaLinea } from "@/lib/api";
-import { soles, fecha } from "@/lib/format";
+import { soles, fecha, hoyPeru } from "@/lib/format";
 import { planillaPDF } from "@/lib/planilla-pdf";
 
 // Lunes y sábado de la semana actual (la semana cierra el sábado).
-function isoAdd(base: Date, days: number) {
-  const d = new Date(base);
-  d.setDate(d.getDate() + days);
+function isoAdd(iso: string, days: number) {
+  const d = new Date(iso + "T12:00:00Z");
+  d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
 }
 function semanaActual() {
-  const hoy = new Date();
-  const day = hoy.getDay(); // 0 dom … 6 sáb
+  const hoy = hoyPeru(); // "YYYY-MM-DD" en Perú
+  const day = new Date(hoy + "T12:00:00Z").getUTCDay(); // 0 dom … 6 sáb
   const lunes = isoAdd(hoy, day === 0 ? -6 : 1 - day);
-  return { desde: lunes, hasta: isoAdd(new Date(lunes + "T12:00:00"), 5) };
+  return { desde: lunes, hasta: isoAdd(lunes, 5) };
 }
 
 type Draft = { lineas: PlanillaLinea[]; descuentoPlanilla: number };
