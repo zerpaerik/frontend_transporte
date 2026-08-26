@@ -6,7 +6,7 @@ import { PageHeader, StatCard, Badge } from "@/components/ui";
 import { DataTable, type Column, type Filter } from "@/components/DataTable";
 import { FormModal, type Field, type FormValues } from "@/components/FormModal";
 import { useData } from "@/lib/store";
-import { soles, km, fecha } from "@/lib/format";
+import { soles, km, fecha, fechaISO } from "@/lib/format";
 import type { Neumatico } from "@/lib/types";
 
 const estadoTone: Record<Neumatico["estado"], "green" | "blue" | "amber" | "orange" | "gray"> = {
@@ -20,7 +20,7 @@ const columns: Column<Neumatico>[] = [
   { key: "recorrido", header: "Km recorridos", align: "right", sortable: true, value: (n) => Math.max(0, n.kmActual - n.kmInstalacion), render: (n) => <span className="tabular">{km(Math.max(0, n.kmActual - n.kmInstalacion))}</span> },
   { key: "tienda", header: "Tienda", sortable: true },
   { key: "costo", header: "Costo", align: "right", sortable: true, value: (n) => n.costo, render: (n) => <span className="tabular font-medium">{soles(n.costo)}</span> },
-  { key: "registrado", header: "Registrado", value: (n) => (n.createdAt || "").slice(0, 10), render: (n) => <span className="tabular whitespace-nowrap">{n.createdAt ? fecha(n.createdAt.slice(0, 10)) : "—"}</span> },
+  { key: "registrado", header: "Registrado", value: (n) => fechaISO(n.createdAt || ""), render: (n) => <span className="tabular whitespace-nowrap">{n.createdAt ? fecha(n.createdAt) : "—"}</span> },
   { key: "estado", header: "Estado", sortable: true, render: (n) => <Badge tone={estadoTone[n.estado]}>{n.estado}</Badge> },
 ];
 

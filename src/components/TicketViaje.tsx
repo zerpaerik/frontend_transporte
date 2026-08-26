@@ -12,7 +12,7 @@ export function TicketViaje({ viaje, onClose }: { viaje: any; onClose: () => voi
   if (!v) return null;
 
   const codigo = v.codigo || "—";
-  const registro = fecha((v.createdAt || "").slice(0, 10));
+  const registro = fecha(v.createdAt || "");
 
   const filas: [string, string][] = [
     ["Código", codigo],

@@ -31,7 +31,7 @@ export default function ComisionesPage() {
   function liquidacionPDF(r: ResumenChofer) {
     const headers = ["Fecha", "Viaje", "Origen", "Destino", "Tipo carga", "Monto", "Estado"];
     const rows: (string | number)[][] = r.viajes.map((v) => [
-      fecha((v.createdAt || "").slice(0, 10)), v.codigo || "—", v.origen || "—", v.destino || "—", v.tipoCarga || "—", soles(v.comisionChofer), v.comisionPagada ? "Pagado" : "Pendiente",
+      fecha(v.createdAt || ""), v.codigo || "—", v.origen || "—", v.destino || "—", v.tipoCarga || "—", soles(v.comisionChofer), v.comisionPagada ? "Pagado" : "Pendiente",
     ]);
     rows.push(["", "", "", "", "TOTAL", soles(r.pendiente + r.pagado), ""]);
     exportPDF(`Liquidación de comisiones — ${r.conductor}`, headers, rows, `Pendiente ${soles(r.pendiente)} · Pagado ${soles(r.pagado)}`);

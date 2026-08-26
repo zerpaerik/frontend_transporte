@@ -55,7 +55,7 @@ export function planillaPDF(p: PlanillaPdfData) {
   const rucNum = p.empresa?.ruc;
   const codigo = p.empresa?.codigo;
   const logo = codigo ? `/sedes/${encodeURIComponent(codigo)}.jpg` : "";
-  const emitido = new Date().toLocaleDateString("es-PE", { day: "2-digit", month: "long", year: "numeric" });
+  const emitido = new Date().toLocaleDateString("es-PE", { day: "2-digit", month: "long", year: "numeric", timeZone: "America/Lima" });
   const pagada = p.estado === "Pagada";
   const folio = p.folio ? esc(p.folio) : "—";
 

@@ -4,6 +4,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { Search, ChevronLeft, ChevronRight, FileSpreadsheet, FileText, ChevronsUpDown } from "lucide-react";
 import { Card } from "./ui";
 import { exportCSV, exportPDF, type Cell } from "@/lib/export";
+import { fechaISO, hoyPeru } from "@/lib/format";
 
 export interface Column<T> {
   key: string;
@@ -54,7 +55,12 @@ export function DataTable<T extends { id: string }>({
   const [showAll, setShowAll] = useState(false);
 
   // "Últimos N días": solo aplica si no hay un rango de fechas manual ni se pidió ver todo.
-  const recentCutoff = useMemo(() => (recentDays ? new Date(Date.now() - recentDays * 86_400_000).toISOString().slice(0, 10) : ""), [recentDays]);
+  const recentCutoff = useMemo(() => {
+    if (!recentDays) return "";
+    const base = new Date(hoyPeru() + "T00:00:00Z"); // hoy en Perú
+    base.setUTCDate(base.getUTCDate() - recentDays);
+    return base.toISOString().slice(0, 10);
+  }, [recentDays]);
   const recentActive = !!(dateField && recentDays && !showAll && !desde && !hasta);
 
   const cellValue = (row: T, c: Column<T>): Cell =>
@@ -76,13 +82,13 @@ export function DataTable<T extends { id: string }>({
         if (sel && sel !== "__all__" && f.value(r) !== sel) return false;
       }
       if (dateField && (desde || hasta)) {
-        const d = (dateField(r) || "").slice(0, 10);
+        const d = fechaISO(dateField(r) || "");
         if (!d) return false;
         if (desde && d < desde) return false;
         if (hasta && d > hasta) return false;
       }
       if (recentActive && dateField) {
-        const d = (dateField(r) || "").slice(0, 10);
+        const d = fechaISO(dateField(r) || "");
         if (!d || d < recentCutoff) return false;
       }
       if (!q) return true;
