@@ -13,6 +13,7 @@ export interface Column<T> {
   value?: (row: T) => Cell;
   sortable?: boolean;
   thClass?: string;
+  tdClass?: string;
 }
 
 export interface Filter<T> {
@@ -27,7 +28,7 @@ const alignCls = { left: "text-left", right: "text-right", center: "text-center"
 export function DataTable<T extends { id: string }>({
   title, columns, rows, filters = [], searchPlaceholder = "Buscar…",
   pageSize = 8, exportName = "export", minWidth = "min-w-[720px]", toolbar,
-  dateField, dateLabel = "Fecha", recentDays, rowActions,
+  dateField, dateLabel = "Fecha", recentDays, rowActions, onRowClick,
 }: {
   title: string;
   columns: Column<T>[];
@@ -42,6 +43,7 @@ export function DataTable<T extends { id: string }>({
   dateLabel?: string;
   recentDays?: number; // si se pasa, por defecto muestra solo los últimos N días (con toggle "ver todo")
   rowActions?: (row: T) => ReactNode;
+  onRowClick?: (row: T) => void; // clic en la fila (p. ej. abrir el detalle)
 }) {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState<Record<string, string>>({});
@@ -207,9 +209,13 @@ export function DataTable<T extends { id: string }>({
                 <tr><td colSpan={columns.length + (rowActions ? 1 : 0)} className="px-4 py-12 text-center text-sm text-slate-400">Sin resultados para el filtro actual</td></tr>
               ) : null}
               {pageRows.map((row) => (
-                <tr key={row.id} className="hover:bg-slate-50/60">
+                <tr
+                  key={row.id}
+                  onClick={onRowClick ? () => onRowClick(row) : undefined}
+                  className={`hover:bg-slate-50/60 ${onRowClick ? "cursor-pointer" : ""}`}
+                >
                   {columns.map((c) => (
-                    <td key={c.key} className={`border-b border-slate-100 px-4 py-3 align-middle text-slate-700 ${alignCls[c.align ?? "left"]}`}>
+                    <td key={c.key} className={`border-b border-slate-100 px-4 py-3 align-middle text-slate-700 ${alignCls[c.align ?? "left"]} ${c.tdClass ?? ""}`}>
                       {c.render ? c.render(row) : String(cellValue(row, c))}
                     </td>
                   ))}

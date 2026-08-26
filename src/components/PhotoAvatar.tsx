@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, type ReactNode } from "react";
-import { Camera } from "lucide-react";
+import { Camera, X } from "lucide-react";
 import { apiFoto } from "@/lib/api";
 import { fileToImageDataURL } from "@/lib/image";
 
@@ -19,6 +19,7 @@ export function PhotoAvatar({
   const ref = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState(false);
   const shown = preview ?? foto;
 
   async function pick(e: React.ChangeEvent<HTMLInputElement>) {
@@ -39,25 +40,55 @@ export function PhotoAvatar({
   }
 
   return (
-    <div className={`relative shrink-0 ${className}`}>
-      <div className="grid h-full w-full place-items-center overflow-hidden rounded-xl bg-steel-600 text-white">
-        {shown ? <img src={shown} alt="" className="h-full w-full object-cover" /> : fallback}
+    <>
+      <div className={`relative shrink-0 ${className}`}>
+        <div
+          className={`grid h-full w-full place-items-center overflow-hidden rounded-xl bg-steel-600 text-white ${shown ? "cursor-zoom-in" : ""}`}
+          onClick={() => { if (shown) setOpen(true); }}
+          title={shown ? "Ver foto" : undefined}
+        >
+          {shown ? <img src={shown} alt="" className="h-full w-full object-cover" /> : fallback}
+        </div>
+        {!readOnly ? (
+          <>
+            <button
+              type="button"
+              onClick={() => ref.current?.click()}
+              disabled={busy}
+              title="Cambiar foto"
+              aria-label="Cambiar foto"
+              className="absolute -bottom-1 -right-1 grid h-5 w-5 place-items-center rounded-full border-2 border-white bg-brand-500 text-white shadow-sm transition hover:bg-brand-600 disabled:opacity-60"
+            >
+              <Camera size={11} />
+            </button>
+            <input ref={ref} type="file" accept="image/*" className="hidden" onChange={pick} />
+          </>
+        ) : null}
       </div>
-      {!readOnly ? (
-        <>
+
+      {open && shown ? (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/80 p-4 backdrop-blur-sm"
+          onClick={() => setOpen(false)}
+          role="dialog"
+          aria-modal="true"
+        >
           <button
             type="button"
-            onClick={() => ref.current?.click()}
-            disabled={busy}
-            title="Cambiar foto"
-            aria-label="Cambiar foto"
-            className="absolute -bottom-1 -right-1 grid h-5 w-5 place-items-center rounded-full border-2 border-white bg-brand-500 text-white shadow-sm transition hover:bg-brand-600 disabled:opacity-60"
+            onClick={() => setOpen(false)}
+            aria-label="Cerrar"
+            className="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
           >
-            <Camera size={11} />
+            <X size={20} />
           </button>
-          <input ref={ref} type="file" accept="image/*" className="hidden" onChange={pick} />
-        </>
+          <img
+            src={shown}
+            alt=""
+            className="max-h-[85vh] max-w-[90vw] rounded-2xl object-contain shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
       ) : null}
-    </div>
+    </>
   );
 }

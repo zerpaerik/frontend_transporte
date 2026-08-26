@@ -10,16 +10,16 @@ export interface Slice {
 
 export function BarChart({ data, format }: { data: Slice[]; format?: (n: number) => string }) {
   const max = Math.max(1, ...data.map((d) => d.value));
+  const fmt = (n: number) => (format ? format(n) : String(n));
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3.5">
       {data.map((d) => (
         <div key={d.label} className="flex items-center gap-3">
-          <span className="w-28 shrink-0 truncate text-sm text-slate-600">{d.label}</span>
-          <div className="h-6 flex-1 overflow-hidden rounded-md bg-slate-100">
-            <div className="flex h-full items-center justify-end rounded-md px-2" style={{ width: `${Math.max(6, (d.value / max) * 100)}%`, background: d.color }}>
-              <span className="text-[11px] font-semibold text-white tabular">{format ? format(d.value) : d.value}</span>
-            </div>
+          <span className="w-24 shrink-0 truncate text-sm text-slate-600" title={d.label}>{d.label}</span>
+          <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-slate-100">
+            <div className="h-full rounded-full" style={{ width: `${(d.value / max) * 100}%`, background: d.color }} />
           </div>
+          <span className="w-24 shrink-0 text-right text-sm font-semibold text-slate-700 tabular">{fmt(d.value)}</span>
         </div>
       ))}
     </div>
