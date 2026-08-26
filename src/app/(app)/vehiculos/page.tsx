@@ -5,6 +5,7 @@ import { Plus, Truck, Pencil, Search, FileSpreadsheet, FileText, ChevronLeft, Ch
 import { PageHeader, StatCard, Card, Badge } from "@/components/ui";
 import { FormModal, type Field, type FormValues } from "@/components/FormModal";
 import { DocumentosModal } from "@/components/DocumentosModal";
+import { PhotoAvatar } from "@/components/PhotoAvatar";
 import { useData } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { km, fecha, diasRestantes, estadoDocumento } from "@/lib/format";
@@ -121,9 +122,14 @@ export default function VehiculosPage() {
             <Card key={v.id} className="p-5">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <span className="grid h-11 w-11 place-items-center rounded-xl bg-steel-600 text-white">
-                    <Truck size={20} />
-                  </span>
+                  <PhotoAvatar
+                    base="vehiculos"
+                    entityId={v.id}
+                    foto={v.foto}
+                    readOnly={readOnly}
+                    onUploaded={reload}
+                    fallback={<Truck size={20} />}
+                  />
                   <div>
                     <div className="font-bold text-slate-900">{v.placa}</div>
                     <div className="text-xs text-slate-500">{v.tipo} · {v.marca} {v.modelo} · {v.anio}</div>

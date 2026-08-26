@@ -5,6 +5,7 @@ import { Plus, IdCard, Phone, AlertTriangle, Search, FileSpreadsheet, FileText, 
 import { PageHeader, StatCard, Card, Badge } from "@/components/ui";
 import { FormModal, type Field, type FormValues } from "@/components/FormModal";
 import { DocumentosModal } from "@/components/DocumentosModal";
+import { PhotoAvatar } from "@/components/PhotoAvatar";
 import { useData } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { fecha, diasRestantes, estadoDocumento } from "@/lib/format";
@@ -109,9 +110,14 @@ export default function ConductoresPage() {
           <Card key={c.id} className="p-5">
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3">
-                <span className="grid h-11 w-11 place-items-center rounded-xl bg-steel-600 text-sm font-bold text-white">
-                  {c.nombre.split(" ").slice(0, 2).map((s) => s[0]).join("")}
-                </span>
+                <PhotoAvatar
+                  base="conductores"
+                  entityId={c.id}
+                  foto={c.foto}
+                  readOnly={readOnly}
+                  onUploaded={reload}
+                  fallback={<span className="text-sm font-bold">{c.nombre.split(" ").slice(0, 2).map((s) => s[0]).join("")}</span>}
+                />
                 <div>
                   <div className="font-bold text-slate-900">{c.nombre}</div>
                   <div className="text-xs text-slate-500">Licencia {c.licencia} · Cat. {c.categoria}</div>
