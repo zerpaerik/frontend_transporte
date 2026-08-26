@@ -7,6 +7,7 @@ import { PageHeader, StatCard, Badge } from "@/components/ui";
 import { DataTable, type Column, type Filter } from "@/components/DataTable";
 import { FormModal, type Field, type FormValues } from "@/components/FormModal";
 import { TicketViaje } from "@/components/TicketViaje";
+import { DetalleViaje } from "@/components/DetalleViaje";
 import { useData } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { apiTipos, apiClientes, apiPuertos, apiComisiones } from "@/lib/api";
@@ -27,25 +28,17 @@ function Semaforo({ iso, estado }: { iso?: string; estado: EstadoViaje }) {
   return <Badge tone="green">{d} días</Badge>;
 }
 
+// Columnas esenciales para escanear. El resto de datos vive en el detalle (clic en la fila).
 const columns: Column<Viaje>[] = [
-  { key: "codigo", header: "Código", sortable: true, render: (v) => <span className="font-semibold text-brand-700">{(v as any).codigo || "—"}</span> },
+  { key: "codigo", header: "Código", sortable: true, thClass: "sticky left-0 z-20", tdClass: "sticky left-0 z-10 bg-white", render: (v) => <span className="font-semibold text-brand-700">{(v as any).codigo || "—"}</span> },
   { key: "registro", header: "Registro", sortable: true, value: (v) => (v as any).createdAt || "", render: (v) => <span className="tabular whitespace-nowrap text-slate-500">{fecha(((v as any).createdAt || "").slice(0, 10))}</span> },
   { key: "placaTracto", header: "Tracto", sortable: true, render: (v) => <span className="font-semibold text-slate-900">{v.placaTracto}</span> },
-  { key: "conductor", header: "Conductor", sortable: true, render: (v) => <span className="whitespace-nowrap">{v.conductor || "—"}</span> },
-  { key: "cliente", header: "Cliente", sortable: true, render: (v) => <span className="block max-w-[180px] truncate font-medium text-slate-700" title={v.cliente}>{v.cliente || "—"}</span> },
-  { key: "nOrden", header: "N° Orden", sortable: true, value: (v) => v.nOrden, render: (v) => v.nOrden ? <span className="tabular whitespace-nowrap">{v.nOrden}</span> : <span className="text-slate-300">—</span> },
-  { key: "operacion", header: "Op.", render: (v) => <span className="text-xs font-semibold text-slate-500">{v.operacion}</span> },
-  { key: "tipoCarga", header: "Carga", sortable: true, render: (v) => <span className="text-xs">{v.tipoCarga || "—"}</span> },
-  { key: "contenedor", header: "Contenedor", sortable: true, render: (v) => <span className="tabular">{v.contenedor}</span> },
-  { key: "origen", header: "Origen", render: (v) => v.origen || <span className="text-slate-300">—</span> },
-  { key: "destino", header: "Destino", render: (v) => v.destino || <span className="text-slate-300">—</span> },
-  { key: "horaCita", header: "Hora cita", render: (v) => v.horaCita || <span className="text-slate-300">—</span> },
-  { key: "devolucion", header: "Devolución", render: (v) => v.devolucion || <span className="text-slate-300">—</span> },
-  { key: "fechaLimite", header: "F. límite", sortable: true, value: (v) => v.fechaLimite || "", render: (v) => v.fechaLimite ? <span className="tabular whitespace-nowrap">{fecha(v.fechaLimite)}</span> : <span className="text-slate-300">—</span> },
-  { key: "semaforo", header: "Devolver", render: (v) => <Semaforo iso={v.fechaLimite || undefined} estado={v.estado} /> },
-  { key: "greRemitente", header: "N° Guía", value: (v) => v.greRemitente, render: (v) => v.greRemitente ? <span className="tabular whitespace-nowrap">{v.greRemitente}</span> : <span className="text-slate-300">—</span> },
-  { key: "facturado", header: "Facturado", value: (v) => (v.factura ? "Sí" : "No"), render: (v) => v.factura ? <Badge tone="green">Facturado · {v.factura}</Badge> : <Badge tone="amber">No facturado</Badge> },
+  { key: "conductor", header: "Conductor", sortable: true, render: (v) => <span className="block max-w-[150px] truncate" title={v.conductor}>{v.conductor || "—"}</span> },
+  { key: "cliente", header: "Cliente", sortable: true, render: (v) => <span className="block max-w-[190px] truncate font-medium text-slate-700" title={v.cliente}>{v.cliente || "—"}</span> },
+  { key: "contenedor", header: "Contenedor", sortable: true, render: (v) => <span className="tabular whitespace-nowrap">{v.contenedor || "—"}</span> },
+  { key: "operacion", header: "Op.", render: (v) => <span className="whitespace-nowrap text-xs font-semibold text-slate-500">{v.operacion}</span> },
   { key: "estado", header: "Estado", sortable: true, render: (v) => <Badge tone={estadoTone[v.estado]}>{v.estado}</Badge> },
+  { key: "semaforo", header: "Devolver", align: "center", render: (v) => <Semaforo iso={v.fechaLimite || undefined} estado={v.estado} /> },
 ];
 
 const filters: Filter<Viaje>[] = [
@@ -58,7 +51,7 @@ function accionesColumn(onTicket: (v: Viaje) => void, onEdit: (v: Viaje) => void
   return {
     key: "acciones", header: "",
     render: (v) => (
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
         <button onClick={() => onTicket(v)} title="Ver ticket / PDF / WhatsApp"
           className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:border-brand-300 hover:text-brand-600">
           <FileText size={13} /> Ticket
@@ -83,6 +76,7 @@ export default function OperacionesPage() {
   const [tipoOpen, setTipoOpen] = useState(false);
   const [editViaje, setEditViaje] = useState<Viaje | null>(null);
   const [ticketViaje, setTicketViaje] = useState<Viaje | null>(null);
+  const [detalle, setDetalle] = useState<Viaje | null>(null);
   const [tipos, setTipos] = useState<string[]>(["IMPO", "EXPO"]);
   const [clientes, setClientes] = useState<string[]>([]);
   const [puertos, setPuertos] = useState<string[]>([]);
@@ -183,8 +177,9 @@ export default function OperacionesPage() {
         dateField={(v) => (v as any).createdAt}
         dateLabel="Registro"
         recentDays={3}
-        minWidth="min-w-[1700px]"
+        minWidth="min-w-[980px]"
         pageSize={9}
+        onRowClick={setDetalle}
         searchPlaceholder="Buscar por código, contenedor, cliente…"
         toolbar={
           <>
@@ -225,6 +220,7 @@ export default function OperacionesPage() {
       />
 
       {ticketViaje ? <TicketViaje viaje={ticketViaje} onClose={() => setTicketViaje(null)} /> : null}
+      {detalle ? <DetalleViaje viaje={detalle} onClose={() => setDetalle(null)} /> : null}
     </div>
   );
 }
