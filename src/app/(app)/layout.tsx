@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth";
-import { canAccess } from "@/lib/nav";
+import { canAccess, homeFor } from "@/lib/nav";
 import { Sidebar } from "@/components/Sidebar";
 import { Topbar } from "@/components/Topbar";
 
@@ -18,7 +18,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     if (!user) {
       router.replace("/login");
     } else if (!canAccess(user.rol, pathname)) {
-      router.replace("/dashboard");
+      router.replace(homeFor(user.rol));
     }
   }, [ready, user, pathname, router]);
 

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LogIn, ShieldCheck, ChevronLeft, Building2 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { homeFor } from "@/lib/nav";
 import { USUARIOS, SEDES_DEMO } from "@/lib/mock-data";
 import { apiGetSedes, type Sede } from "@/lib/api";
 
@@ -21,7 +22,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (ready && user) router.replace("/dashboard");
+    if (ready && user) router.replace(homeFor(user.rol));
   }, [ready, user, router]);
 
   useEffect(() => {
@@ -39,7 +40,7 @@ export default function LoginPage() {
       setError(res.error || "No se pudo iniciar sesión.");
       return;
     }
-    router.replace("/dashboard");
+    // La redirección al home del rol la hace el efecto de arriba cuando el usuario queda seteado.
   }
 
   function quick(u: (typeof USUARIOS)[number]) {

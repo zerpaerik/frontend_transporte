@@ -12,7 +12,7 @@ interface Doc {
 }
 
 export function DocumentosModal({
-  open, onClose, title, subtitle, base, entityId, documentos, onChanged,
+  open, onClose, title, subtitle, base, entityId, documentos, onChanged, readOnly = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -22,6 +22,7 @@ export function DocumentosModal({
   entityId: string;
   documentos: Doc[];
   onChanged?: (updated: any) => void;
+  readOnly?: boolean; // rol Conductor: solo ver y descargar, sin editar/eliminar/agregar
 }) {
   const [docs, setDocs] = useState<Doc[]>(documentos);
   const [busy, setBusy] = useState(false);
@@ -146,8 +147,12 @@ export function DocumentosModal({
                       {d.archivoNombre ? (
                         <button onClick={() => doDownload(d.id)} title="Descargar PDF" className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-emerald-600"><Download size={16} /></button>
                       ) : null}
-                      <button onClick={() => abrirEdicion(d)} title="Editar" className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-brand-600"><Pencil size={16} /></button>
-                      <button onClick={() => doDelete(d.id)} title="Eliminar" className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-rose-600"><Trash2 size={16} /></button>
+                      {!readOnly ? (
+                        <>
+                          <button onClick={() => abrirEdicion(d)} title="Editar" className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-brand-600"><Pencil size={16} /></button>
+                          <button onClick={() => doDelete(d.id)} title="Eliminar" className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-rose-600"><Trash2 size={16} /></button>
+                        </>
+                      ) : null}
                     </div>
                   </div>
 
@@ -183,6 +188,7 @@ export function DocumentosModal({
           </div>
 
           {/* Alta de documento */}
+          {!readOnly ? (
           <form onSubmit={doAdd} className="mt-5 rounded-xl border border-dashed border-slate-300 bg-slate-50/60 p-4">
             <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-700"><Plus size={15} /> Agregar documento</div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -207,6 +213,7 @@ export function DocumentosModal({
               <button type="submit" disabled={busy} className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-60">{busy ? "Guardando…" : "Agregar documento"}</button>
             </div>
           </form>
+          ) : null}
         </div>
 
         <div className="flex justify-end border-t border-slate-200 px-6 py-3">

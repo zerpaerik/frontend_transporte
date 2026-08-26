@@ -16,8 +16,8 @@ const TODOS: Rol[] = ["Administrador", "Operador", "Mecánico"];
 
 export const NAV: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, modulo: "", roles: TODOS },
-  { href: "/vehiculos", label: "Flota", icon: Truck, modulo: "01", roles: TODOS },
-  { href: "/conductores", label: "Conductores", icon: IdCard, modulo: "02", roles: ["Administrador", "Operador"] },
+  { href: "/vehiculos", label: "Flota", icon: Truck, modulo: "01", roles: [...TODOS, "Conductor"] },
+  { href: "/conductores", label: "Conductores", icon: IdCard, modulo: "02", roles: ["Administrador", "Operador", "Conductor"] },
   { href: "/mantenimiento", label: "Mantenimiento", icon: Wrench, modulo: "03", roles: ["Administrador", "Mecánico"] },
   { href: "/repuestos", label: "Repuestos", icon: Package, modulo: "04", roles: ["Administrador", "Mecánico"] },
   { href: "/neumaticos", label: "Neumáticos", icon: CircleDot, modulo: "05", roles: ["Administrador", "Mecánico"] },
@@ -33,6 +33,11 @@ export const NAV: NavItem[] = [
 
 export function navFor(rol: Rol): NavItem[] {
   return NAV.filter((n) => n.roles.includes(rol));
+}
+
+// Primera pantalla a la que puede entrar el rol (para redirigir tras login o acceso denegado).
+export function homeFor(rol: Rol): string {
+  return navFor(rol)[0]?.href ?? "/dashboard";
 }
 
 export function canAccess(rol: Rol, href: string): boolean {

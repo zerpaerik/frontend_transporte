@@ -6,6 +6,7 @@ import { PageHeader, StatCard, Card, Badge } from "@/components/ui";
 import { FormModal, type Field, type FormValues } from "@/components/FormModal";
 import { DocumentosModal } from "@/components/DocumentosModal";
 import { useData } from "@/lib/store";
+import { useAuth } from "@/lib/auth";
 import { fecha, diasRestantes, estadoDocumento } from "@/lib/format";
 import { exportCSV, exportPDF } from "@/lib/export";
 
@@ -23,6 +24,8 @@ const PAGE = 6;
 
 export default function ConductoresPage() {
   const { conductores, addConductor, updateConductor, reload } = useData();
+  const { user } = useAuth();
+  const readOnly = user?.rol === "Conductor";
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
@@ -93,9 +96,11 @@ export default function ConductoresPage() {
           <button onClick={() => exportar("pdf")} className="flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-rose-50 hover:text-rose-700">
             <FileText size={15} /> PDF
           </button>
-          <button onClick={() => setOpen(true)} className="flex items-center gap-2 rounded-lg bg-brand-500 px-3.5 py-2 text-sm font-semibold text-white hover:bg-brand-600">
-            <Plus size={16} /> Nuevo conductor
-          </button>
+          {!readOnly ? (
+            <button onClick={() => setOpen(true)} className="flex items-center gap-2 rounded-lg bg-brand-500 px-3.5 py-2 text-sm font-semibold text-white hover:bg-brand-600">
+              <Plus size={16} /> Nuevo conductor
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -116,9 +121,11 @@ export default function ConductoresPage() {
                 <a href={`tel:${c.telefono.replace(/\s/g, "")}`} className="flex items-center gap-1 text-xs text-slate-500 hover:text-brand-600">
                   <Phone size={13} /> {c.telefono}
                 </a>
-                <button onClick={() => setEditCond(c)} title="Editar conductor" className="rounded-md border border-slate-200 p-1.5 text-slate-500 hover:border-brand-300 hover:text-brand-600">
-                  <Pencil size={13} />
-                </button>
+                {!readOnly ? (
+                  <button onClick={() => setEditCond(c)} title="Editar conductor" className="rounded-md border border-slate-200 p-1.5 text-slate-500 hover:border-brand-300 hover:text-brand-600">
+                    <Pencil size={13} />
+                  </button>
+                ) : null}
               </div>
             </div>
 
@@ -177,6 +184,7 @@ export default function ConductoresPage() {
           title={`Documentos — ${docCond.nombre}`}
           subtitle={`Licencia ${docCond.licencia}`}
           documentos={docCond.documentos ?? []}
+          readOnly={readOnly}
           onChanged={(u) => setDocCond(u)}
           onClose={() => { setDocCond(null); reload(); }}
         />
