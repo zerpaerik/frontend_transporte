@@ -20,6 +20,7 @@ export interface Vehiculo {
   anio: number;
   kilometraje: number;
   estado: "Operativo" | "En taller" | "Inactivo";
+  foto?: string | null;
 }
 
 export type EstadoDocumento = "Vigente" | "Por vencer" | "Vencido";
@@ -38,6 +39,7 @@ export interface Conductor {
   telefono: string;
   descuentoMensual?: number;
   documentos: DocumentoConductor[];
+  foto?: string | null;
 }
 
 export type TipoMantenimiento = "Preventivo" | "Correctivo" | "Predictivo";

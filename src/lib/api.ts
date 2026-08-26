@@ -219,6 +219,12 @@ export const apiDocs = {
   archivo: (base: string, id: string, docId: string) => api.get<{ nombre: string; mime: string; base64: string }>(`/${base}/${id}/documentos/${docId}/archivo`),
 };
 
+// Foto de conductor / vehículo (se guarda como binario en la BD).
+export const apiFoto = {
+  set: (base: "conductores" | "vehiculos", id: string, fotoBase64: string, fotoMime: string) => api.patch<any>(`/${base}/${id}/foto`, { fotoBase64, fotoMime }),
+  remove: (base: "conductores" | "vehiculos", id: string) => api.del<any>(`/${base}/${id}/foto`),
+};
+
 export function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const r = new FileReader();
