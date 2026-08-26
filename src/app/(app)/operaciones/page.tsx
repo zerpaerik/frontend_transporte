@@ -182,6 +182,7 @@ export default function OperacionesPage() {
         filters={filters}
         dateField={(v) => (v as any).createdAt}
         dateLabel="Registro"
+        recentDays={3}
         minWidth="min-w-[1700px]"
         pageSize={9}
         searchPlaceholder="Buscar por código, contenedor, cliente…"

@@ -27,7 +27,7 @@ const alignCls = { left: "text-left", right: "text-right", center: "text-center"
 export function DataTable<T extends { id: string }>({
   title, columns, rows, filters = [], searchPlaceholder = "Buscar…",
   pageSize = 8, exportName = "export", minWidth = "min-w-[720px]", toolbar,
-  dateField, dateLabel = "Fecha", rowActions,
+  dateField, dateLabel = "Fecha", recentDays, rowActions,
 }: {
   title: string;
   columns: Column<T>[];
@@ -40,6 +40,7 @@ export function DataTable<T extends { id: string }>({
   toolbar?: ReactNode;
   dateField?: (row: T) => string | null | undefined;
   dateLabel?: string;
+  recentDays?: number; // si se pasa, por defecto muestra solo los últimos N días (con toggle "ver todo")
   rowActions?: (row: T) => ReactNode;
 }) {
   const [query, setQuery] = useState("");
@@ -48,6 +49,11 @@ export function DataTable<T extends { id: string }>({
   const [page, setPage] = useState(1);
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
+  const [showAll, setShowAll] = useState(false);
+
+  // "Últimos N días": solo aplica si no hay un rango de fechas manual ni se pidió ver todo.
+  const recentCutoff = useMemo(() => (recentDays ? new Date(Date.now() - recentDays * 86_400_000).toISOString().slice(0, 10) : ""), [recentDays]);
+  const recentActive = !!(dateField && recentDays && !showAll && !desde && !hasta);
 
   const cellValue = (row: T, c: Column<T>): Cell =>
     c.value ? c.value(row) : ((row as Record<string, unknown>)[c.key] as Cell) ?? "";
@@ -73,11 +79,15 @@ export function DataTable<T extends { id: string }>({
         if (desde && d < desde) return false;
         if (hasta && d > hasta) return false;
       }
+      if (recentActive && dateField) {
+        const d = (dateField(r) || "").slice(0, 10);
+        if (!d || d < recentCutoff) return false;
+      }
       if (!q) return true;
       return columns.some((c) => String(cellValue(r, c)).toLowerCase().includes(q));
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, query, active, filters, columns, desde, hasta]);
+  }, [rows, query, active, filters, columns, desde, hasta, recentActive, recentCutoff]);
 
   const sorted = useMemo(() => {
     if (!sort) return filtered;
@@ -144,6 +154,18 @@ export function DataTable<T extends { id: string }>({
             <input type="date" value={hasta} onChange={(e) => { setHasta(e.target.value); setPage(1); }} className="rounded border-0 text-sm outline-none" />
             {(desde || hasta) ? <button onClick={() => { setDesde(""); setHasta(""); }} className="text-xs text-slate-400 hover:text-rose-600">✕</button> : null}
           </div>
+        ) : null}
+
+        {recentDays ? (
+          <button
+            onClick={() => { if (recentActive) { setShowAll(true); } else { setShowAll(false); setDesde(""); setHasta(""); } setPage(1); }}
+            title={recentActive ? "Mostrando solo lo reciente — clic para ver todo el historial" : `Ver solo los últimos ${recentDays} días`}
+            className={recentActive
+              ? "whitespace-nowrap rounded-lg border border-brand-500 bg-brand-50 px-3 py-2 text-sm font-medium text-brand-700"
+              : "whitespace-nowrap rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:border-brand-300 hover:text-brand-600"}
+          >
+            Últimos {recentDays} días
+          </button>
         ) : null}
 
         <div className="ml-auto flex items-center gap-2">
