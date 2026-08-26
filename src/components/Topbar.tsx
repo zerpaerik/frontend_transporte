@@ -1,18 +1,36 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Menu, LogOut, ChevronDown } from "lucide-react";
+import { Menu, LogOut, ChevronDown, Building2, Check } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { apiGetSedes, type Sede } from "@/lib/api";
 import { NAV } from "@/lib/nav";
 
 const LOGO: Record<string, string> = { mgr: "/sedes/mgr.jpg", mjg: "/sedes/mjg.jpg", mgrsi: "/sedes/mgr.jpg" };
 
 export function Topbar({ onMenu }: { onMenu: () => void }) {
-  const { user, logout } = useAuth();
+  const { user, logout, cambiarSede } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [sedes, setSedes] = useState<Sede[]>([]);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (menuOpen && sedes.length === 0) {
+      apiGetSedes().then(setSedes).catch(() => setSedes([]));
+    }
+  }, [menuOpen, sedes.length]);
+
+  async function elegirSede(sedeId: string) {
+    if (busy || sedeId === user?.sede?.id) { setMenuOpen(false); return; }
+    setBusy(true);
+    try {
+      const r = await cambiarSede(sedeId);
+      if (!r.ok) alert(r.error || "No se pudo cambiar de sede.");
+    } finally { setBusy(false); setMenuOpen(false); }
+  }
 
   const current = NAV.find((n) => n.href === pathname);
   const iniciales = (user?.nombre || "?")
@@ -62,11 +80,35 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
         {menuOpen ? (
           <>
             <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} aria-hidden />
-            <div className="absolute right-0 z-20 mt-2 w-52 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
+            <div className="absolute right-0 z-20 mt-2 w-64 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
               <div className="border-b border-slate-100 px-4 py-3">
                 <div className="text-sm font-semibold text-slate-800">{user?.nombre}</div>
                 <div className="text-xs text-slate-400">{user?.email}</div>
               </div>
+
+              {sedes.length > 1 ? (
+                <div className="border-b border-slate-100 py-1.5">
+                  <div className="flex items-center gap-1.5 px-4 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                    <Building2 size={13} /> Cambiar sede
+                  </div>
+                  {sedes.map((s) => {
+                    const activa = s.id === user?.sede?.id;
+                    return (
+                      <button
+                        key={s.id}
+                        disabled={busy}
+                        onClick={() => elegirSede(s.id)}
+                        className={`flex w-full items-center gap-2 px-4 py-2 text-left text-sm disabled:opacity-60 ${activa ? "bg-brand-50 font-semibold text-brand-700" : "text-slate-600 hover:bg-slate-50"}`}
+                      >
+                        <span className="grid h-5 w-5 shrink-0 place-items-center rounded bg-slate-100 text-[9px] font-bold uppercase text-slate-500">{s.codigo.slice(0, 2)}</span>
+                        <span className="flex-1 truncate">{s.nombre}</span>
+                        {activa ? <Check size={15} className="shrink-0 text-brand-600" /> : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
+
               <button
                 onClick={salir}
                 className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-rose-600 hover:bg-rose-50"

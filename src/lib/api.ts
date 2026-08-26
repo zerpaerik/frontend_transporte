@@ -89,6 +89,10 @@ export async function apiLogin(email: string, password: string, sedeId: string) 
   return request<{ access_token: string; user: any }>("POST", "/auth/login", { email, password, sedeId });
 }
 
+export async function apiCambiarSede(sedeId: string) {
+  return request<{ access_token: string; user: any }>("POST", "/auth/cambiar-sede", { sedeId });
+}
+
 // --- Catálogos (menú Archivo) ---
 export interface TipoOperacion { id: string; nombre: string; activo: boolean; }
 export const apiTipos = {
@@ -167,6 +171,7 @@ export const apiPlanillas = {
   generar: (b: { conductor: string; semanaDesde: string; semanaHasta: string }) => api.post<Planilla>("/planillas/generar", b),
   update: (id: string, b: Partial<{ sueldoDia: number; descuentoPlanilla: number; estado: string; lineas: PlanillaLinea[] }>) => api.patch<Planilla>(`/planillas/${id}`, b),
   pagar: (id: string) => api.post<Planilla>(`/planillas/${id}/pagar`, {}),
+  reversar: (id: string) => api.post<Planilla>(`/planillas/${id}/reversar`, {}),
   remove: (id: string) => api.del<void>(`/planillas/${id}`),
 };
 
