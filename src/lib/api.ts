@@ -175,6 +175,38 @@ export const apiPlanillas = {
   remove: (id: string) => api.del<void>(`/planillas/${id}`),
 };
 
+// --- Devolución de contenedores (importación) ---
+export interface Devolucion {
+  id: string;
+  codigo: string;
+  placaTracto: string;
+  carreta: string;
+  conductor: string;
+  cliente: string;
+  contenedor: string;
+  tamanio: string;
+  destino: string;
+  devolucion: string;
+  operacion: string;
+  createdAt: string;
+  citaFecha: string | null;
+  citaHora: string;
+  lugarGuardado: string;
+  estadoDevolucion: string;
+  citaArchivoNombre: string | null;
+}
+export interface LugarGuardado { id: string; nombre: string; }
+export const apiDevoluciones = {
+  list: () => api.get<Devolucion[]>("/devoluciones"),
+  update: (viajeId: string, b: Partial<{ citaFecha: string | null; citaHora: string; lugarGuardado: string; estadoDevolucion: string; archivoBase64: string; archivoNombre: string; archivoMime: string }>) => api.patch<Devolucion>(`/devoluciones/${viajeId}`, b),
+  archivo: (viajeId: string) => api.get<{ nombre: string; mime: string; base64: string }>(`/devoluciones/${viajeId}/archivo`),
+};
+export const apiLugares = {
+  list: () => api.get<LugarGuardado[]>("/lugares-guardado"),
+  create: (nombre: string) => api.post<LugarGuardado>("/lugares-guardado", { nombre }),
+  remove: (id: string) => api.del<void>(`/lugares-guardado/${id}`),
+};
+
 // --- Documentos (conductores / vehículos) ---
 export interface DocumentoInput {
   tipo: string; numero?: string; vencimiento: string;
