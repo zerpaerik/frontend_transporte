@@ -43,6 +43,7 @@ export default function PlanillaPage() {
   const [openGen, setOpenGen] = useState(false);
   const [openCfg, setOpenCfg] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [tab, setTab] = useState<"pendientes" | "pagadas">("pendientes");
 
   function cargar() {
     apiPlanillas.list().then(setPlanillas).catch(() => setPlanillas([]));
@@ -176,6 +177,14 @@ export default function PlanillaPage() {
     try { await apiPlanillas.remove(sel.id); setPlanillas((s) => s.filter((x) => x.id !== sel.id)); setSel(null); }
     finally { setBusy(false); }
   }
+  // Corrige un error: una planilla pagada vuelve a Borrador y libera sus comisiones.
+  async function reversar() {
+    if (!sel || !confirm(`¿Reversar el pago de la planilla de ${sel.conductor}? Volverá a Borrador y sus comisiones quedarán otra vez pendientes.`)) return;
+    setBusy(true);
+    try { aplicar(await apiPlanillas.reversar(sel.id)); }
+    catch (e) { alert((e as Error).message || "No se pudo reversar."); }
+    finally { setBusy(false); }
+  }
 
   function descargarPDF() {
     if (!sel) return;
@@ -245,7 +254,11 @@ export default function PlanillaPage() {
                   <Check size={15} /> Marcar pagada
                 </button>
               </>
-            ) : null}
+            ) : (
+              <button disabled={busy} onClick={reversar} title="Corregir un error: vuelve a borrador y libera las comisiones" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50">
+                <Undo2 size={15} /> Reversar
+              </button>
+            )}
           </div>
         </div>
 
@@ -344,6 +357,9 @@ export default function PlanillaPage() {
   const borradores = planillas.filter((p) => p.estado === "Borrador").length;
   const generadas = planillas.filter((p) => p.estado === "Generada").length;
   const pagadas = planillas.filter((p) => p.estado === "Pagada").length;
+  // Pestañas: Pendientes (borrador + finalizadas, aún no pagadas) vs Pagadas.
+  const pendientesCount = planillas.filter((p) => p.estado !== "Pagada").length;
+  const visibles = planillas.filter((p) => (tab === "pagadas" ? p.estado === "Pagada" : p.estado !== "Pagada"));
 
   return (
     <div>
@@ -365,11 +381,25 @@ export default function PlanillaPage() {
         </button>
       </div>
 
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        {(["pendientes", "pagadas"] as const).map((t) => {
+          const on = tab === t;
+          const n = t === "pendientes" ? pendientesCount : pagadas;
+          return (
+            <button key={t} onClick={() => setTab(t)}
+              className={`inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold transition ${on ? "bg-brand-500 text-white" : "border border-slate-300 bg-white text-slate-600 hover:border-brand-300 hover:text-brand-600"}`}>
+              {t === "pendientes" ? "Pendientes" : "Pagadas"}
+              <span className={`rounded-full px-1.5 text-xs ${on ? "bg-white/25" : "bg-slate-100 text-slate-500"}`}>{n}</span>
+            </button>
+          );
+        })}
+      </div>
+
       <div className="space-y-3">
-        {planillas.length === 0 ? (
-          <Card className="p-10 text-center text-sm text-slate-400">Aún no hay planillas. Genera la primera con “Generar planilla”.</Card>
+        {visibles.length === 0 ? (
+          <Card className="p-10 text-center text-sm text-slate-400">{tab === "pagadas" ? "Aún no hay planillas pagadas." : "No hay planillas pendientes. Genera una con “Generar planilla”."}</Card>
         ) : null}
-        {planillas.map((p) => (
+        {visibles.map((p) => (
           <Card key={p.id} className="flex flex-wrap items-center justify-between gap-4 p-4 transition hover:shadow-md">
             <button onClick={() => abrir(p)} className="flex items-center gap-3 text-left">
               <span className="grid h-10 w-10 place-items-center rounded-full bg-steel-600 text-xs font-bold text-white">
