@@ -9,15 +9,15 @@ import { useData } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import type { Rol, Usuario } from "@/lib/types";
 
-const rolTone: Record<Rol, "orange" | "blue" | "gray"> = {
-  Administrador: "orange", Operador: "blue", Mecánico: "gray",
+const rolTone: Record<Rol, "orange" | "blue" | "gray" | "green"> = {
+  Administrador: "orange", Operador: "blue", Mecánico: "gray", Conductor: "green",
 };
 
 const fields: Field[] = [
   { name: "nombre", label: "Nombre completo", type: "text", required: true, placeholder: "Rosa Quispe", full: true },
   { name: "email", label: "Correo", type: "text", required: true, placeholder: "usuario@transporte.pe" },
   { name: "password", label: "Contraseña", type: "text", required: true, placeholder: "••••••••" },
-  { name: "rol", label: "Rol", type: "select", options: ["Administrador", "Operador", "Mecánico"] },
+  { name: "rol", label: "Rol", type: "select", options: ["Administrador", "Operador", "Mecánico", "Conductor"] },
   { name: "estado", label: "Estado", type: "select", options: ["Activo", "Inactivo"], full: true },
 ];
 

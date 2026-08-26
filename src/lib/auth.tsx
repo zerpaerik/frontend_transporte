@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { USUARIOS, SEDES_DEMO } from "./mock-data";
-import { apiLogin, setToken, clearToken, ApiError, type Sede } from "./api";
+import { apiLogin, apiCambiarSede, setToken, clearToken, ApiError, type Sede } from "./api";
 import type { Usuario } from "./types";
 
 type SafeUser = Omit<Usuario, "password"> & { sede?: Sede };
@@ -12,6 +12,7 @@ interface AuthCtx {
   ready: boolean;
   offline: boolean;
   login: (email: string, password: string, sedeId: string) => Promise<{ ok: boolean; error?: string }>;
+  cambiarSede: (sedeId: string) => Promise<{ ok: boolean; error?: string }>;
   logout: () => void;
 }
 
@@ -70,6 +71,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  async function cambiarSede(sedeId: string) {
+    try {
+      const res = await apiCambiarSede(sedeId);
+      setToken(res.access_token);
+      setOffline(false);
+      persist(res.user);
+      return { ok: true };
+    } catch (e) {
+      const err = e as ApiError;
+      // Sin backend (demo offline): cambiar la sede localmente.
+      if (err.network) {
+        const sede = SEDES_DEMO.find((s) => s.id === sedeId || s.codigo === sedeId);
+        if (sede && user) { persist({ ...user, sede }); return { ok: true }; }
+      }
+      return { ok: false, error: err.message || "No se pudo cambiar de sede." };
+    }
+  }
+
   function logout() {
     setUser(null);
     clearToken();
@@ -80,7 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  return <Ctx.Provider value={{ user, ready, offline, login, logout }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ user, ready, offline, login, cambiarSede, logout }}>{children}</Ctx.Provider>;
 }
 
 export function useAuth() {

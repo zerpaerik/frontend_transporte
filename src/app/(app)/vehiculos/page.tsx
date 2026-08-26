@@ -7,6 +7,7 @@ import { DataTable, type Column, type Filter } from "@/components/DataTable";
 import { FormModal, type Field, type FormValues } from "@/components/FormModal";
 import { DocumentosModal } from "@/components/DocumentosModal";
 import { useData } from "@/lib/store";
+import { useAuth } from "@/lib/auth";
 import { km } from "@/lib/format";
 import type { Vehiculo } from "@/lib/types";
 
@@ -37,14 +38,16 @@ const filters: Filter<Vehiculo>[] = [
   { key: "estado", label: "Estado", value: (v) => v.estado },
 ];
 
-function accionesColumn(onEdit: (v: Vehiculo) => void, onDocs: (v: Vehiculo) => void): Column<Vehiculo> {
+function accionesColumn(onEdit: (v: Vehiculo) => void, onDocs: (v: Vehiculo) => void, readOnly: boolean): Column<Vehiculo> {
   return {
     key: "acciones", header: "Acciones",
     render: (v) => (
       <div className="flex items-center gap-1.5">
-        <button onClick={() => onEdit(v)} title="Editar vehículo" className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:border-brand-300 hover:text-brand-600">
-          <Pencil size={13} /> Editar
-        </button>
+        {!readOnly ? (
+          <button onClick={() => onEdit(v)} title="Editar vehículo" className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:border-brand-300 hover:text-brand-600">
+            <Pencil size={13} /> Editar
+          </button>
+        ) : null}
         <button onClick={() => onDocs(v)} title="Documentos" className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:border-brand-300 hover:text-brand-600">
           <Paperclip size={13} /> {((v as any).documentos?.length ?? 0)}
         </button>
@@ -55,6 +58,8 @@ function accionesColumn(onEdit: (v: Vehiculo) => void, onDocs: (v: Vehiculo) => 
 
 export default function VehiculosPage() {
   const { vehiculos, addVehiculo, updateVehiculo, reload } = useData();
+  const { user } = useAuth();
+  const readOnly = user?.rol === "Conductor";
   const [open, setOpen] = useState(false);
   const [editVeh, setEditVeh] = useState<Vehiculo | null>(null);
   const [docVeh, setDocVeh] = useState<Vehiculo | null>(null);
@@ -86,14 +91,16 @@ export default function VehiculosPage() {
       <DataTable
         title="Flota de vehículos"
         exportName="flota-vehiculos"
-        columns={[...columns, accionesColumn((v) => setEditVeh(v), (v) => setDocVeh(v))]}
+        columns={[...columns, accionesColumn((v) => setEditVeh(v), (v) => setDocVeh(v), readOnly)]}
         rows={vehiculos}
         filters={filters}
         searchPlaceholder="Buscar por placa, marca, modelo…"
         toolbar={
-          <button onClick={() => setOpen(true)} className="flex items-center gap-2 rounded-lg bg-brand-500 px-3.5 py-2 text-sm font-semibold text-white hover:bg-brand-600">
-            <Plus size={16} /> Nuevo vehículo
-          </button>
+          !readOnly ? (
+            <button onClick={() => setOpen(true)} className="flex items-center gap-2 rounded-lg bg-brand-500 px-3.5 py-2 text-sm font-semibold text-white hover:bg-brand-600">
+              <Plus size={16} /> Nuevo vehículo
+            </button>
+          ) : null
         }
       />
 
@@ -119,6 +126,7 @@ export default function VehiculosPage() {
           title={`Documentos — ${docVeh.placa}`}
           subtitle={`${docVeh.marca} ${docVeh.modelo}`}
           documentos={(docVeh as any).documentos ?? []}
+          readOnly={readOnly}
           onChanged={(u) => setDocVeh(u)}
           onClose={() => { setDocVeh(null); reload(); }}
         />
