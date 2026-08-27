@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { LogIn, ShieldCheck, ChevronLeft, Building2 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { homeFor } from "@/lib/nav";
-import { USUARIOS, SEDES_DEMO } from "@/lib/mock-data";
+import { SEDES_DEMO } from "@/lib/mock-data";
 import { apiGetSedes, type Sede } from "@/lib/api";
 
 const LOGO: Record<string, string> = { mgr: "/sedes/mgr.jpg", mjg: "/sedes/mjg.jpg", mgrsi: "/sedes/mgr.jpg" };
@@ -46,12 +46,6 @@ export default function LoginPage() {
       return;
     }
     // La redirección al home del rol la hace el efecto de arriba cuando el usuario queda seteado.
-  }
-
-  function quick(u: (typeof USUARIOS)[number]) {
-    setEmail(u.email);
-    setPassword(u.password);
-    setError("");
   }
 
   return (
@@ -128,7 +122,7 @@ export default function LoginPage() {
               </div>
 
               <h2 className="text-xl font-extrabold tracking-tight text-slate-900">Iniciar sesión</h2>
-              <p className="mt-1 text-sm text-slate-500">Ingresa con uno de los usuarios de prueba.</p>
+              <p className="mt-1 text-sm text-slate-500">Ingresa con tu correo y contraseña.</p>
 
               <form onSubmit={submit} className="mt-5 space-y-4">
                 <div>
@@ -150,20 +144,6 @@ export default function LoginPage() {
                   <LogIn size={16} /> {loading ? "Ingresando…" : "Entrar"}
                 </button>
               </form>
-
-              <div className="mt-6">
-                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Accesos rápidos</div>
-                <div className="grid gap-2">
-                  {USUARIOS.map((u) => (
-                    <button key={u.id} onClick={() => quick(u)}
-                      className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm transition hover:border-brand-300 hover:bg-brand-50/40">
-                      <span><span className="font-medium text-slate-800">{u.nombre}</span><span className="ml-2 text-xs text-slate-400">{u.email}</span></span>
-                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">{u.rol}</span>
-                    </button>
-                  ))}
-                </div>
-                <p className="mt-3 text-xs text-slate-400">Contraseñas: admin123 · gerente123 · operador123 · mecanico123</p>
-              </div>
             </>
           )}
         </div>

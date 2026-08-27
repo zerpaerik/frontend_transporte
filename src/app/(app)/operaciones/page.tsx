@@ -14,11 +14,12 @@ import { apiTipos, apiClientes, apiPuertos, apiComisiones } from "@/lib/api";
 import { fecha, diasRestantes } from "@/lib/format";
 import type { EstadoViaje, Viaje } from "@/lib/types";
 
-const estadoTone: Record<EstadoViaje, "gray" | "blue" | "green" | "orange"> = {
-  Programado: "gray", "En curso": "orange", Culminado: "blue", Devuelto: "green",
+const estadoTone: Record<EstadoViaje, "gray" | "blue" | "green" | "orange" | "red"> = {
+  Programado: "gray", "En curso": "orange", Culminado: "blue", Devuelto: "green", Cancelado: "red",
 };
 
 function Semaforo({ iso, estado }: { iso?: string; estado: EstadoViaje }) {
+  if (estado === "Cancelado") return <span className="text-slate-300">—</span>;
   if (estado === "Culminado" || estado === "Devuelto") return <Badge tone="green">OK</Badge>;
   if (!iso) return <span className="text-slate-300">—</span>;
   const d = diasRestantes(iso);
@@ -128,7 +129,7 @@ export default function OperacionesPage() {
         : { name: "devolucion", label: "Punto de devolución", type: "select", options: puertoOpts, default: g("devolucion") },
       { name: "ubicacion", label: "Ubicación", type: "text", full: true, placeholder: "Dirección / link de Maps de la entrega", default: g("ubicacion") },
       { name: "fechaLimite", label: "Fecha límite devolución (opcional)", type: "date", default: g("fechaLimite") },
-      { name: "estado", label: "Estado", type: "select", options: ["Programado", "En curso", "Culminado", "Devuelto"], default: g("estado", "Programado") },
+      { name: "estado", label: "Estado", type: "select", options: ["Programado", "En curso", "Culminado", "Devuelto", "Cancelado"], default: g("estado", "Programado") },
     ];
   };
 

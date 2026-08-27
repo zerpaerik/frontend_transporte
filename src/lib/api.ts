@@ -207,13 +207,16 @@ export interface Devolucion {
   citaHora: string;
   lugarGuardado: string;
   estadoDevolucion: string;
-  citaArchivoNombre: string | null;
+  devueltoEn: string | null;
+  citaArchivos: { id: string; nombre: string; mime: string }[];
 }
 export interface LugarGuardado { id: string; nombre: string; }
 export const apiDevoluciones = {
   list: () => api.get<Devolucion[]>("/devoluciones"),
-  update: (viajeId: string, b: Partial<{ citaFecha: string | null; citaHora: string; lugarGuardado: string; estadoDevolucion: string; archivoBase64: string; archivoNombre: string; archivoMime: string }>) => api.patch<Devolucion>(`/devoluciones/${viajeId}`, b),
-  archivo: (viajeId: string) => api.get<{ nombre: string; mime: string; base64: string }>(`/devoluciones/${viajeId}/archivo`),
+  update: (viajeId: string, b: Partial<{ citaFecha: string | null; citaHora: string; lugarGuardado: string; estadoDevolucion: string }>) => api.patch<Devolucion>(`/devoluciones/${viajeId}`, b),
+  agregarArchivo: (viajeId: string, archivoBase64: string, nombre: string, mime: string) => api.post<Devolucion>(`/devoluciones/${viajeId}/archivos`, { archivoBase64, nombre, mime }),
+  quitarArchivo: (viajeId: string, archivoId: string) => api.del<Devolucion>(`/devoluciones/${viajeId}/archivos/${archivoId}`),
+  archivo: (viajeId: string, archivoId: string) => api.get<{ nombre: string; mime: string; base64: string }>(`/devoluciones/${viajeId}/archivos/${archivoId}`),
 };
 export const apiLugares = {
   list: () => api.get<LugarGuardado[]>("/lugares-guardado"),

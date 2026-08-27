@@ -28,26 +28,36 @@ function DevolucionCard({ d, lugares, onSaved }: { d: Devolucion; lugares: Lugar
   async function guardar() {
     setBusy(true); setMsg("");
     try {
-      const body: any = { citaFecha: citaFecha || null, citaHora, lugarGuardado: lugar, estadoDevolucion: estado };
-      const f = fileRef.current?.files?.[0];
-      if (f) {
-        const ok = f.type === "application/pdf" || f.type.startsWith("image/");
-        if (!ok) throw new Error("El adjunto debe ser PDF o imagen (JPG/PNG).");
-        body.archivoBase64 = await fileToBase64(f);
-        body.archivoNombre = f.name;
-        body.archivoMime = f.type || "application/pdf";
-      }
-      const upd = await apiDevoluciones.update(d.id, body);
+      const upd = await apiDevoluciones.update(d.id, { citaFecha: citaFecha || null, citaHora, lugarGuardado: lugar, estadoDevolucion: estado });
       onSaved(upd);
-      if (fileRef.current) fileRef.current.value = "";
       setMsg("Guardado");
       setTimeout(() => setMsg(""), 1500);
     } catch (e) { setMsg((e as Error).message || "No se pudo guardar."); }
     finally { setBusy(false); }
   }
 
-  async function descargar() {
-    try { const a = await apiDevoluciones.archivo(d.id); downloadBase64(a.nombre, a.mime, a.base64); }
+  async function subirArchivo(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (fileRef.current) fileRef.current.value = "";
+    if (!f) return;
+    if (!(f.type === "application/pdf" || f.type.startsWith("image/"))) { setMsg("El adjunto debe ser PDF o imagen (JPG/PNG)."); return; }
+    setBusy(true); setMsg("");
+    try {
+      const base64 = await fileToBase64(f);
+      onSaved(await apiDevoluciones.agregarArchivo(d.id, base64, f.name, f.type || "application/pdf"));
+    } catch (err) { setMsg((err as Error).message || "No se pudo subir el archivo."); }
+    finally { setBusy(false); }
+  }
+
+  async function quitar(archivoId: string) {
+    setBusy(true); setMsg("");
+    try { onSaved(await apiDevoluciones.quitarArchivo(d.id, archivoId)); }
+    catch (err) { setMsg((err as Error).message || "No se pudo quitar el archivo."); }
+    finally { setBusy(false); }
+  }
+
+  async function descargar(a: { id: string; nombre: string; mime: string }) {
+    try { const r = await apiDevoluciones.archivo(d.id, a.id); downloadBase64(r.nombre, r.mime, r.base64); }
     catch (e) { setMsg((e as Error).message || "No se pudo descargar."); }
   }
 
@@ -95,13 +105,19 @@ function DevolucionCard({ d, lugares, onSaved }: { d: Devolucion; lugares: Lugar
         </div>
       </div>
 
-      {/* Adjunto + guardar */}
-      <div className="flex flex-wrap items-center gap-3 px-4 py-3">
+      {/* Adjuntos (varios) + guardar */}
+      <div className="flex flex-wrap items-center gap-2 px-4 py-3">
         <label className="flex items-center gap-1.5 text-xs font-medium text-slate-500"><Paperclip size={13} /> Cita del puerto (PDF/JPG)</label>
-        <input ref={fileRef} type="file" accept="application/pdf,image/*" className="block max-w-[220px] text-xs text-slate-500 file:mr-2 file:rounded file:border-0 file:bg-slate-100 file:px-2 file:py-1 file:text-xs" />
-        {d.citaArchivoNombre ? (
-          <button onClick={descargar} className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:border-brand-300 hover:text-brand-600"><Download size={13} /> {d.citaArchivoNombre}</button>
-        ) : null}
+        {d.citaArchivos.map((a) => (
+          <span key={a.id} className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white py-1 pl-2 pr-1 text-xs text-slate-600">
+            <button onClick={() => descargar(a)} title="Descargar" className="inline-flex items-center gap-1 hover:text-brand-600"><Download size={13} /> <span className="max-w-[160px] truncate">{a.nombre}</span></button>
+            <button disabled={busy} onClick={() => quitar(a.id)} title="Quitar" className="rounded p-0.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50"><X size={12} /></button>
+          </span>
+        ))}
+        <label className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-dashed border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:border-brand-300 hover:text-brand-600">
+          <Plus size={13} /> Adjuntar
+          <input ref={fileRef} type="file" accept="application/pdf,image/*" className="hidden" onChange={subirArchivo} />
+        </label>
         <div className="ml-auto flex items-center gap-3">
           {msg ? <span className="text-xs text-slate-400">{msg}</span> : null}
           <button disabled={busy} onClick={guardar} className="inline-flex items-center gap-1.5 rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-60">
