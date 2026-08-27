@@ -6,8 +6,8 @@ import { Badge } from "./ui";
 import { fecha } from "@/lib/format";
 import type { EstadoViaje, Viaje } from "@/lib/types";
 
-const estadoTone: Record<EstadoViaje, "gray" | "blue" | "green" | "orange"> = {
-  Programado: "gray", "En curso": "orange", Culminado: "blue", Devuelto: "green",
+const estadoTone: Record<EstadoViaje, "gray" | "blue" | "green" | "orange" | "red"> = {
+  Programado: "gray", "En curso": "orange", Culminado: "blue", Devuelto: "green", Cancelado: "red",
 };
 
 function Campo({ label, value }: { label: string; value?: ReactNode }) {

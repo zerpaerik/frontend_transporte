@@ -48,7 +48,7 @@ function computeLocal(c: ReturnType<typeof useData>): Resumen {
     },
     mantenimientoPorTipo: ["Preventivo", "Correctivo", "Predictivo"].map((label) => ({ label, value: c.ordenes.filter((o) => o.tipo === label).reduce((s, o) => s + o.costo, 0) })),
     facturasPorEstado: ["Emitida", "Aceptada", "Pagada", "Anulada"].map((label) => ({ label, value: c.facturas.filter((f) => f.estadoSunat === label).length })),
-    viajesPorEstado: ["Programado", "En curso", "Culminado", "Devuelto"].map((label) => ({ label, value: c.viajes.filter((v) => v.estado === label).length })),
+    viajesPorEstado: ["Programado", "En curso", "Culminado", "Devuelto", "Cancelado"].map((label) => ({ label, value: c.viajes.filter((v) => v.estado === label).length })),
     ventasPorCliente: Object.entries(ventasMap).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([label, value]) => ({ label, value })),
     documentosAlerta, devoluciones,
   };
@@ -70,7 +70,7 @@ export default function DashboardPage() {
 
   const mantSlices: Slice[] = d.mantenimientoPorTipo.map((s, i) => ({ ...s, color: [COL.steel, COL.rose, COL.brand][i] }));
   const factSlices: Slice[] = d.facturasPorEstado.map((s, i) => ({ ...s, color: [COL.amber, COL.steel, COL.green, COL.rose][i] }));
-  const viajeSlices: Slice[] = d.viajesPorEstado.map((s, i) => ({ ...s, color: [COL.slate, COL.brand, COL.steel, COL.green][i] }));
+  const viajeSlices: Slice[] = d.viajesPorEstado.map((s, i) => ({ ...s, color: [COL.slate, COL.brand, COL.steel, COL.green, COL.rose][i] }));
   const clienteSlices: Slice[] = d.ventasPorCliente.map((s) => ({ ...s, color: COL.steel }));
 
   return (

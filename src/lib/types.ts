@@ -83,7 +83,7 @@ export interface Neumatico {
   createdAt?: string;
 }
 
-export type EstadoViaje = "Programado" | "En curso" | "Culminado" | "Devuelto";
+export type EstadoViaje = "Programado" | "En curso" | "Culminado" | "Devuelto" | "Cancelado";
 
 export interface Viaje {
   id: string;
