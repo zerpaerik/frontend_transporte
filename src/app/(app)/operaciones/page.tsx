@@ -108,7 +108,7 @@ export default function OperacionesPage() {
     const suelta = String(vals.operacion || "").toLowerCase().includes("suelta");
     const g = (k: string, fallback = "") => (v ? (v[k] ?? fallback) : fallback);
     return [
-      { name: "placaTracto", label: "Placa tracto", type: "select", options: vehiculos.filter((x) => x.tipo === "Tracto").map((x) => x.placa), default: g("placaTracto") },
+      { name: "placaTracto", label: "Placa tracto", type: "select", options: vehiculos.filter((x) => x.tipo === "Tracto").map((x) => x.placa), required: true, default: g("placaTracto") },
       { name: "carreta", label: "Carreta", type: "select", options: ["", ...vehiculos.filter((x) => x.tipo === "Carreta").map((x) => x.placa)], default: g("carreta") },
       { name: "conductor", label: "Conductor", type: "select", options: ["", ...conductores.map((c) => c.nombre)], default: g("conductor") },
       { name: "cliente", label: "Cliente", type: "select", options: clientes, required: true, default: g("cliente") },
@@ -162,6 +162,12 @@ export default function OperacionesPage() {
         <StatCard label="Exportación" value={expo} icon={ArrowUpFromLine} tone="green" />
         <StatCard label="Total viajes" value={viajes.length} icon={Container} tone="gray" />
       </div>
+
+      {vehiculos.filter((x) => x.tipo === "Tracto").length === 0 ? (
+        <div className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700 ring-1 ring-inset ring-amber-200">
+          No hay tractos en la flota de esta sede. Agrégalos en <Link href="/vehiculos" className="font-semibold underline">Flota</Link> para poder registrar viajes.
+        </div>
+      ) : null}
 
       {clientes.length === 0 ? (
         <div className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700 ring-1 ring-inset ring-amber-200">
