@@ -99,6 +99,7 @@ export interface Viaje {
   origen: string;
   destino: string;
   devolucion: string;
+  ubicacion?: string;
   fechaLimite: string; // ISO date
   estado: EstadoViaje;
   nOrden: string;

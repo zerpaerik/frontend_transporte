@@ -32,17 +32,31 @@ function Semaforo({ iso, estado }: { iso?: string; estado: EstadoViaje }) {
   return <Badge tone="green">{d} días</Badge>;
 }
 
-// Columnas esenciales para escanear. El resto de datos vive en el detalle (clic en la fila).
+// Lista completa de campos del despacho. El código queda fijo a la izquierda y las
+// acciones fijas a la derecha, para no tener que hacer scroll hasta el final.
+const dash = <span className="text-slate-300">—</span>;
 const columns: Column<Viaje>[] = [
   { key: "codigo", header: "Código", sortable: true, thClass: "sticky left-0 z-20", tdClass: "sticky left-0 z-10 bg-white", render: (v) => <span className="font-semibold text-brand-700">{(v as any).codigo || "—"}</span> },
   { key: "registro", header: "Registro", sortable: true, value: (v) => (v as any).createdAt || "", render: (v) => <span className="tabular whitespace-nowrap text-slate-500">{fecha((v as any).createdAt || "")}</span> },
   { key: "placaTracto", header: "Tracto", sortable: true, render: (v) => <span className="font-semibold text-slate-900">{v.placaTracto}</span> },
+  { key: "carreta", header: "Carreta", render: (v) => v.carreta ? <span className="tabular whitespace-nowrap">{v.carreta}</span> : dash },
   { key: "conductor", header: "Conductor", sortable: true, render: (v) => <span className="block max-w-[150px] truncate" title={v.conductor}>{v.conductor || "—"}</span> },
   { key: "cliente", header: "Cliente", sortable: true, render: (v) => <span className="block max-w-[190px] truncate font-medium text-slate-700" title={v.cliente}>{v.cliente || "—"}</span> },
-  { key: "contenedor", header: "Contenedor", sortable: true, render: (v) => <span className="tabular whitespace-nowrap">{v.contenedor || "—"}</span> },
+  { key: "nOrden", header: "N° Orden", sortable: true, value: (v) => v.nOrden, render: (v) => v.nOrden ? <span className="tabular whitespace-nowrap">{v.nOrden}</span> : dash },
   { key: "operacion", header: "Op.", render: (v) => <span className="whitespace-nowrap text-xs font-semibold text-slate-500">{v.operacion}</span> },
-  { key: "estado", header: "Estado", sortable: true, render: (v) => <Badge tone={estadoTone[v.estado]}>{v.estado}</Badge> },
+  { key: "tipoCarga", header: "Carga", sortable: true, render: (v) => <span className="whitespace-nowrap text-xs">{v.tipoCarga || "—"}</span> },
+  { key: "contenedor", header: "Contenedor", sortable: true, render: (v) => <span className="tabular whitespace-nowrap">{v.contenedor || "—"}</span> },
+  { key: "tamanio", header: "Tamaño", render: (v) => v.tamanio ? <span className="whitespace-nowrap">{v.tamanio}</span> : dash },
+  { key: "origen", header: "Origen", render: (v) => v.origen ? <span className="block max-w-[150px] truncate" title={v.origen}>{v.origen}</span> : dash },
+  { key: "destino", header: "Destino", render: (v) => v.destino ? <span className="block max-w-[150px] truncate" title={v.destino}>{v.destino}</span> : dash },
+  { key: "horaCita", header: "Hora cita", render: (v) => v.horaCita ? <span className="whitespace-nowrap">{v.horaCita}</span> : dash },
+  { key: "devolucion", header: "Devolución", render: (v) => v.devolucion ? <span className="block max-w-[150px] truncate" title={v.devolucion}>{v.devolucion}</span> : dash },
+  { key: "ubicacion", header: "Ubicación", render: (v) => v.ubicacion ? <span className="block max-w-[170px] truncate" title={v.ubicacion}>{v.ubicacion}</span> : dash },
+  { key: "fechaLimite", header: "F. límite", sortable: true, value: (v) => v.fechaLimite || "", render: (v) => v.fechaLimite ? <span className="tabular whitespace-nowrap">{fecha(v.fechaLimite)}</span> : dash },
   { key: "semaforo", header: "Devolver", align: "center", render: (v) => <Semaforo iso={v.fechaLimite || undefined} estado={v.estado} /> },
+  { key: "greRemitente", header: "N° Guía", value: (v) => v.greRemitente, render: (v) => v.greRemitente ? <span className="tabular whitespace-nowrap">{v.greRemitente}</span> : dash },
+  { key: "facturado", header: "Facturado", value: (v) => (v.factura ? "Sí" : "No"), render: (v) => v.factura ? <Badge tone="green">Facturado · {v.factura}</Badge> : <Badge tone="amber">No facturado</Badge> },
+  { key: "estado", header: "Estado", sortable: true, render: (v) => <Badge tone={estadoTone[v.estado]}>{v.estado}</Badge> },
 ];
 
 const filters: Filter<Viaje>[] = [
@@ -51,26 +65,23 @@ const filters: Filter<Viaje>[] = [
   { key: "cliente", label: "Cliente", value: (v) => v.cliente },
 ];
 
-function accionesColumn(onTicket: (v: Viaje) => void, onEdit: (v: Viaje) => void, onDelete: (v: Viaje) => void): Column<Viaje> {
-  return {
-    key: "acciones", header: "",
-    render: (v) => (
-      <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-        <button onClick={() => onTicket(v)} title="Ver ticket / PDF / WhatsApp"
-          className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:border-brand-300 hover:text-brand-600">
-          <FileText size={13} /> Ticket
-        </button>
-        <button onClick={() => onEdit(v)} title="Editar viaje"
-          className="rounded-md border border-slate-200 p-1.5 text-slate-500 hover:border-brand-300 hover:text-brand-600">
-          <Pencil size={13} />
-        </button>
-        <button onClick={() => onDelete(v)} title="Eliminar viaje"
-          className="rounded-md border border-slate-200 p-1.5 text-slate-500 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-600">
-          <Trash2 size={13} />
-        </button>
-      </div>
-    ),
-  };
+function AccionesViaje({ v, onTicket, onEdit, onDelete }: { v: Viaje; onTicket: (v: Viaje) => void; onEdit: (v: Viaje) => void; onDelete: (v: Viaje) => void }) {
+  return (
+    <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+      <button onClick={() => onTicket(v)} title="Ver ticket / PDF / WhatsApp"
+        className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:border-brand-300 hover:text-brand-600">
+        <FileText size={13} /> Ticket
+      </button>
+      <button onClick={() => onEdit(v)} title="Editar viaje"
+        className="rounded-md border border-slate-200 p-1.5 text-slate-500 hover:border-brand-300 hover:text-brand-600">
+        <Pencil size={13} />
+      </button>
+      <button onClick={() => onDelete(v)} title="Eliminar viaje"
+        className="rounded-md border border-slate-200 p-1.5 text-slate-500 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-600">
+        <Trash2 size={13} />
+      </button>
+    </div>
+  );
 }
 
 export default function OperacionesPage() {
@@ -190,15 +201,16 @@ export default function OperacionesPage() {
       <DataTable
         title="Operaciones y despachos"
         exportName="operaciones-despachos"
-        columns={[...columns, accionesColumn(setTicketViaje, setEditViaje, eliminarViaje)]}
+        columns={columns}
         rows={viajes}
         filters={filters}
         dateField={(v) => (v as any).createdAt}
         dateLabel="Registro"
         recentDays={3}
-        minWidth="min-w-[980px]"
+        minWidth="min-w-[1500px]"
         pageSize={9}
         onRowClick={setDetalle}
+        rowActions={(v) => <AccionesViaje v={v} onTicket={setTicketViaje} onEdit={setEditViaje} onDelete={eliminarViaje} />}
         searchPlaceholder="Buscar por código, contenedor, cliente…"
         toolbar={
           <>

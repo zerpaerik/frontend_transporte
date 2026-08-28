@@ -207,7 +207,7 @@ export function DataTable<T extends { id: string }>({
                     </span>
                   </th>
                 ))}
-                {rowActions ? <th className="whitespace-nowrap border-b border-slate-200 bg-slate-50/80 px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Acciones</th> : null}
+                {rowActions ? <th className="sticky right-0 z-20 whitespace-nowrap border-b border-slate-200 bg-slate-50 px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500 shadow-[-10px_0_10px_-8px_rgba(15,23,42,0.12)]">Acciones</th> : null}
               </tr>
             </thead>
             <tbody>
@@ -225,7 +225,7 @@ export function DataTable<T extends { id: string }>({
                       {c.render ? c.render(row) : String(cellValue(row, c))}
                     </td>
                   ))}
-                  {rowActions ? <td className="border-b border-slate-100 px-4 py-3 text-right align-middle">{rowActions(row)}</td> : null}
+                  {rowActions ? <td className="sticky right-0 z-10 border-b border-slate-100 bg-white px-4 py-3 text-right align-middle shadow-[-10px_0_10px_-8px_rgba(15,23,42,0.12)]">{rowActions(row)}</td> : null}
                 </tr>
               ))}
             </tbody>
