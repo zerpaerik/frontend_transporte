@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { X, Copy, FileText, MessageCircle, MapPin, Check } from "lucide-react";
 import { Badge } from "./ui";
-import { fecha } from "@/lib/format";
 import { fichaViajePDF } from "@/lib/ticket-pdf";
 
 export function TicketViaje({ viaje, empresa, onClose }: { viaje: any; empresa?: { nombre?: string; ruc?: string; codigo?: string }; onClose: () => void }) {
@@ -13,39 +12,24 @@ export function TicketViaje({ viaje, empresa, onClose }: { viaje: any; empresa?:
   if (!v) return null;
 
   const codigo = v.codigo || "—";
-  const registro = fecha(v.createdAt || "");
 
-  // Ficha por secciones (sin tarifa: el conductor no debe ver cuánto se cobra).
-  const grupos: { titulo: string; filas: [string, string][] }[] = [
-    { titulo: "Cliente", filas: [["Cliente", v.cliente], ["RUC", v.clienteRuc || "—"], ["Dirección", v.clienteDireccion || "—"]] },
-    { titulo: "Unidad y conductor", filas: [["Tracto", v.placaTracto], ["Carreta", v.carreta || "—"], ["Conductor", v.conductor || "—"]] },
-    { titulo: "Carga", filas: [["Operación", v.operacion], ["Tipo de carga", v.tipoCarga || "—"], ["Contenedor", v.contenedor], ["Tamaño", v.tamanio || "—"]] },
-    {
-      titulo: "Ruta y entrega",
-      filas: [
-        ["Origen", v.origen || "—"], ["Destino", v.destino || "—"], ["Punto de devolución", v.devolucion || "—"],
-        ["Hora de cita", v.horaCita || "—"], ["Fecha límite devolución", v.fechaLimite ? fecha(v.fechaLimite) : "—"],
-        ["N° Orden", v.nOrden || "—"], ["Guía de remisión", v.greRemitente || "—"],
-      ],
-    },
+  // Solo estos datos se muestran/comparten (los demás no van en la ficha del conductor).
+  const filas: [string, string][] = [
+    ["Punto de recojo", v.origen || "—"],
+    ["Cita de retiro", v.horaCita || "—"],
+    ["Punto de llegada", v.destino || "—"],
+    ["Tamaño contenedor", v.tamanio || "—"],
+    ["Tipo de mercadería a trasladar", v.tipoCarga || "—"],
   ];
 
-  const seccion = (titulo: string, lineas: string[]) => {
-    const body = lineas.filter(Boolean);
-    return body.length ? [titulo, ...body].join("\n") : "";
-  };
   const texto = [
-    `🚛 VIAJE ${codigo}  ·  ${v.estado || ""}`.trim(),
-    seccion("👤 CLIENTE", [`${v.cliente}${v.clienteRuc ? `  (RUC ${v.clienteRuc})` : ""}`, v.clienteDireccion ? `Dirección: ${v.clienteDireccion}` : ""]),
-    seccion("🚚 UNIDAD", [`Tracto: ${v.placaTracto}`, v.carreta ? `Carreta: ${v.carreta}` : "", v.conductor ? `Conductor: ${v.conductor}` : ""]),
-    seccion("📦 CARGA", [`Operación: ${v.operacion}`, `Contenedor: ${v.contenedor}${v.tamanio ? ` (${v.tamanio})` : ""}`, v.tipoCarga ? `Tipo de carga: ${v.tipoCarga}` : ""]),
-    seccion("🧭 RUTA", [
-      v.origen ? `Origen: ${v.origen}` : "", v.destino ? `Destino: ${v.destino}` : "",
-      v.devolucion ? `Devolución: ${v.devolucion}${v.fechaLimite ? ` (límite ${fecha(v.fechaLimite)})` : ""}` : "",
-      v.horaCita ? `Hora de cita: ${v.horaCita}` : "", v.nOrden ? `N° Orden: ${v.nOrden}` : "", v.greRemitente ? `Guía: ${v.greRemitente}` : "",
-    ]),
-    v.ubicacion ? seccion("📍 ENTREGA", [v.ubicacion]) : "",
-  ].filter(Boolean).join("\n\n");
+    `* Punto de recojo: ${v.origen || ""}`,
+    `* Cita de retiro: ${v.horaCita || ""}`,
+    `* Punto de llegada: ${v.destino || ""}`,
+    `* Ubicación de llegada:  ${v.ubicacion || ""}`,
+    `* Tamaño contenedor: ${v.tamanio || ""}`,
+    `* Tipo de mercadería a trasladar: ${v.tipoCarga || ""}`,
+  ].join("\n");
 
   const mapsUrl = v.ubicacion ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(v.ubicacion)}` : "";
 
@@ -64,37 +48,42 @@ export function TicketViaje({ viaje, empresa, onClose }: { viaje: any; empresa?:
             <div className="text-2xl font-extrabold tracking-tight">{codigo}</div>
             <Badge tone="blue">{v.estado}</Badge>
           </div>
-          <div className="mt-1 text-sm text-steel-100">{v.cliente} · {registro}</div>
         </div>
 
-        {/* Cuerpo por secciones */}
-        <div className="max-h-[60vh] overflow-y-auto px-6 py-3">
-          {grupos.map((g) => (
-            <section key={g.titulo} className="border-b border-slate-100 py-3 last:border-b-0">
-              <div className="mb-1.5 text-xs font-bold uppercase tracking-wide text-brand-600">{g.titulo}</div>
-              <dl className="space-y-1">
-                {g.filas.map(([k, val]) => (
-                  <div key={k} className="flex items-start justify-between gap-4">
-                    <dt className="shrink-0 text-sm text-slate-500">{k}</dt>
-                    <dd className="select-text break-words text-right text-sm font-semibold text-slate-800">{val}</dd>
-                  </div>
-                ))}
-              </dl>
-            </section>
-          ))}
-
-          {v.ubicacion ? (
-            <section className="py-3">
-              <div className="mb-1.5 text-xs font-bold uppercase tracking-wide text-brand-600">📍 Ubicación de entrega</div>
-              <div className="select-text break-words rounded-lg bg-slate-50 px-3 py-2 text-sm font-medium text-slate-800 ring-1 ring-inset ring-slate-200">{v.ubicacion}</div>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <button onClick={() => copiar(v.ubicacion, setCopiadoUbic)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 hover:border-brand-300 hover:text-brand-600">
-                  {copiadoUbic ? <><Check size={14} /> ¡Copiado!</> : <><Copy size={14} /> Copiar ubicación</>}
-                </button>
-                {mapsUrl ? <a href={mapsUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 hover:border-brand-300 hover:text-brand-600"><MapPin size={14} /> Abrir en Maps</a> : null}
+        {/* Cuerpo — solo los datos del conductor */}
+        <div className="px-6 py-3">
+          <dl>
+            {filas.slice(0, 3).map(([k, val]) => (
+              <div key={k} className="flex items-start justify-between gap-4 border-b border-slate-100 py-2.5">
+                <dt className="shrink-0 text-sm text-slate-500">{k}</dt>
+                <dd className="select-text break-words text-right text-base font-bold text-slate-800">{val}</dd>
               </div>
-            </section>
-          ) : null}
+            ))}
+          </dl>
+
+          <div className="py-3">
+            <div className="mb-1.5 text-sm text-slate-500">Ubicación de llegada</div>
+            {v.ubicacion ? (
+              <>
+                <div className="select-text break-words rounded-lg bg-slate-50 px-3 py-2 text-sm font-semibold text-brand-700 ring-1 ring-inset ring-slate-200">{v.ubicacion}</div>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button onClick={() => copiar(v.ubicacion, setCopiadoUbic)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 hover:border-brand-300 hover:text-brand-600">
+                    {copiadoUbic ? <><Check size={14} /> ¡Copiado!</> : <><Copy size={14} /> Copiar ubicación</>}
+                  </button>
+                  {mapsUrl ? <a href={mapsUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 hover:border-brand-300 hover:text-brand-600"><MapPin size={14} /> Abrir en Maps</a> : null}
+                </div>
+              </>
+            ) : <div className="text-sm text-slate-300">—</div>}
+          </div>
+
+          <dl>
+            {filas.slice(3).map(([k, val]) => (
+              <div key={k} className="flex items-start justify-between gap-4 border-t border-slate-100 py-2.5">
+                <dt className="shrink-0 text-sm text-slate-500">{k}</dt>
+                <dd className="select-text break-words text-right text-base font-bold text-slate-800">{val}</dd>
+              </div>
+            ))}
+          </dl>
         </div>
 
         {/* Acciones */}
