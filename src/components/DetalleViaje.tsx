@@ -65,6 +65,7 @@ export function DetalleViaje({ viaje, onClose }: { viaje: Viaje; onClose: () => 
           <Grupo title="Ruta y devolución">
             <Campo label="Origen" value={viaje.origen} />
             <Campo label="Destino" value={viaje.destino} />
+            <Campo label="En el cliente" value={[viaje.fechaCliente ? fecha(viaje.fechaCliente) : "", viaje.horaCliente].filter(Boolean).join(" · ")} />
             <Campo label="Punto de devolución" value={viaje.devolucion} />
             <Campo label="Fecha límite" value={viaje.fechaLimite ? fecha(viaje.fechaLimite) : ""} />
           </Grupo>

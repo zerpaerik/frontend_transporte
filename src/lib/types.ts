@@ -96,6 +96,8 @@ export interface Viaje {
   tamanio: string;
   tipoCarga: string;
   horaCita: string;
+  fechaCliente: string; // ISO date
+  horaCliente: string;
   origen: string;
   destino: string;
   devolucion: string;

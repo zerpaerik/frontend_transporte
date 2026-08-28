@@ -50,6 +50,10 @@ const columns: Column<Viaje>[] = [
   { key: "origen", header: "Origen", render: (v) => v.origen ? <span className="block max-w-[150px] truncate" title={v.origen}>{v.origen}</span> : dash },
   { key: "destino", header: "Destino", render: (v) => v.destino ? <span className="block max-w-[150px] truncate" title={v.destino}>{v.destino}</span> : dash },
   { key: "horaCita", header: "Hora cita", render: (v) => v.horaCita ? <span className="whitespace-nowrap">{v.horaCita}</span> : dash },
+  { key: "enCliente", header: "En cliente", value: (v) => `${v.fechaCliente || ""} ${v.horaCliente || ""}`.trim(), render: (v) => {
+    const t = [v.fechaCliente ? fecha(v.fechaCliente) : "", v.horaCliente || ""].filter(Boolean).join(" · ");
+    return t ? <span className="whitespace-nowrap">{t}</span> : dash;
+  } },
   { key: "devolucion", header: "Devolución", render: (v) => v.devolucion ? <span className="block max-w-[150px] truncate" title={v.devolucion}>{v.devolucion}</span> : dash },
   { key: "ubicacion", header: "Ubicación", render: (v) => v.ubicacion ? <span className="block max-w-[170px] truncate" title={v.ubicacion}>{v.ubicacion}</span> : dash },
   { key: "fechaLimite", header: "F. límite", sortable: true, value: (v) => v.fechaLimite || "", render: (v) => v.fechaLimite ? <span className="tabular whitespace-nowrap">{fecha(v.fechaLimite)}</span> : dash },
@@ -140,7 +144,14 @@ export default function OperacionesPage() {
       { name: "contenedor", label: "Contenedor", type: "text", placeholder: "Opcional — se puede registrar luego al editar", default: g("contenedor") },
       { name: "tipoCarga", label: "Tipo de carga", type: "select", options: ["GENERAL", "IMO", "REEFER"], default: g("tipoCarga", "GENERAL") },
       { name: "tamanio", label: "Tamaño", type: "select", options: ["", "20'", "40'", "40' HC"], default: g("tamanio") },
-      { name: "horaCita", label: "Hora de cita", type: "text", placeholder: "08:00", default: g("horaCita") },
+      { name: "horaCita", label: "Hora de cita (retiro en puerto)", type: "text", placeholder: "08:00", default: g("horaCita") },
+      // "En el cliente" (fecha + hora) — suele ser otro día; solo en importación/exportación.
+      ...(!suelta
+        ? [
+            { name: "fechaCliente", label: "Fecha en el cliente", type: "date" as const, default: g("fechaCliente") },
+            { name: "horaCliente", label: "Hora en el cliente", type: "text" as const, placeholder: "Ej. 09:00", default: g("horaCliente") },
+          ]
+        : []),
       suelta
         ? { name: "origen", label: "Origen (texto libre)", type: "text", placeholder: "Escribe el origen", default: g("origen") }
         : { name: "origen", label: "Origen (puerto)", type: "select", options: puertoOpts, default: g("origen") },
@@ -160,11 +171,12 @@ export default function OperacionesPage() {
       carreta: v.carreta === ALQ_CARRETA ? String(v.carretaPlaca || "").toUpperCase() : String(v.carreta || ""),
       conductor: String(v.conductor || ""), cliente: String(v.cliente),
       operacion: String(v.operacion), contenedor: String(v.contenedor).toUpperCase(), tamanio: String(v.tamanio || ""),
-      tipoCarga: String(v.tipoCarga || "GENERAL"), horaCita: String(v.horaCita || ""), origen: String(v.origen || ""),
+      tipoCarga: String(v.tipoCarga || "GENERAL"), horaCita: String(v.horaCita || ""), horaCliente: String(v.horaCliente || ""), origen: String(v.origen || ""),
       destino: String(v.destino || ""), devolucion: String(v.devolucion || ""), ubicacion: String(v.ubicacion || ""),
       estado: String(v.estado || "Programado"), nOrden: String(v.nOrden || ""), greRemitente: String(v.greRemitente || ""),
       tarifa: Number(v.tarifa || 0),
       fechaLimite: v.fechaLimite ? String(v.fechaLimite) : undefined,
+      fechaCliente: v.fechaCliente ? String(v.fechaCliente) : undefined,
     };
     return body;
   }

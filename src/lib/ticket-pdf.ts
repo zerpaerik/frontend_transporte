@@ -3,6 +3,8 @@
 // operativos que el conductor necesita. La ubicación de llegada es tocable
 // (copiar / abrir en Maps). Se abre como página; se guarda como PDF con el botón.
 
+import { fecha } from "./format";
+
 const esc = (v: unknown) =>
   String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
@@ -15,12 +17,15 @@ export function fichaViajePDF(v: any, empresa?: { nombre?: string; ruc?: string;
   const emp = empresa?.nombre || "Orden de viaje";
   const ruc = empresa?.ruc || "";
   const logo = empresa?.codigo ? `/sedes/${encodeURIComponent(empresa.codigo)}.jpg` : "";
+  const enCliente = [v.fechaCliente ? fecha(v.fechaCliente) : "", v.horaCliente].filter(Boolean).join(" · ");
 
   // Los únicos datos que se muestran en la ficha.
   const datos: [string, string][] = [
     ["Punto de recojo", v.origen || ""],
     ["Cita de retiro", v.horaCita || ""],
     ["Punto de llegada", v.destino || ""],
+    ["En el cliente", enCliente],
+    ["Punto de devolución", v.devolucion || ""],
     ["Tamaño contenedor", v.tamanio || ""],
     ["Tipo de mercadería a trasladar", v.tipoCarga || ""],
   ];
@@ -109,9 +114,11 @@ export function fichaViajePDF(v: any, empresa?: { nombre?: string; ruc?: string;
       ${row(datos[0][0], datos[0][1])}
       ${row(datos[1][0], datos[1][1])}
       ${row(datos[2][0], datos[2][1])}
-      ${ubic}
       ${row(datos[3][0], datos[3][1])}
+      ${ubic}
       ${row(datos[4][0], datos[4][1])}
+      ${row(datos[5][0], datos[5][1])}
+      ${row(datos[6][0], datos[6][1])}
     </div>
 
     <div class="pie">${esc(emp)}${ruc ? " · RUC " + esc(ruc) : ""}</div>
