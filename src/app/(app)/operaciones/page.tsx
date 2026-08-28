@@ -238,7 +238,7 @@ export default function OperacionesPage() {
         onClose={() => setTipoOpen(false)}
       />
 
-      {ticketViaje ? <TicketViaje viaje={ticketViaje} empresa={user?.sede ? { nombre: user.sede.nombre, ruc: user.sede.ruc } : undefined} onClose={() => setTicketViaje(null)} /> : null}
+      {ticketViaje ? <TicketViaje viaje={ticketViaje} empresa={user?.sede ? { nombre: user.sede.nombre, ruc: user.sede.ruc, codigo: user.sede.codigo } : undefined} onClose={() => setTicketViaje(null)} /> : null}
       {detalle ? <DetalleViaje viaje={detalle} onClose={() => setDetalle(null)} /> : null}
     </div>
   );

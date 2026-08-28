@@ -6,7 +6,7 @@ import { Badge } from "./ui";
 import { fecha } from "@/lib/format";
 import { fichaViajePDF } from "@/lib/ticket-pdf";
 
-export function TicketViaje({ viaje, empresa, onClose }: { viaje: any; empresa?: { nombre?: string; ruc?: string }; onClose: () => void }) {
+export function TicketViaje({ viaje, empresa, onClose }: { viaje: any; empresa?: { nombre?: string; ruc?: string; codigo?: string }; onClose: () => void }) {
   const v = viaje;
   const [copiadoUbic, setCopiadoUbic] = useState(false);
   const [copiadoTodo, setCopiadoTodo] = useState(false);
