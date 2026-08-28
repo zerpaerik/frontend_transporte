@@ -14,6 +14,9 @@ import { apiTipos, apiClientes, apiPuertos, apiComisiones } from "@/lib/api";
 import { fecha, diasRestantes } from "@/lib/format";
 import type { EstadoViaje, Viaje } from "@/lib/types";
 
+// Opción del select de carreta para escribir una placa alquilada (fuera de la flota).
+const ALQ_CARRETA = "Alquilada (otra placa)";
+
 const estadoTone: Record<EstadoViaje, "gray" | "blue" | "green" | "orange" | "red"> = {
   Programado: "gray", "En curso": "orange", Culminado: "blue", Devuelto: "green", Cancelado: "red",
 };
@@ -107,9 +110,16 @@ export default function OperacionesPage() {
   const buildFields = (vals: Record<string, string>, v?: any): Field[] => {
     const suelta = String(vals.operacion || "").toLowerCase().includes("suelta");
     const g = (k: string, fallback = "") => (v ? (v[k] ?? fallback) : fallback);
+    // Carreta: la de flota o una alquilada (placa libre para este viaje).
+    const carretasFlota = vehiculos.filter((x) => x.tipo === "Carreta").map((x) => x.placa);
+    const carretaGuardada = g("carreta");
+    const alquiladaGuardada = !!carretaGuardada && !carretasFlota.includes(carretaGuardada);
     return [
       { name: "placaTracto", label: "Placa tracto", type: "select", options: vehiculos.filter((x) => x.tipo === "Tracto").map((x) => x.placa), required: true, default: g("placaTracto") },
-      { name: "carreta", label: "Carreta", type: "select", options: ["", ...vehiculos.filter((x) => x.tipo === "Carreta").map((x) => x.placa)], default: g("carreta") },
+      { name: "carreta", label: "Carreta", type: "select", options: ["", ...carretasFlota, ALQ_CARRETA], default: alquiladaGuardada ? ALQ_CARRETA : carretaGuardada },
+      ...(vals.carreta === ALQ_CARRETA
+        ? [{ name: "carretaPlaca", label: "Placa de la carreta alquilada", type: "text" as const, required: true, placeholder: "Ej. B7A-845", full: true, default: alquiladaGuardada ? carretaGuardada : "" }]
+        : []),
       { name: "conductor", label: "Conductor", type: "select", options: ["", ...conductores.map((c) => c.nombre)], default: g("conductor") },
       { name: "cliente", label: "Cliente", type: "select", options: clientes, required: true, default: g("cliente") },
       { name: "nOrden", label: "Orden", type: "text", placeholder: "26/03000251", default: g("nOrden") },
@@ -135,7 +145,9 @@ export default function OperacionesPage() {
 
   function toBody(v: FormValues) {
     const body: any = {
-      placaTracto: String(v.placaTracto), carreta: String(v.carreta || ""), conductor: String(v.conductor || ""), cliente: String(v.cliente),
+      placaTracto: String(v.placaTracto),
+      carreta: v.carreta === ALQ_CARRETA ? String(v.carretaPlaca || "").toUpperCase() : String(v.carreta || ""),
+      conductor: String(v.conductor || ""), cliente: String(v.cliente),
       operacion: String(v.operacion), contenedor: String(v.contenedor).toUpperCase(), tamanio: String(v.tamanio || ""),
       tipoCarga: String(v.tipoCarga || "GENERAL"), horaCita: String(v.horaCita || ""), origen: String(v.origen || ""),
       destino: String(v.destino || ""), devolucion: String(v.devolucion || ""), ubicacion: String(v.ubicacion || ""),
@@ -226,7 +238,7 @@ export default function OperacionesPage() {
         onClose={() => setTipoOpen(false)}
       />
 
-      {ticketViaje ? <TicketViaje viaje={ticketViaje} onClose={() => setTicketViaje(null)} /> : null}
+      {ticketViaje ? <TicketViaje viaje={ticketViaje} empresa={user?.sede ? { nombre: user.sede.nombre, ruc: user.sede.ruc, codigo: user.sede.codigo } : undefined} onClose={() => setTicketViaje(null)} /> : null}
       {detalle ? <DetalleViaje viaje={detalle} onClose={() => setDetalle(null)} /> : null}
     </div>
   );
