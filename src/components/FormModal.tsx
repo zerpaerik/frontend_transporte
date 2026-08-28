@@ -10,15 +10,29 @@ export type Field =
 
 export type FormValues = Record<string, string | number>;
 
-function initial(fields: Field[]): Record<string, string> {
-  const o: Record<string, string> = {};
-  for (const f of fields) {
-    if (f.type === "select") o[f.name] = f.default ?? f.options[0] ?? "";
-    // Los numéricos en 0 arrancan vacíos para no mostrar el "0" antes del número.
-    else if (f.type === "number") o[f.name] = f.default != null && f.default !== 0 ? String(f.default) : "";
-    else o[f.name] = f.default != null ? String(f.default) : "";
+function fieldDefault(f: Field): string {
+  // Un select sin default toma su primera opción (usar || para que "" caiga a la primera:
+  // así el estado coincide con lo que muestra el navegador y no falla el "obligatorio").
+  if (f.type === "select") return f.default || f.options[0] || "";
+  // Los numéricos en 0 arrancan vacíos para no mostrar el "0" antes del número.
+  if (f.type === "number") return f.default != null && f.default !== 0 ? String(f.default) : "";
+  return f.default != null ? String(f.default) : "";
+}
+
+// Inicializa en varias pasadas para resolver campos que aparecen según otros
+// (p. ej. "Placa de la carreta alquilada" cuando eliges alquilar).
+function computeInitial(resolve: (v: Record<string, string>) => Field[]): Record<string, string> {
+  let vals: Record<string, string> = {};
+  for (let i = 0; i < 4; i++) {
+    let changed = false;
+    const next = { ...vals };
+    for (const f of resolve(vals)) {
+      if (!(f.name in next)) { next[f.name] = fieldDefault(f); changed = true; }
+    }
+    vals = next;
+    if (!changed) break;
   }
-  return o;
+  return vals;
 }
 
 export function FormModal({
@@ -33,12 +47,12 @@ export function FormModal({
   onClose: () => void;
 }) {
   const resolve = (vals: Record<string, string>) => (typeof fields === "function" ? fields(vals) : fields);
-  const [values, setValues] = useState<Record<string, string>>(() => initial(resolve({})));
+  const [values, setValues] = useState<Record<string, string>>(() => computeInitial(resolve));
   const [error, setError] = useState("");
 
   useEffect(() => {
     if (open) {
-      setValues(initial(resolve({})));
+      setValues(computeInitial(resolve));
       setError("");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -92,7 +106,7 @@ export function FormModal({
                 </label>
                 {f.type === "select" ? (
                   <select
-                    value={values[f.name]}
+                    value={values[f.name] ?? ""}
                     onChange={(e) => set(f.name, e.target.value)}
                     className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30"
                   >
@@ -105,7 +119,7 @@ export function FormModal({
                     type={f.type}
                     inputMode={f.type === "number" ? "decimal" : undefined}
                     step={f.type === "number" ? f.step ?? "any" : undefined}
-                    value={values[f.name]}
+                    value={values[f.name] ?? ""}
                     placeholder={f.type !== "date" ? f.placeholder : undefined}
                     onChange={(e) => set(f.name, e.target.value)}
                     className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30"
