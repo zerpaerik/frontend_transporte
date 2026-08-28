@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { X, Copy, FileText, MessageCircle, MapPin, Check } from "lucide-react";
 import { Badge } from "./ui";
+import { fecha } from "@/lib/format";
 import { fichaViajePDF } from "@/lib/ticket-pdf";
 
 export function TicketViaje({ viaje, empresa, onClose }: { viaje: any; empresa?: { nombre?: string; ruc?: string; codigo?: string }; onClose: () => void }) {
@@ -12,12 +13,17 @@ export function TicketViaje({ viaje, empresa, onClose }: { viaje: any; empresa?:
   if (!v) return null;
 
   const codigo = v.codigo || "—";
+  // "En el cliente" = fecha + hora (suele ser otro día).
+  const enCliente = [v.fechaCliente ? fecha(v.fechaCliente) : "", v.horaCliente].filter(Boolean).join(" · ");
 
   // Solo estos datos se muestran/comparten (los demás no van en la ficha del conductor).
+  // Las primeras 4 van arriba, luego la ubicación, y el resto abajo.
   const filas: [string, string][] = [
     ["Punto de recojo", v.origen || "—"],
     ["Cita de retiro", v.horaCita || "—"],
     ["Punto de llegada", v.destino || "—"],
+    ["En el cliente", enCliente || "—"],
+    ["Punto de devolución", v.devolucion || "—"],
     ["Tamaño contenedor", v.tamanio || "—"],
     ["Tipo de mercadería a trasladar", v.tipoCarga || "—"],
   ];
@@ -26,7 +32,9 @@ export function TicketViaje({ viaje, empresa, onClose }: { viaje: any; empresa?:
     `* Punto de recojo: ${v.origen || ""}`,
     `* Cita de retiro: ${v.horaCita || ""}`,
     `* Punto de llegada: ${v.destino || ""}`,
+    `* En el cliente: ${enCliente}`,
     `* Ubicación de llegada:  ${v.ubicacion || ""}`,
+    `* Punto de devolución: ${v.devolucion || ""}`,
     `* Tamaño contenedor: ${v.tamanio || ""}`,
     `* Tipo de mercadería a trasladar: ${v.tipoCarga || ""}`,
   ].join("\n");
@@ -53,7 +61,7 @@ export function TicketViaje({ viaje, empresa, onClose }: { viaje: any; empresa?:
         {/* Cuerpo — solo los datos del conductor */}
         <div className="px-6 py-3">
           <dl>
-            {filas.slice(0, 3).map(([k, val]) => (
+            {filas.slice(0, 4).map(([k, val]) => (
               <div key={k} className="flex items-start justify-between gap-4 border-b border-slate-100 py-2.5">
                 <dt className="shrink-0 text-sm text-slate-500">{k}</dt>
                 <dd className="select-text break-words text-right text-base font-bold text-slate-800">{val}</dd>
@@ -77,7 +85,7 @@ export function TicketViaje({ viaje, empresa, onClose }: { viaje: any; empresa?:
           </div>
 
           <dl>
-            {filas.slice(3).map(([k, val]) => (
+            {filas.slice(4).map(([k, val]) => (
               <div key={k} className="flex items-start justify-between gap-4 border-t border-slate-100 py-2.5">
                 <dt className="shrink-0 text-sm text-slate-500">{k}</dt>
                 <dd className="select-text break-words text-right text-base font-bold text-slate-800">{val}</dd>
