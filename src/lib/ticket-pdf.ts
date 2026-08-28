@@ -114,7 +114,7 @@ export function fichaViajePDF(v: any, empresa?: { nombre?: string; ruc?: string;
       ${row(datos[4][0], datos[4][1])}
     </div>
 
-    <div class="pie">${esc(emp)}${ruc ? " · RUC " + esc(ruc) : ""} · Documento para el conductor</div>
+    <div class="pie">${esc(emp)}${ruc ? " · RUC " + esc(ruc) : ""}</div>
   </div>
 
   <button class="print" type="button" onclick="window.print()">Imprimir / Guardar PDF</button>
