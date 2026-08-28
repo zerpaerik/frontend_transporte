@@ -126,7 +126,7 @@ export default function OperacionesPage() {
       { name: "greRemitente", label: "Guía de remisión", type: "text", placeholder: "T001-26916", default: g("greRemitente") },
       { name: "tarifa", label: "Tarifa (S/) — se jala en la factura", type: "number", default: g("tarifa", "0") },
       { name: "operacion", label: "Tipo de operación", type: "select", options: tipos, default: g("operacion", tipos[0]) },
-      { name: "contenedor", label: "Contenedor", type: "text", required: true, placeholder: "PCIU6111486 (o S/N en carga suelta)", default: g("contenedor") },
+      { name: "contenedor", label: "Contenedor", type: "text", placeholder: "Opcional — se puede registrar luego al editar", default: g("contenedor") },
       { name: "tipoCarga", label: "Tipo de carga", type: "select", options: ["GENERAL", "IMO", "REEFER"], default: g("tipoCarga", "GENERAL") },
       { name: "tamanio", label: "Tamaño", type: "select", options: ["", "20'", "40'", "40' HC"], default: g("tamanio") },
       { name: "horaCita", label: "Hora de cita", type: "text", placeholder: "08:00", default: g("horaCita") },
