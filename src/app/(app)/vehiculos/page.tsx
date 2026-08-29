@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Plus, Truck, Pencil, Search, FileSpreadsheet, FileText, ChevronLeft, ChevronRight, FolderOpen, AlertTriangle } from "lucide-react";
+import { Plus, Truck, Pencil, Trash2, Search, FileSpreadsheet, FileText, ChevronLeft, ChevronRight, FolderOpen, AlertTriangle } from "lucide-react";
 import { PageHeader, StatCard, Card, Badge } from "@/components/ui";
 import { FormModal, type Field, type FormValues } from "@/components/FormModal";
 import { DocumentosModal } from "@/components/DocumentosModal";
@@ -28,9 +28,14 @@ const PAGE = 6;
 const estadoTone = (e: string): "green" | "amber" | "gray" => (e === "Operativo" ? "green" : e === "En taller" ? "amber" : "gray");
 
 export default function VehiculosPage() {
-  const { vehiculos, addVehiculo, updateVehiculo, reload } = useData();
+  const { vehiculos, addVehiculo, updateVehiculo, removeVehiculo, reload } = useData();
   const { user } = useAuth();
   const readOnly = user?.rol === "Conductor";
+  const puedeEliminar = user?.rol === "Administrador";
+
+  function eliminarVehiculo(v: Vehiculo) {
+    if (confirm(`¿Eliminar el vehículo ${v.placa} de la flota? Esta acción no se puede deshacer.`)) removeVehiculo(v.id);
+  }
   const [open, setOpen] = useState(false);
   const [editVeh, setEditVeh] = useState<Vehiculo | null>(null);
   const [docVeh, setDocVeh] = useState<Vehiculo | null>(null);
@@ -141,6 +146,11 @@ export default function VehiculosPage() {
                   {!readOnly ? (
                     <button onClick={() => setEditVeh(v)} title="Editar vehículo" className="rounded-md border border-slate-200 p-1.5 text-slate-500 hover:border-brand-300 hover:text-brand-600">
                       <Pencil size={13} />
+                    </button>
+                  ) : null}
+                  {puedeEliminar ? (
+                    <button onClick={() => eliminarVehiculo(v)} title="Eliminar vehículo" className="rounded-md border border-slate-200 p-1.5 text-slate-500 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-600">
+                      <Trash2 size={13} />
                     </button>
                   ) : null}
                 </div>

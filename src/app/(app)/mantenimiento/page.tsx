@@ -39,7 +39,7 @@ export default function MantenimientoPage() {
 
   const fieldsFor = (o?: OrdenTrabajo): Field[] => [
     { name: "fecha", label: "Fecha", type: "date", required: true, default: o?.fecha },
-    { name: "placa", label: "Vehículo", type: "select", options: vehiculos.filter((v) => v.tipo === "Tracto").map((v) => v.placa), default: o?.placa },
+    { name: "placa", label: "Vehículo (tracto o carreta)", type: "select", options: vehiculos.map((v) => v.placa), default: o?.placa },
     { name: "tipo", label: "Tipo de mantenimiento", type: "select", options: ["Preventivo", "Correctivo", "Predictivo"], default: o?.tipo },
     { name: "descripcion", label: "Detalle técnico (falla / diagnóstico / solución)", type: "text", required: true, full: true, placeholder: "Cambio de pastillas y discos de freno", default: o?.descripcion },
     { name: "responsable", label: "Responsable (mecánico o taller)", type: "text", placeholder: "Taller Diesel Pro", default: o?.responsable },

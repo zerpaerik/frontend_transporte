@@ -62,6 +62,7 @@ export interface Repuesto {
   id: string;
   nombre: string;
   categoria: string;
+  placa?: string;
   calidad: CalidadRepuesto;
   cantidad: number;
   garantia: string;

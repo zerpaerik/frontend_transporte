@@ -13,8 +13,9 @@ const calidadTone: Record<CalidadRepuesto, "green" | "blue" | "amber"> = {
   Original: "green", Alternativo: "blue", Remanufacturado: "amber",
 };
 
-const fieldsFor = (r?: Repuesto): Field[] => [
+const fieldsFor = (placas: string[], r?: Repuesto): Field[] => [
   { name: "nombre", label: "Repuesto", type: "text", required: true, placeholder: "Pastillas de freno", full: true, default: r?.nombre },
+  { name: "placa", label: "Vehículo (tracto o carreta)", type: "select", options: ["", ...placas], default: r?.placa },
   { name: "categoria", label: "Categoría", type: "select", options: ["Frenos", "Filtros", "Transmisión", "Eléctrico", "Motor", "Suspensión", "Refrigeración", "Otros"], default: r?.categoria },
   { name: "calidad", label: "Calidad", type: "select", options: ["Original", "Alternativo", "Remanufacturado"], default: r?.calidad },
   { name: "cantidad", label: "Cantidad", type: "number", default: r?.cantidad ?? 1 },
@@ -26,6 +27,7 @@ const fieldsFor = (r?: Repuesto): Field[] => [
 
 const columns: Column<Repuesto>[] = [
   { key: "nombre", header: "Repuesto", sortable: true, render: (r) => <span className="font-semibold text-slate-900">{r.nombre}</span> },
+  { key: "placa", header: "Vehículo", sortable: true, render: (r) => r.placa ? <span className="font-medium text-slate-700">{r.placa}</span> : <span className="text-slate-300">—</span> },
   { key: "categoria", header: "Categoría", sortable: true },
   { key: "calidad", header: "Calidad", sortable: true, render: (r) => <Badge tone={calidadTone[r.calidad]}>{r.calidad}</Badge> },
   { key: "cantidad", header: "Cant.", align: "center", sortable: true },
@@ -41,16 +43,17 @@ const filters: Filter<Repuesto>[] = [
 ];
 
 export default function RepuestosPage() {
-  const { repuestos, addRepuesto, updateRepuesto, removeRepuesto } = useData();
+  const { repuestos, vehiculos, addRepuesto, updateRepuesto, removeRepuesto } = useData();
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState<Repuesto | null>(null);
 
+  const placas = vehiculos.map((v) => v.placa);
   const gasto = repuestos.reduce((s, r) => s + r.costo, 0);
   const unidades = repuestos.reduce((s, r) => s + r.cantidad, 0);
 
   function toBody(v: FormValues) {
     return {
-      nombre: String(v.nombre), categoria: String(v.categoria), calidad: v.calidad as Repuesto["calidad"],
+      nombre: String(v.nombre), categoria: String(v.categoria), placa: String(v.placa || ""), calidad: v.calidad as Repuesto["calidad"],
       cantidad: Number(v.cantidad), garantia: String(v.garantia), proveedor: String(v.proveedor), costo: Number(v.costo), fecha: String(v.fecha),
     };
   }
@@ -90,8 +93,8 @@ export default function RepuestosPage() {
         }
       />
 
-      <FormModal open={open} title="Nuevo repuesto" subtitle="Registra un repuesto o accesorio con su calidad, garantía y costo." fields={fieldsFor()} onSubmit={guardar} onClose={() => setOpen(false)} />
-      {edit ? <FormModal open title={`Editar repuesto — ${edit.nombre}`} subtitle="Corrige los datos del repuesto." fields={fieldsFor(edit)} submitLabel="Guardar cambios" onSubmit={guardarEdit} onClose={() => setEdit(null)} /> : null}
+      <FormModal open={open} title="Nuevo repuesto" subtitle="Registra un repuesto o accesorio con su calidad, garantía y costo." fields={fieldsFor(placas)} onSubmit={guardar} onClose={() => setOpen(false)} />
+      {edit ? <FormModal open title={`Editar repuesto — ${edit.nombre}`} subtitle="Corrige los datos del repuesto." fields={fieldsFor(placas, edit)} submitLabel="Guardar cambios" onSubmit={guardarEdit} onClose={() => setEdit(null)} /> : null}
     </div>
   );
 }
