@@ -3,7 +3,7 @@
 // operativos que el conductor necesita. La ubicación de llegada es tocable
 // (copiar / abrir en Maps). Se abre como página; se guarda como PDF con el botón.
 
-import { fecha } from "./format";
+import { fecha, mapsHref } from "./format";
 
 const esc = (v: unknown) =>
   String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -32,7 +32,7 @@ export function fichaViajePDF(v: any, empresa?: { nombre?: string; ruc?: string;
   const row = (k: string, val: string) => `
     <div class="row"><div class="k">${esc(k)}</div><div class="val">${val ? esc(val) : '<span class="dash">—</span>'}</div></div>`;
 
-  const mapsUrl = v.ubicacion ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(v.ubicacion)}` : "";
+  const mapsUrl = mapsHref(v.ubicacion || "");
   const ubic = `
     <div class="ublabel">Ubicación de llegada</div>
     ${v.ubicacion

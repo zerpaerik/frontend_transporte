@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { X, Copy, FileText, MessageCircle, MapPin, Check } from "lucide-react";
 import { Badge } from "./ui";
-import { fecha } from "@/lib/format";
+import { fecha, mapsHref } from "@/lib/format";
 import { fichaViajePDF } from "@/lib/ticket-pdf";
 
 export function TicketViaje({ viaje, empresa, onClose }: { viaje: any; empresa?: { nombre?: string; ruc?: string; codigo?: string }; onClose: () => void }) {
@@ -39,7 +39,7 @@ export function TicketViaje({ viaje, empresa, onClose }: { viaje: any; empresa?:
     `* Tipo de mercadería a trasladar: ${v.tipoCarga || ""}`,
   ].join("\n");
 
-  const mapsUrl = v.ubicacion ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(v.ubicacion)}` : "";
+  const mapsUrl = mapsHref(v.ubicacion || "");
 
   function copiar(text: string, marcar: (b: boolean) => void) {
     navigator.clipboard?.writeText(text).then(() => { marcar(true); setTimeout(() => marcar(false), 1500); }).catch(() => {});
