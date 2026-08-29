@@ -49,3 +49,15 @@ export function estadoDocumento(iso: string, umbral = 30): EstadoDocumento {
   if (dias <= umbral) return "Por vencer";
   return "Vigente";
 }
+
+// Enlace correcto para abrir la ubicación en Google Maps.
+// La "ubicación" puede ser un enlace (p. ej. https://maps.app.goo.gl/…) o una
+// dirección/coordenadas en texto. Si ya es un enlace se abre tal cual; solo el
+// texto se manda como búsqueda (meter un enlace como búsqueda da "no se encuentra").
+export function mapsHref(ubicacion: string): string {
+  const s = (ubicacion || "").trim();
+  if (!s) return "";
+  if (/^https?:\/\//i.test(s)) return s; // ya es un enlace completo
+  if (/^(www\.|maps\.app\.goo\.gl|goo\.gl\/|maps\.google\.)/i.test(s)) return "https://" + s; // enlace sin protocolo
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s)}`;
+}
