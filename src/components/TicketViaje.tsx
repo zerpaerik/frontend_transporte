@@ -15,6 +15,8 @@ export function TicketViaje({ viaje, empresa, onClose }: { viaje: any; empresa?:
   const codigo = v.codigo || "—";
   // "En el cliente" = fecha + hora (suele ser otro día).
   const enCliente = [v.fechaCliente ? fecha(v.fechaCliente) : "", v.horaCliente].filter(Boolean).join(" · ");
+  // En exportación el punto de devolución es el "Puerto de ingreso".
+  const devolLabel = String(v.operacion || "").toLowerCase().includes("expo") ? "Punto de ingreso" : "Punto de devolución";
 
   // Solo estos datos se muestran/comparten (los demás no van en la ficha del conductor).
   // Las primeras 4 van arriba, luego la ubicación, y el resto abajo.
@@ -23,7 +25,7 @@ export function TicketViaje({ viaje, empresa, onClose }: { viaje: any; empresa?:
     ["Cita de retiro", v.horaCita || "—"],
     ["Punto de llegada", v.destino || "—"],
     ["En el cliente", enCliente || "—"],
-    ["Punto de devolución", v.devolucion || "—"],
+    [devolLabel, v.devolucion || "—"],
     ["Tamaño contenedor", v.tamanio || "—"],
     ["Tipo de mercadería a trasladar", v.tipoCarga || "—"],
   ];
@@ -34,7 +36,7 @@ export function TicketViaje({ viaje, empresa, onClose }: { viaje: any; empresa?:
     `* Punto de llegada: ${v.destino || ""}`,
     `* En el cliente: ${enCliente}`,
     `* Ubicación de llegada:  ${v.ubicacion || ""}`,
-    `* Punto de devolución: ${v.devolucion || ""}`,
+    `* ${devolLabel}: ${v.devolucion || ""}`,
     `* Tamaño contenedor: ${v.tamanio || ""}`,
     `* Tipo de mercadería a trasladar: ${v.tipoCarga || ""}`,
   ].join("\n");

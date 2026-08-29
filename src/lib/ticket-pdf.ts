@@ -18,6 +18,8 @@ export function fichaViajePDF(v: any, empresa?: { nombre?: string; ruc?: string;
   const ruc = empresa?.ruc || "";
   const logo = empresa?.codigo ? `/sedes/${encodeURIComponent(empresa.codigo)}.jpg` : "";
   const enCliente = [v.fechaCliente ? fecha(v.fechaCliente) : "", v.horaCliente].filter(Boolean).join(" · ");
+  // En exportación el punto de devolución es el "Puerto de ingreso".
+  const devolLabel = String(v.operacion || "").toLowerCase().includes("expo") ? "Punto de ingreso" : "Punto de devolución";
 
   // Los únicos datos que se muestran en la ficha.
   const datos: [string, string][] = [
@@ -25,7 +27,7 @@ export function fichaViajePDF(v: any, empresa?: { nombre?: string; ruc?: string;
     ["Cita de retiro", v.horaCita || ""],
     ["Punto de llegada", v.destino || ""],
     ["En el cliente", enCliente],
-    ["Punto de devolución", v.devolucion || ""],
+    [devolLabel, v.devolucion || ""],
     ["Tamaño contenedor", v.tamanio || ""],
     ["Tipo de mercadería a trasladar", v.tipoCarga || ""],
   ];
