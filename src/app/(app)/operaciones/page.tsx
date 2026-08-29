@@ -124,6 +124,7 @@ export default function OperacionesPage() {
   // Campos del viaje. En "carga suelta", origen y punto de devolución pasan a texto libre.
   const buildFields = (vals: Record<string, string>, v?: any): Field[] => {
     const suelta = String(vals.operacion || "").toLowerCase().includes("suelta");
+    const expo = String(vals.operacion || "").toLowerCase().includes("expo");
     const g = (k: string, fallback = "") => (v ? (v[k] ?? fallback) : fallback);
     // Carreta: la de flota o una alquilada (placa libre para este viaje).
     const carretasFlota = vehiculos.filter((x) => x.tipo === "Carreta").map((x) => x.placa);
@@ -154,11 +155,11 @@ export default function OperacionesPage() {
         : []),
       suelta
         ? { name: "origen", label: "Origen (texto libre)", type: "text", placeholder: "Escribe el origen", default: g("origen") }
-        : { name: "origen", label: "Origen (puerto)", type: "select", options: puertoOpts, default: g("origen") },
+        : { name: "origen", label: expo ? "Puerto de recojo" : "Origen (puerto)", type: "select", options: puertoOpts, default: g("origen") },
       { name: "destino", label: "Destino (distrito)", type: "select", options: distritoOpts, default: g("destino") },
       suelta
         ? { name: "devolucion", label: "Punto de devolución (texto libre)", type: "text", placeholder: "Escribe el punto de devolución", default: g("devolucion") }
-        : { name: "devolucion", label: "Punto de devolución", type: "select", options: puertoOpts, default: g("devolucion") },
+        : { name: "devolucion", label: expo ? "Puerto de ingreso" : "Punto de devolución", type: "select", options: puertoOpts, default: g("devolucion") },
       { name: "ubicacion", label: "Ubicación", type: "text", full: true, placeholder: "Dirección / link de Maps de la entrega", default: g("ubicacion") },
       { name: "fechaLimite", label: "Fecha límite devolución (opcional)", type: "date", default: g("fechaLimite") },
       { name: "estado", label: "Estado", type: "select", options: ["Programado", "En curso", "Culminado", "Devuelto", "Cancelado"], default: g("estado", "Programado") },
