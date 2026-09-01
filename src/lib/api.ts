@@ -162,19 +162,30 @@ export interface PlanillaLinea {
   viajeId: string;
   orden: number;
 }
+export interface PlanillaDescuento {
+  id?: string;
+  concepto: string;
+  monto: number;
+  orden?: number;
+}
+export type EstadoPlanilla = "Borrador" | "Generada" | "Aprobada" | "Pagada";
 export interface Planilla {
   id: string;
   conductor: string;
   semanaDesde: string;
   semanaHasta: string;
   sueldoDia: number;
-  descuentoPlanilla: number;
-  estado: "Borrador" | "Generada" | "Pagada";
+  descuentoPlanilla: number; // heredado
+  descuentos: PlanillaDescuento[];
+  estado: EstadoPlanilla;
+  aprobadaPor: string;
+  aprobadaEn: string | null;
   lineas: PlanillaLinea[];
   totalSueldo: number;
   totalComision: number;
   totalViaticos: number;
   totalPagar: number;
+  totalDescuento: number;
   aDepositar: number;
 }
 export const apiPlanillas = {
@@ -183,7 +194,8 @@ export const apiPlanillas = {
   list: () => api.get<Planilla[]>("/planillas"),
   get: (id: string) => api.get<Planilla>(`/planillas/${id}`),
   generar: (b: { conductor: string; semanaDesde: string; semanaHasta: string }) => api.post<Planilla>("/planillas/generar", b),
-  update: (id: string, b: Partial<{ sueldoDia: number; descuentoPlanilla: number; estado: string; lineas: PlanillaLinea[] }>) => api.patch<Planilla>(`/planillas/${id}`, b),
+  update: (id: string, b: Partial<{ sueldoDia: number; estado: string; lineas: PlanillaLinea[]; descuentos: PlanillaDescuento[] }>) => api.patch<Planilla>(`/planillas/${id}`, b),
+  aprobar: (id: string) => api.post<Planilla>(`/planillas/${id}/aprobar`, {}),
   pagar: (id: string) => api.post<Planilla>(`/planillas/${id}/pagar`, {}),
   reversar: (id: string) => api.post<Planilla>(`/planillas/${id}/reversar`, {}),
   remove: (id: string) => api.del<void>(`/planillas/${id}`),

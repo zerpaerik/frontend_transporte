@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  Plus, Users, Settings2, ArrowLeft, Trash2, Save, FileText, Check, CalendarDays, Coins, RefreshCw, FileCheck2, Undo2,
+  Plus, Users, Settings2, ArrowLeft, Trash2, Save, FileText, Check, CalendarDays, Coins, RefreshCw, FileCheck2, Undo2, ShieldCheck,
 } from "lucide-react";
 import { PageHeader, StatCard, Card, Badge } from "@/components/ui";
 import { FormModal, type Field, type FormValues } from "@/components/FormModal";
@@ -25,13 +25,15 @@ function semanaActual() {
   return { desde: lunes, hasta: isoAdd(lunes, 5) };
 }
 
-type Draft = { lineas: PlanillaLinea[]; descuentoPlanilla: number };
+type Descuento = { concepto: string; monto: number };
+type Draft = { lineas: PlanillaLinea[]; descuentos: Descuento[] };
 
 const num = (v: string) => Number(v.replace(",", ".") || 0);
 // Muestra vacío cuando el valor es 0, para que no aparezca el "0" antes del número.
 const dv = (n: number) => (n ? String(n) : "");
-// Color del estado: Borrador (ámbar) · Generada (azul) · Pagada (verde).
-const toneEstado = (e: string): "green" | "blue" | "amber" => (e === "Pagada" ? "green" : e === "Generada" ? "blue" : "amber");
+// Color del estado: Borrador (ámbar) · Generada (azul) · Aprobada (naranja) · Pagada (verde).
+const toneEstado = (e: string): "green" | "blue" | "amber" | "orange" =>
+  e === "Pagada" ? "green" : e === "Aprobada" ? "orange" : e === "Generada" ? "blue" : "amber";
 
 export default function PlanillaPage() {
   const { conductores } = useData();
@@ -39,7 +41,7 @@ export default function PlanillaPage() {
   const [planillas, setPlanillas] = useState<Planilla[]>([]);
   const [sueldoDia, setSueldoDia] = useState(0);
   const [sel, setSel] = useState<Planilla | null>(null);
-  const [draft, setDraft] = useState<Draft>({ lineas: [], descuentoPlanilla: 0 });
+  const [draft, setDraft] = useState<Draft>({ lineas: [], descuentos: [] });
   const [openGen, setOpenGen] = useState(false);
   const [openCfg, setOpenCfg] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -53,12 +55,13 @@ export default function PlanillaPage() {
 
   function abrir(p: Planilla) {
     setSel(p);
-    setDraft({ lineas: p.lineas.map((l) => ({ ...l })), descuentoPlanilla: p.descuentoPlanilla });
+    setDraft({ lineas: p.lineas.map((l) => ({ ...l })), descuentos: (p.descuentos ?? []).map((d) => ({ concepto: d.concepto, monto: d.monto })) });
   }
 
   const esBorrador = sel?.estado === "Borrador";
   const esGenerada = sel?.estado === "Generada";
-  // Solo se editan líneas en Borrador; Generada y Pagada quedan bloqueadas.
+  const esAprobada = sel?.estado === "Aprobada";
+  // Solo se editan líneas y descuentos en Borrador; Generada/Aprobada/Pagada quedan bloqueadas.
   const bloqueada = !esBorrador;
 
   const totales = useMemo(() => {
@@ -66,7 +69,8 @@ export default function PlanillaPage() {
     const totalComision = draft.lineas.reduce((s, l) => s + (l.comision || 0), 0);
     const totalViaticos = draft.lineas.reduce((s, l) => s + (l.viaticos || 0), 0);
     const totalPagar = totalSueldo + totalComision + totalViaticos;
-    return { totalSueldo, totalComision, totalViaticos, totalPagar, aDepositar: totalPagar - draft.descuentoPlanilla };
+    const totalDescuento = draft.descuentos.reduce((s, d) => s + (d.monto || 0), 0);
+    return { totalSueldo, totalComision, totalViaticos, totalPagar, totalDescuento, aDepositar: totalPagar - totalDescuento };
   }, [draft]);
 
   // --- Acciones de lista ---
@@ -94,7 +98,14 @@ export default function PlanillaPage() {
     finally { setBusy(false); }
   }
 
-  // --- Acciones de editor ---
+  // Descartar/eliminar una planilla directamente desde la lista (para resetear un borrador de prueba).
+  async function eliminarDeLista(p: Planilla) {
+    if (!confirm(`¿Descartar la planilla de ${p.conductor} (semana del ${fecha(p.semanaDesde)})? Esta acción no se puede deshacer.`)) return;
+    try { await apiPlanillas.remove(p.id); setPlanillas((s) => s.filter((x) => x.id !== p.id)); if (sel?.id === p.id) setSel(null); }
+    catch (e) { alert((e as Error).message || "No se pudo descartar."); }
+  }
+
+  // --- Acciones de editor: líneas ---
   function setLinea(i: number, patch: Partial<PlanillaLinea>) {
     setDraft((d) => ({ ...d, lineas: d.lineas.map((l, j) => (j === i ? { ...l, ...patch } : l)) }));
   }
@@ -108,27 +119,15 @@ export default function PlanillaPage() {
     setDraft((d) => ({ ...d, lineas: d.lineas.filter((_, j) => j !== i) }));
   }
 
-  async function guardar() {
-    if (!sel) return;
-    setBusy(true);
-    try {
-      const lineas = draft.lineas.map((l, i) => ({
-        fecha: l.fecha, cliente: l.cliente, origen: l.origen, destino: l.destino,
-        sueldoDia: l.sueldoDia, comision: l.comision, viaticos: l.viaticos,
-        concepto: l.concepto, viajeId: l.viajeId, orden: i,
-      }));
-      const p = await apiPlanillas.update(sel.id, { descuentoPlanilla: draft.descuentoPlanilla, lineas });
-      setPlanillas((s) => s.map((x) => (x.id === p.id ? p : x)));
-      setSel(p);
-      setDraft({ lineas: p.lineas.map((l) => ({ ...l })), descuentoPlanilla: p.descuentoPlanilla });
-    } catch (e) { alert((e as Error).message || "No se pudo guardar."); }
-    finally { setBusy(false); }
+  // --- Acciones de editor: descuentos ---
+  function setDescuento(i: number, patch: Partial<Descuento>) {
+    setDraft((d) => ({ ...d, descuentos: d.descuentos.map((x, j) => (j === i ? { ...x, ...patch } : x)) }));
   }
-  async function pagar() {
-    if (!sel || !confirm(`¿Marcar como PAGADA la planilla de ${sel.conductor}? Ya no podrá editarse.`)) return;
-    setBusy(true);
-    try { const p = await apiPlanillas.pagar(sel.id); setPlanillas((s) => s.map((x) => (x.id === p.id ? p : x))); setSel(p); }
-    finally { setBusy(false); }
+  function agregarDescuento() {
+    setDraft((d) => ({ ...d, descuentos: [...d.descuentos, { concepto: "", monto: 0 }] }));
+  }
+  function quitarDescuento(i: number) {
+    setDraft((d) => ({ ...d, descuentos: d.descuentos.filter((_, j) => j !== i) }));
   }
 
   // Líneas del draft en el formato que espera el backend.
@@ -139,21 +138,49 @@ export default function PlanillaPage() {
       concepto: l.concepto, viajeId: l.viajeId, orden: i,
     }));
   }
+  // Descuentos, descartando filas totalmente vacías.
+  function descuentosPayload() {
+    return draft.descuentos
+      .filter((d) => d.monto > 0 || (d.concepto || "").trim())
+      .map((d, i) => ({ concepto: d.concepto, monto: d.monto, orden: i }));
+  }
   function aplicar(p: Planilla) {
     setPlanillas((s) => s.map((x) => (x.id === p.id ? p : x)));
     setSel(p);
-    setDraft({ lineas: p.lineas.map((l) => ({ ...l })), descuentoPlanilla: p.descuentoPlanilla });
+    setDraft({ lineas: p.lineas.map((l) => ({ ...l })), descuentos: (p.descuentos ?? []).map((d) => ({ concepto: d.concepto, monto: d.monto })) });
   }
 
-  // Viernes: finaliza la semana (guarda + pasa a "Generada"). Queda lista para imprimir y pagar.
-  async function finalizar() {
-    if (!sel || !confirm(`¿Finalizar la planilla de ${sel.conductor}? Quedará lista para imprimir y pagar; para editarla de nuevo tendrás que reabrirla.`)) return;
+  async function guardar() {
+    if (!sel) return;
     setBusy(true);
-    try { aplicar(await apiPlanillas.update(sel.id, { descuentoPlanilla: draft.descuentoPlanilla, lineas: lineasPayload(), estado: "Generada" })); }
+    try { aplicar(await apiPlanillas.update(sel.id, { descuentos: descuentosPayload(), lineas: lineasPayload() })); }
+    catch (e) { alert((e as Error).message || "No se pudo guardar."); }
+    finally { setBusy(false); }
+  }
+  // Finaliza la semana (guarda + pasa a "Generada"). Queda lista para aprobar.
+  async function finalizar() {
+    if (!sel || !confirm(`¿Finalizar la planilla de ${sel.conductor}? Quedará lista para aprobar; para editarla de nuevo tendrás que reabrirla.`)) return;
+    setBusy(true);
+    try { aplicar(await apiPlanillas.update(sel.id, { descuentos: descuentosPayload(), lineas: lineasPayload(), estado: "Generada" })); }
     catch (e) { alert((e as Error).message || "No se pudo finalizar."); }
     finally { setBusy(false); }
   }
-  // Vuelve una planilla finalizada a Borrador para poder editarla otra vez.
+  // Aprueba una planilla finalizada: recién ahí se habilita el pago.
+  async function aprobar() {
+    if (!sel || !confirm(`¿Aprobar la planilla de ${sel.conductor}? Quedará lista para pagar.`)) return;
+    setBusy(true);
+    try { aplicar(await apiPlanillas.aprobar(sel.id)); }
+    catch (e) { alert((e as Error).message || "No se pudo aprobar."); }
+    finally { setBusy(false); }
+  }
+  async function pagar() {
+    if (!sel || !confirm(`¿Marcar como PAGADA la planilla de ${sel.conductor}? Ya no podrá editarse.`)) return;
+    setBusy(true);
+    try { aplicar(await apiPlanillas.pagar(sel.id)); }
+    catch (e) { alert((e as Error).message || "No se pudo pagar."); }
+    finally { setBusy(false); }
+  }
+  // Vuelve una planilla finalizada o aprobada a Borrador para poder editarla otra vez (borra la aprobación).
   async function reabrir() {
     if (!sel) return;
     setBusy(true);
@@ -166,7 +193,7 @@ export default function PlanillaPage() {
     if (!sel) return;
     setBusy(true);
     try {
-      await apiPlanillas.update(sel.id, { descuentoPlanilla: draft.descuentoPlanilla, lineas: lineasPayload() });
+      await apiPlanillas.update(sel.id, { descuentos: descuentosPayload(), lineas: lineasPayload() });
       aplicar(await apiPlanillas.generar({ conductor: sel.conductor, semanaDesde: sel.semanaDesde, semanaHasta: sel.semanaHasta }));
     } catch (e) { alert((e as Error).message || "No se pudieron traer los viajes."); }
     finally { setBusy(false); }
@@ -202,8 +229,10 @@ export default function PlanillaPage() {
       totalComision: totales.totalComision,
       totalViaticos: totales.totalViaticos,
       totalPagar: totales.totalPagar,
-      descuentoPlanilla: draft.descuentoPlanilla,
+      descuentos: draft.descuentos.map((d) => ({ concepto: d.concepto, monto: d.monto })),
       aDepositar: totales.aDepositar,
+      aprobadaPor: sel.aprobadaPor,
+      aprobadaEn: sel.aprobadaEn,
       empresa: user?.sede ? { nombre: user.sede.nombre, ruc: user.sede.ruc, codigo: user.sede.codigo } : undefined,
     });
   }
@@ -225,6 +254,11 @@ export default function PlanillaPage() {
             <p className="mt-1 flex items-center gap-1.5 text-sm text-slate-500">
               <CalendarDays size={15} /> Semana del {fecha(sel.semanaDesde)} al {fecha(sel.semanaHasta)}
             </p>
+            {sel.aprobadaPor ? (
+              <p className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-100">
+                <ShieldCheck size={14} /> Aprobada por {sel.aprobadaPor}{sel.aprobadaEn ? ` · ${fecha(sel.aprobadaEn)}` : ""}
+              </p>
+            ) : null}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <button onClick={descargarPDF} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:border-brand-300 hover:text-brand-600">
@@ -248,6 +282,15 @@ export default function PlanillaPage() {
             ) : esGenerada ? (
               <>
                 <button disabled={busy} onClick={reabrir} title="Volver a borrador para editar" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:border-brand-300 hover:text-brand-600 disabled:opacity-50">
+                  <Undo2 size={15} /> Reabrir
+                </button>
+                <button disabled={busy} onClick={aprobar} title="Aprobar para habilitar el pago" className="inline-flex items-center gap-1.5 rounded-lg bg-brand-500 px-3.5 py-2 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-50">
+                  <ShieldCheck size={15} /> Aprobar
+                </button>
+              </>
+            ) : esAprobada ? (
+              <>
+                <button disabled={busy} onClick={reabrir} title="Volver a borrador para editar (quita la aprobación)" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:border-brand-300 hover:text-brand-600 disabled:opacity-50">
                   <Undo2 size={15} /> Reabrir
                 </button>
                 <button disabled={busy} onClick={pagar} className="inline-flex items-center gap-1.5 rounded-lg bg-brand-500 px-3.5 py-2 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-50">
@@ -327,20 +370,43 @@ export default function PlanillaPage() {
               <div className="flex justify-between"><span className="text-slate-500">Comisiones / bonos</span><span className="tabular font-medium text-emerald-600">{soles(totales.totalComision)}</span></div>
               <div className="flex justify-between"><span className="text-slate-500">Viáticos</span><span className="tabular font-medium">{soles(totales.totalViaticos)}</span></div>
               <div className="flex justify-between border-t border-slate-100 pt-2"><span className="font-semibold text-slate-700">Total a pagar</span><span className="tabular font-bold">{soles(totales.totalPagar)}</span></div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-500">Descuento de planilla (cuota semanal)</span>
-                <span className="flex items-center gap-1 text-rose-500">−
-                  <input type="number" step="any" min="0" disabled={bloqueada} value={dv(draft.descuentoPlanilla)}
-                    onChange={(e) => setDraft((d) => ({ ...d, descuentoPlanilla: num(e.target.value) }))}
-                    className="w-28 rounded-md border border-slate-200 px-2 py-1 text-right text-sm tabular outline-none focus:border-brand-500 disabled:bg-slate-50" />
-                </span>
+            </div>
+
+            {/* Descuentos (varios) */}
+            <div className="mt-5">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">Descuentos</span>
+                <span className="tabular text-sm font-semibold text-rose-500">− {soles(totales.totalDescuento)}</span>
               </div>
+              <div className="space-y-2">
+                {draft.descuentos.length === 0 ? (
+                  <div className="text-sm text-slate-400">{bloqueada ? "Sin descuentos." : "Sin descuentos. Agrega uno si corresponde."}</div>
+                ) : draft.descuentos.map((d, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <input disabled={bloqueada} value={d.concepto} placeholder="Concepto (ej. Cuota semanal, adelanto…)"
+                      onChange={(e) => setDescuento(i, { concepto: e.target.value })}
+                      className="min-w-0 flex-1 rounded-md border border-slate-200 px-2 py-1 text-sm outline-none focus:border-brand-500 disabled:bg-slate-50" />
+                    <span className="text-rose-400">−</span>
+                    <input type="number" step="any" min="0" disabled={bloqueada} value={dv(d.monto)}
+                      onChange={(e) => setDescuento(i, { monto: num(e.target.value) })}
+                      className="w-28 rounded-md border border-slate-200 px-2 py-1 text-right text-sm tabular outline-none focus:border-brand-500 disabled:bg-slate-50" />
+                    {!bloqueada ? (
+                      <button onClick={() => quitarDescuento(i)} title="Quitar descuento" className="rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"><Trash2 size={15} /></button>
+                    ) : <span className="w-7" />}
+                  </div>
+                ))}
+              </div>
+              {!bloqueada ? (
+                <button onClick={agregarDescuento} className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-dashed border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 hover:border-brand-300 hover:text-brand-600">
+                  <Plus size={14} /> Agregar descuento
+                </button>
+              ) : null}
             </div>
           </Card>
           <Card className="flex flex-col justify-center bg-brand-50/40 p-5 ring-1 ring-brand-100">
             <div className="text-xs font-semibold uppercase tracking-wide text-brand-600">A depositar</div>
             <div className="mt-1 text-3xl font-extrabold tabular text-slate-900">{soles(totales.aDepositar)}</div>
-            <div className="mt-1 text-xs text-slate-500">Total a pagar − descuento de planilla</div>
+            <div className="mt-1 text-xs text-slate-500">Total a pagar − descuentos</div>
           </Card>
         </div>
 
@@ -356,8 +422,9 @@ export default function PlanillaPage() {
   // ============ LISTA ============
   const borradores = planillas.filter((p) => p.estado === "Borrador").length;
   const generadas = planillas.filter((p) => p.estado === "Generada").length;
+  const aprobadas = planillas.filter((p) => p.estado === "Aprobada").length;
   const pagadas = planillas.filter((p) => p.estado === "Pagada").length;
-  // Pestañas: Pendientes (borrador + finalizadas, aún no pagadas) vs Pagadas.
+  // Pestañas: Pendientes (borrador + finalizadas + aprobadas, aún no pagadas) vs Pagadas.
   const pendientesCount = planillas.filter((p) => p.estado !== "Pagada").length;
   const visibles = planillas.filter((p) => (tab === "pagadas" ? p.estado === "Pagada" : p.estado !== "Pagada"));
 
@@ -365,10 +432,11 @@ export default function PlanillaPage() {
     <div>
       <PageHeader modulo="10" title="Planilla semanal" subtitle="Planilla por conductor armada línea a línea desde sus viajes de la semana. Sueldo por día trabajado, comisiones automáticas y viáticos manuales." />
 
-      <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-5">
         <StatCard label="Sueldo por día" value={soles(sueldoDia)} icon={Coins} tone="orange" hint="igual para todos" />
         <StatCard label="En borrador" value={borradores} icon={Users} tone="amber" />
-        <StatCard label="Finalizadas" value={generadas} icon={FileCheck2} tone="blue" />
+        <StatCard label="Por aprobar" value={generadas} icon={FileCheck2} tone="blue" />
+        <StatCard label="Aprobadas" value={aprobadas} icon={ShieldCheck} tone="orange" />
         <StatCard label="Pagadas" value={pagadas} icon={Check} tone="green" />
       </div>
 
@@ -410,13 +478,18 @@ export default function PlanillaPage() {
                 <span className="block text-xs text-slate-400">Semana del {fecha(p.semanaDesde)} al {fecha(p.semanaHasta)} · {p.lineas.length} línea(s)</span>
               </span>
             </button>
-            <div className="flex items-center gap-5">
+            <div className="flex items-center gap-4 sm:gap-5">
               <div className="text-right">
                 <div className="text-xs text-slate-400">A depositar</div>
                 <div className="text-lg font-extrabold tabular text-slate-900">{soles(p.aDepositar)}</div>
               </div>
               <Badge tone={toneEstado(p.estado)}>{p.estado}</Badge>
               <button onClick={() => abrir(p)} className="rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-600 hover:border-brand-300 hover:text-brand-600">Abrir</button>
+              {p.estado !== "Pagada" ? (
+                <button onClick={() => eliminarDeLista(p)} title="Descartar planilla" className="rounded-lg border border-slate-300 bg-white p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600">
+                  <Trash2 size={16} />
+                </button>
+              ) : null}
             </div>
           </Card>
         ))}
