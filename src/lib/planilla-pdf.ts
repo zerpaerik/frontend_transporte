@@ -27,8 +27,10 @@ export interface PlanillaPdfData {
   totalComision: number;
   totalViaticos: number;
   totalPagar: number;
-  descuentoPlanilla: number;
+  descuentos: { concepto: string; monto: number }[];
   aDepositar: number;
+  aprobadaPor?: string;
+  aprobadaEn?: string | null;
   empresa?: { nombre?: string; ruc?: string; codigo?: string };
 }
 
@@ -76,6 +78,16 @@ export function planillaPDF(p: PlanillaPdfData) {
 
   const sinLineas = p.lineas.length === 0
     ? `<tr><td colspan="7" class="empty">Sin líneas registradas para esta semana.</td></tr>`
+    : "";
+
+  const totalDescuento = p.descuentos.reduce((s, d) => s + (d.monto || 0), 0);
+  const descRows = p.descuentos.length
+    ? p.descuentos
+        .map((d) => `<div class="r"><span class="lbl">${esc(d.concepto) || "Descuento"}</span><span class="amt rojo">− ${esc(soles(d.monto))}</span></div>`)
+        .join("")
+    : `<div class="r"><span class="lbl">Descuentos</span><span class="amt">${DASH}</span></div>`;
+  const totalDescRow = p.descuentos.length > 1
+    ? `<div class="r"><span class="lbl">Total descuentos</span><span class="amt rojo">− ${esc(soles(totalDescuento))}</span></div>`
     : "";
 
   // La cabecera con logo cae de vuelta al monograma si la imagen no carga.
@@ -233,18 +245,19 @@ export function planillaPDF(p: PlanillaPdfData) {
         <div class="r"><span class="lbl">Comisiones / bonos</span><span class="amt verde">${esc(soles(p.totalComision))}</span></div>
         <div class="r"><span class="lbl">Viáticos</span><span class="amt">${esc(soles(p.totalViaticos))}</span></div>
         <div class="r total"><span class="lbl">Total a pagar</span><span class="amt">${esc(soles(p.totalPagar))}</span></div>
-        <div class="r"><span class="lbl">Descuento de planilla (cuota semanal)</span><span class="amt rojo">− ${esc(soles(p.descuentoPlanilla))}</span></div>
+        ${descRows}
+        ${totalDescRow}
       </div>
       <div class="deposito">
         <div class="lbl">A depositar</div>
         <div class="val">${esc(soles(p.aDepositar))}</div>
-        <div class="hint">Total a pagar − descuento de planilla</div>
+        <div class="hint">Total a pagar − descuentos</div>
       </div>
     </div>
 
     <div class="firmas">
       <div class="firma"><div class="ln">${esc(p.conductor)}</div><div class="sub">Recibí conforme · Conductor · DNI ____________</div></div>
-      <div class="firma"><div class="ln">&nbsp;</div><div class="sub">Administración</div></div>
+      <div class="firma"><div class="ln">${p.aprobadaPor ? esc(p.aprobadaPor) : "&nbsp;"}</div><div class="sub">${p.aprobadaPor ? "Aprobó · Administración" : "Administración"}</div></div>
     </div>
 
     <div class="pie">
