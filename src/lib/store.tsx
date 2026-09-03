@@ -7,7 +7,7 @@ import {
 import { api, getToken, ApiError } from "./api";
 import { useAuth } from "./auth";
 import type {
-  Vehiculo, Conductor, OrdenTrabajo, Repuesto, Neumatico, Viaje, Factura, Empleado, Usuario,
+  Vehiculo, Conductor, OrdenTrabajo, Repuesto, Neumatico, Viaje, Factura, Empleado, Usuario, Combustible,
 } from "./types";
 
 interface DataState {
@@ -20,6 +20,7 @@ interface DataState {
   facturas: Factura[];
   empleados: Empleado[];
   usuarios: Usuario[];
+  combustible: Combustible[];
 }
 
 interface DataCtx extends DataState {
@@ -34,6 +35,7 @@ interface DataCtx extends DataState {
   addFactura: (f: Omit<Factura, "id">) => Promise<void>;
   addEmpleado: (e: Omit<Empleado, "id">) => Promise<void>;
   addUsuario: (u: Omit<Usuario, "id">) => Promise<void>;
+  addCombustible: (c: Omit<Combustible, "id">) => Promise<void>;
   updateVehiculo: (id: string, body: Partial<Vehiculo>) => Promise<void>;
   updateConductor: (id: string, body: Partial<Conductor>) => Promise<void>;
   updateViaje: (id: string, body: Partial<Viaje>) => Promise<void>;
@@ -47,6 +49,8 @@ interface DataCtx extends DataState {
   removeOrden: (id: string) => Promise<void>;
   removeRepuesto: (id: string) => Promise<void>;
   removeNeumatico: (id: string) => Promise<void>;
+  updateCombustible: (id: string, body: Partial<Combustible>) => Promise<void>;
+  removeCombustible: (id: string) => Promise<void>;
   reload: () => void;
 }
 
@@ -60,17 +64,18 @@ const KEYS: { key: keyof DataState; path: string }[] = [
   { key: "facturas", path: "/facturas" },
   { key: "empleados", path: "/empleados" },
   { key: "usuarios", path: "/usuarios" },
+  { key: "combustible", path: "/combustible" },
 ];
 
 const EMPTY: DataState = {
   vehiculos: [], conductores: [], ordenes: [], repuestos: [],
-  neumaticos: [], viajes: [], facturas: [], empleados: [], usuarios: [],
+  neumaticos: [], viajes: [], facturas: [], empleados: [], usuarios: [], combustible: [],
 };
 
 function mockState(): DataState {
   return {
     vehiculos: VEHICULOS, conductores: CONDUCTORES, ordenes: ORDENES, repuestos: REPUESTOS,
-    neumaticos: NEUMATICOS, viajes: VIAJES, facturas: FACTURAS, empleados: EMPLEADOS, usuarios: USUARIOS,
+    neumaticos: NEUMATICOS, viajes: VIAJES, facturas: FACTURAS, empleados: EMPLEADOS, usuarios: USUARIOS, combustible: [],
   };
 }
 
@@ -186,6 +191,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
     removeOrden: (id) => removeItem("ordenes", "/ordenes", id),
     removeRepuesto: (id) => removeItem("repuestos", "/repuestos", id),
     removeNeumatico: (id) => removeItem("neumaticos", "/neumaticos", id),
+    updateCombustible: (id, body) => updateItem("combustible", "/combustible", id, body),
+    removeCombustible: (id) => removeItem("combustible", "/combustible", id),
     addVehiculo: (v) => add("vehiculos", "/vehiculos", v),
     addConductor: (c) => add("conductores", "/conductores", c),
     addOrden: (o) => add("ordenes", "/ordenes", o),
@@ -195,6 +202,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     addFactura: (f) => add("facturas", "/facturas", f),
     addEmpleado: (e) => add("empleados", "/empleados", e),
     addUsuario: (u) => add("usuarios", "/usuarios", u),
+    addCombustible: (c) => add("combustible", "/combustible", c),
     reload: loadAll,
   };
 

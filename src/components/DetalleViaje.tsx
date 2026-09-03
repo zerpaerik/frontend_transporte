@@ -52,6 +52,7 @@ export function DetalleViaje({ viaje, onClose }: { viaje: Viaje; onClose: () => 
             <Campo label="Carreta" value={viaje.carreta} />
             <Campo label="Conductor" value={viaje.conductor} />
             <Campo label="Cliente" value={viaje.cliente} />
+            <Campo label="Fecha viaje" value={v.fechaViaje ? fecha(v.fechaViaje) : ""} />
             <Campo label="N° Orden" value={viaje.nOrden} />
           </Grupo>
 
@@ -75,6 +76,13 @@ export function DetalleViaje({ viaje, onClose }: { viaje: Viaje; onClose: () => 
             <Campo label="GRE transporte" value={viaje.greTransporte} />
             <Campo label="Facturado" value={viaje.factura ? <Badge tone="green">{viaje.factura}</Badge> : <Badge tone="amber">No facturado</Badge>} />
           </Grupo>
+
+          {viaje.observacion ? (
+            <section>
+              <div className="mb-2 text-[11px] font-bold uppercase tracking-wide text-slate-400">Observación</div>
+              <p className="whitespace-pre-wrap break-words rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">{viaje.observacion}</p>
+            </section>
+          ) : null}
         </div>
 
         <div className="flex justify-end border-t border-slate-200 px-6 py-3">

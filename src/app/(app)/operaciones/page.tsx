@@ -38,6 +38,7 @@ const dash = <span className="text-slate-300">—</span>;
 const columns: Column<Viaje>[] = [
   { key: "codigo", header: "Código", sortable: true, thClass: "sticky left-0 z-20", tdClass: "sticky left-0 z-10 bg-white", render: (v) => <span className="font-semibold text-brand-700">{(v as any).codigo || "—"}</span> },
   { key: "registro", header: "Registro", sortable: true, value: (v) => (v as any).createdAt || "", render: (v) => <span className="tabular whitespace-nowrap text-slate-500">{fecha((v as any).createdAt || "")}</span> },
+  { key: "fechaViaje", header: "Fecha viaje", sortable: true, value: (v) => v.fechaViaje || "", render: (v) => v.fechaViaje ? <span className="tabular whitespace-nowrap">{fecha(v.fechaViaje)}</span> : dash },
   { key: "placaTracto", header: "Tracto", sortable: true, render: (v) => <span className="font-semibold text-slate-900">{v.placaTracto}</span> },
   { key: "carreta", header: "Carreta", render: (v) => v.carreta ? <span className="tabular whitespace-nowrap">{v.carreta}</span> : dash },
   { key: "conductor", header: "Conductor", sortable: true, render: (v) => <span className="block max-w-[150px] truncate" title={v.conductor}>{v.conductor || "—"}</span> },
@@ -126,6 +127,7 @@ export default function OperacionesPage() {
     const suelta = String(vals.operacion || "").toLowerCase().includes("suelta");
     const expo = String(vals.operacion || "").toLowerCase().includes("expo");
     const g = (k: string, fallback = "") => (v ? (v[k] ?? fallback) : fallback);
+    const hoyISO = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })();
     // Carreta: la de flota o una alquilada (placa libre para este viaje).
     const carretasFlota = vehiculos.filter((x) => x.tipo === "Carreta").map((x) => x.placa);
     const carretaGuardada = g("carreta");
@@ -138,6 +140,7 @@ export default function OperacionesPage() {
         : []),
       { name: "conductor", label: "Conductor", type: "select", options: ["", ...conductores.map((c) => c.nombre)], default: g("conductor") },
       { name: "cliente", label: "Cliente", type: "select", options: clientes, required: true, default: g("cliente") },
+      { name: "fechaViaje", label: "Fecha del viaje", type: "date", default: g("fechaViaje", hoyISO) },
       { name: "nOrden", label: "Orden", type: "text", placeholder: "26/03000251", default: g("nOrden") },
       { name: "greRemitente", label: "Guía de remisión", type: "text", placeholder: "T001-26916", default: g("greRemitente") },
       { name: "tarifa", label: "Tarifa (S/) — se jala en la factura", type: "number", default: g("tarifa", "0") },
@@ -161,6 +164,7 @@ export default function OperacionesPage() {
         ? { name: "devolucion", label: "Punto de devolución (texto libre)", type: "text", placeholder: "Escribe el punto de devolución", default: g("devolucion") }
         : { name: "devolucion", label: expo ? "Puerto de ingreso" : "Punto de devolución", type: "select", options: puertoOpts, default: g("devolucion") },
       { name: "ubicacion", label: "Ubicación", type: "text", full: true, placeholder: "Dirección / link de Maps de la entrega", default: g("ubicacion") },
+      { name: "observacion", label: "Observación", type: "text", full: true, placeholder: "Notas del viaje (opcional)", default: g("observacion") },
       { name: "fechaLimite", label: "Fecha límite devolución (opcional)", type: "date", default: g("fechaLimite") },
       { name: "estado", label: "Estado", type: "select", options: ["Programado", "En curso", "Culminado", "Devuelto", "Cancelado"], default: g("estado", "Programado") },
     ];
@@ -174,10 +178,12 @@ export default function OperacionesPage() {
       operacion: String(v.operacion), contenedor: String(v.contenedor).toUpperCase(), tamanio: String(v.tamanio || ""),
       tipoCarga: String(v.tipoCarga || "GENERAL"), horaCita: String(v.horaCita || ""), horaCliente: String(v.horaCliente || ""), origen: String(v.origen || ""),
       destino: String(v.destino || ""), devolucion: String(v.devolucion || ""), ubicacion: String(v.ubicacion || ""),
+      observacion: String(v.observacion || ""),
       estado: String(v.estado || "Programado"), nOrden: String(v.nOrden || ""), greRemitente: String(v.greRemitente || ""),
       tarifa: Number(v.tarifa || 0),
       fechaLimite: v.fechaLimite ? String(v.fechaLimite) : undefined,
       fechaCliente: v.fechaCliente ? String(v.fechaCliente) : undefined,
+      fechaViaje: v.fechaViaje ? String(v.fechaViaje) : undefined,
     };
     return body;
   }

@@ -103,6 +103,8 @@ export interface Viaje {
   destino: string;
   devolucion: string;
   ubicacion?: string;
+  fechaViaje?: string; // fecha del viaje (manual)
+  observacion?: string;
   fechaLimite: string; // ISO date
   estado: EstadoViaje;
   nOrden: string;
@@ -137,4 +139,16 @@ export interface Empleado {
   descuentos: number;
   periodo: string;
   estadoPago: "Pendiente" | "Pagado";
+}
+
+export interface Combustible {
+  id: string;
+  fecha: string;
+  placa: string;
+  tipoCombustible: string; // Diésel | Gasolina | GNV | GLP
+  kilometraje: number; // odómetro al cargar
+  galones: number;
+  monto: number; // soles
+  tipoPago: string;
+  observacion?: string;
 }
