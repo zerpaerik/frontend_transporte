@@ -236,6 +236,27 @@ export const apiLugares = {
   remove: (id: string) => api.del<void>(`/lugares-guardado/${id}`),
 };
 
+// --- Gestor documental (carpetas + archivos) ---
+export interface CarpetaLite { id: string; nombre: string; parentId: string | null; items: number; }
+export interface ArchivoMeta { id: string; nombre: string; mime: string; size: number; createdAt: string; carpetaId: string; }
+export interface ListarArchivos {
+  carpeta: { id: string; nombre: string; parentId: string | null } | null;
+  ruta: { id: string; nombre: string }[];
+  subcarpetas: CarpetaLite[];
+  archivos: ArchivoMeta[];
+}
+export const apiArchivos = {
+  listar: (carpetaId?: string) => api.get<ListarArchivos>(`/archivos${carpetaId ? `?carpetaId=${encodeURIComponent(carpetaId)}` : ""}`),
+  crearCarpeta: (nombre: string, parentId?: string) => api.post<CarpetaLite>("/archivos/carpetas", { nombre, parentId }),
+  renombrar: (id: string, nombre: string) => api.patch<CarpetaLite>(`/archivos/carpetas/${id}`, { nombre }),
+  borrarCarpeta: (id: string) => api.del<void>(`/archivos/carpetas/${id}`),
+  crearMeses: (id: string, anio?: number) => api.post<{ creadas: number }>(`/archivos/carpetas/${id}/meses`, { anio }),
+  sembrar: () => api.post<{ creada: boolean }>("/archivos/sembrar", {}),
+  subir: (b: { carpetaId: string; nombre: string; mime?: string; base64: string }) => api.post<ArchivoMeta>("/archivos", b),
+  descargar: (id: string) => api.get<{ nombre: string; mime: string; base64: string }>(`/archivos/${id}/descargar`),
+  borrarArchivo: (id: string) => api.del<void>(`/archivos/${id}`),
+};
+
 // --- Documentos (conductores / vehículos) ---
 export interface DocumentoInput {
   tipo: string; numero?: string; vencimiento: string;

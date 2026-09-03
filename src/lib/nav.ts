@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Truck, IdCard, Wrench, Package, CircleDot,
-  Container, PackageCheck, ReceiptText, Wallet, UserCog, Coins, FolderCog, Fuel, type LucideIcon,
+  Container, PackageCheck, ReceiptText, Wallet, UserCog, Coins, FolderCog, Fuel, FolderArchive, type LucideIcon,
 } from "lucide-react";
 import type { Rol } from "./types";
 
@@ -26,6 +26,7 @@ export const NAV: NavItem[] = [
   { href: "/devoluciones", label: "Devoluciones", icon: PackageCheck, modulo: "07", roles: ["Administrador", "Operador"] },
   { href: "/facturacion", label: "Facturación SUNAT", icon: ReceiptText, modulo: "09", roles: ["Administrador", "Operador"] },
   { href: "/planilla", label: "Planilla", icon: Wallet, modulo: "10", roles: ["Administrador"] },
+  { href: "/archivos", label: "Archivos", icon: FolderArchive, modulo: "13", roles: ["Administrador"] },
   // Comisiones se maneja ahora dentro de la planilla. Se oculta del menú y se
   // bloquea la ruta (roles: []); el backend del tarifario/bono sigue en uso.
   { href: "/comisiones", label: "Comisiones", icon: Coins, modulo: "11", roles: [] },
