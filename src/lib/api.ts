@@ -254,6 +254,7 @@ export const apiArchivos = {
   sembrar: () => api.post<{ creada: boolean }>("/archivos/sembrar", {}),
   subir: (b: { carpetaId: string; nombre: string; mime?: string; base64: string }) => api.post<ArchivoMeta>("/archivos", b),
   descargar: (id: string) => api.get<{ nombre: string; mime: string; base64: string }>(`/archivos/${id}/descargar`),
+  renombrarArchivo: (id: string, nombre: string) => api.patch<ArchivoMeta>(`/archivos/${id}`, { nombre }),
   borrarArchivo: (id: string) => api.del<void>(`/archivos/${id}`),
 };
 

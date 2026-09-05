@@ -16,6 +16,7 @@ const calidadTone: Record<CalidadRepuesto, "green" | "blue" | "amber"> = {
 const fieldsFor = (placas: string[], r?: Repuesto): Field[] => [
   { name: "nombre", label: "Repuesto", type: "text", required: true, placeholder: "Pastillas de freno", full: true, default: r?.nombre },
   { name: "placa", label: "Vehículo (tracto o carreta)", type: "select", options: ["", ...placas], default: r?.placa },
+  { name: "kilometraje", label: "Kilometraje", type: "number", default: r?.kilometraje ?? 0 },
   { name: "categoria", label: "Categoría", type: "select", options: ["Frenos", "Filtros", "Transmisión", "Eléctrico", "Motor", "Suspensión", "Refrigeración", "Otros"], default: r?.categoria },
   { name: "calidad", label: "Calidad", type: "select", options: ["Original", "Alternativo", "Remanufacturado"], default: r?.calidad },
   { name: "cantidad", label: "Cantidad", type: "number", default: r?.cantidad ?? 1 },
@@ -28,6 +29,7 @@ const fieldsFor = (placas: string[], r?: Repuesto): Field[] => [
 const columns: Column<Repuesto>[] = [
   { key: "nombre", header: "Repuesto", sortable: true, render: (r) => <span className="font-semibold text-slate-900">{r.nombre}</span> },
   { key: "placa", header: "Vehículo", sortable: true, render: (r) => r.placa ? <span className="font-medium text-slate-700">{r.placa}</span> : <span className="text-slate-300">—</span> },
+  { key: "kilometraje", header: "Km", align: "right", sortable: true, value: (r) => r.kilometraje ?? 0, render: (r) => r.kilometraje ? <span className="tabular">{r.kilometraje.toLocaleString("es-PE")}</span> : <span className="text-slate-300">—</span> },
   { key: "categoria", header: "Categoría", sortable: true },
   { key: "calidad", header: "Calidad", sortable: true, render: (r) => <Badge tone={calidadTone[r.calidad]}>{r.calidad}</Badge> },
   { key: "cantidad", header: "Cant.", align: "center", sortable: true },
@@ -53,7 +55,7 @@ export default function RepuestosPage() {
 
   function toBody(v: FormValues) {
     return {
-      nombre: String(v.nombre), categoria: String(v.categoria), placa: String(v.placa || ""), calidad: v.calidad as Repuesto["calidad"],
+      nombre: String(v.nombre), categoria: String(v.categoria), placa: String(v.placa || ""), kilometraje: Number(v.kilometraje), calidad: v.calidad as Repuesto["calidad"],
       cantidad: Number(v.cantidad), garantia: String(v.garantia), proveedor: String(v.proveedor), costo: Number(v.costo), fecha: String(v.fecha),
     };
   }

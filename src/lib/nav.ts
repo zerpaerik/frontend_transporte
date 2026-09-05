@@ -26,7 +26,7 @@ export const NAV: NavItem[] = [
   { href: "/devoluciones", label: "Devoluciones", icon: PackageCheck, modulo: "07", roles: ["Administrador", "Operador"] },
   { href: "/facturacion", label: "Facturación SUNAT", icon: ReceiptText, modulo: "09", roles: ["Administrador", "Operador"] },
   { href: "/planilla", label: "Planilla", icon: Wallet, modulo: "10", roles: ["Administrador"] },
-  { href: "/archivos", label: "Archivos", icon: FolderArchive, modulo: "13", roles: ["Administrador"] },
+  { href: "/archivos", label: "Archivos", icon: FolderArchive, modulo: "13", roles: ["Administrador", "Contable"] },
   // Comisiones se maneja ahora dentro de la planilla. Se oculta del menú y se
   // bloquea la ruta (roles: []); el backend del tarifario/bono sigue en uso.
   { href: "/comisiones", label: "Comisiones", icon: Coins, modulo: "11", roles: [] },

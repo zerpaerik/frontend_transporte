@@ -1,6 +1,6 @@
 // Tipos de dominio del sistema de gestión de transporte de carga pesada.
 
-export type Rol = "Administrador" | "Operador" | "Mecánico" | "Conductor";
+export type Rol = "Administrador" | "Operador" | "Mecánico" | "Conductor" | "Contable";
 
 export interface Usuario {
   id: string;
@@ -52,6 +52,7 @@ export interface OrdenTrabajo {
   descripcion: string;
   responsable: string;
   conductor: string;
+  kilometraje?: number;
   costo: number;
   estado: "Abierta" | "En proceso" | "Cerrada";
 }
@@ -63,6 +64,7 @@ export interface Repuesto {
   nombre: string;
   categoria: string;
   placa?: string;
+  kilometraje?: number;
   calidad: CalidadRepuesto;
   cantidad: number;
   garantia: string;

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   FolderArchive, Folder, FolderPlus, Upload, Download, Trash2, Pencil, ChevronRight, Home,
-  CalendarPlus, FileText, FileSpreadsheet, Image as ImageIcon, File as FileIcon,
+  CalendarPlus, FileText, FileSpreadsheet, Image as ImageIcon, File as FileIcon, Eye, X,
 } from "lucide-react";
 import { PageHeader, Card } from "@/components/ui";
 import { FormModal, type FormValues } from "@/components/FormModal";
@@ -11,6 +11,17 @@ import { apiArchivos, fileToBase64, downloadBase64, type ListarArchivos, type Ar
 import { fecha } from "@/lib/format";
 
 const fmtSize = (b: number) => (b < 1024 ? `${b} B` : b < 1024 * 1024 ? `${Math.round(b / 1024)} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`);
+
+function base64ToUrl(base64: string, mime: string) {
+  const bin = atob(base64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return URL.createObjectURL(new Blob([bytes], { type: mime }));
+}
+const previsualizable = (nombre: string, mime: string) => {
+  const ext = nombre.split(".").pop()?.toLowerCase() ?? "";
+  return mime.startsWith("image/") || mime === "application/pdf" || ext === "pdf" || ["jpg", "jpeg", "png", "gif", "webp"].includes(ext);
+};
 
 function iconoArchivo(nombre: string, mime: string) {
   const ext = nombre.split(".").pop()?.toLowerCase() ?? "";
@@ -26,6 +37,8 @@ export default function ArchivosPage() {
   const [busy, setBusy] = useState(false);
   const [nuevaOpen, setNuevaOpen] = useState(false);
   const [renOpen, setRenOpen] = useState<{ id: string; nombre: string } | null>(null);
+  const [renArchivo, setRenArchivo] = useState<{ id: string; nombre: string } | null>(null);
+  const [preview, setPreview] = useState<{ url: string; mime: string; nombre: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const seedTried = useRef(false);
 
@@ -91,6 +104,24 @@ export default function ArchivosPage() {
   async function descargar(a: ArchivoMeta) {
     setBusy(true);
     try { const r = await apiArchivos.descargar(a.id); downloadBase64(r.nombre, r.mime, r.base64); }
+    finally { setBusy(false); }
+  }
+  async function vistaPrevia(a: ArchivoMeta) {
+    setBusy(true);
+    try {
+      const r = await apiArchivos.descargar(a.id);
+      setPreview({ url: base64ToUrl(r.base64, r.mime), mime: r.mime, nombre: r.nombre });
+    } catch { alert("No se pudo abrir la vista previa."); }
+    finally { setBusy(false); }
+  }
+  function cerrarPreview() {
+    if (preview) URL.revokeObjectURL(preview.url);
+    setPreview(null);
+  }
+  async function renombrarArchivo(v: FormValues) {
+    if (!renArchivo) return;
+    setBusy(true);
+    try { await apiArchivos.renombrarArchivo(renArchivo.id, String(v.nombre).trim()); await cargar(carpetaId); }
     finally { setBusy(false); }
   }
   async function borrarArchivo(a: ArchivoMeta) {
@@ -180,6 +211,10 @@ export default function ArchivosPage() {
                     <div className="truncate text-sm font-medium text-slate-800">{a.nombre}</div>
                     <div className="text-xs text-slate-400">{fmtSize(a.size)} · {fecha((a.createdAt || "").slice(0, 10))}</div>
                   </div>
+                  {previsualizable(a.nombre, a.mime) ? (
+                    <button onClick={() => vistaPrevia(a)} disabled={busy} title="Vista previa" className="rounded-md border border-slate-200 p-1.5 text-slate-500 hover:border-brand-300 hover:text-brand-600 disabled:opacity-50"><Eye size={15} /></button>
+                  ) : null}
+                  <button onClick={() => setRenArchivo({ id: a.id, nombre: a.nombre })} disabled={busy} title="Renombrar" className="rounded-md border border-slate-200 p-1.5 text-slate-500 hover:border-steel-300 hover:text-steel-600 disabled:opacity-50"><Pencil size={15} /></button>
                   <button onClick={() => descargar(a)} disabled={busy} title="Descargar" className="rounded-md border border-slate-200 p-1.5 text-slate-500 hover:border-brand-300 hover:text-brand-600 disabled:opacity-50"><Download size={15} /></button>
                   <button onClick={() => borrarArchivo(a)} disabled={busy} title="Eliminar" className="rounded-md border border-slate-200 p-1.5 text-slate-500 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50"><Trash2 size={15} /></button>
                 </div>
@@ -214,6 +249,38 @@ export default function ArchivosPage() {
           onSubmit={renombrar}
           onClose={() => setRenOpen(null)}
         />
+      ) : null}
+      {renArchivo ? (
+        <FormModal
+          open
+          title="Renombrar archivo"
+          subtitle="Puedes cambiar el nombre manteniendo la extensión (p. ej. .pdf, .xlsx)."
+          fields={[{ name: "nombre", label: "Nuevo nombre", type: "text", required: true, full: true, default: renArchivo.nombre }]}
+          submitLabel="Guardar"
+          onSubmit={renombrarArchivo}
+          onClose={() => setRenArchivo(null)}
+        />
+      ) : null}
+
+      {preview ? (
+        <div className="fixed inset-0 z-50 flex flex-col bg-slate-900/70 p-4 sm:p-8" onClick={cerrarPreview}>
+          <div className="mx-auto flex h-full w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-3">
+              <div className="min-w-0 truncate text-sm font-semibold text-slate-800">{preview.nombre}</div>
+              <div className="flex shrink-0 items-center gap-2">
+                <a href={preview.url} download={preview.nombre} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 hover:border-brand-300 hover:text-brand-600"><Download size={14} /> Descargar</a>
+                <button onClick={cerrarPreview} className="rounded-md p-1 text-slate-400 hover:bg-slate-100" aria-label="Cerrar"><X size={20} /></button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-auto bg-slate-50">
+              {preview.mime.startsWith("image/") ? (
+                <div className="grid h-full place-items-center p-4"><img src={preview.url} alt={preview.nombre} className="max-h-full max-w-full object-contain" /></div>
+              ) : (
+                <iframe src={preview.url} title={preview.nombre} className="h-full w-full" />
+              )}
+            </div>
+          </div>
+        </div>
       ) : null}
     </div>
   );

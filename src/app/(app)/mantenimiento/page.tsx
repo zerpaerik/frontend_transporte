@@ -20,6 +20,7 @@ const columns: Column<OrdenTrabajo>[] = [
   { key: "descripcion", header: "Descripción", render: (o) => <span className="line-clamp-2 max-w-xs text-slate-600">{o.descripcion}</span> },
   { key: "responsable", header: "Responsable" },
   { key: "conductor", header: "Conductor" },
+  { key: "kilometraje", header: "Km", align: "right", sortable: true, value: (o) => o.kilometraje ?? 0, render: (o) => o.kilometraje ? <span className="tabular">{o.kilometraje.toLocaleString("es-PE")}</span> : <span className="text-slate-300">—</span> },
   { key: "costo", header: "Costo", align: "right", sortable: true, value: (o) => o.costo, render: (o) => <span className="tabular font-medium">{soles(o.costo)}</span> },
   { key: "estado", header: "Estado", sortable: true, render: (o) => <Badge tone={o.estado === "Cerrada" ? "green" : o.estado === "En proceso" ? "amber" : "gray"}>{o.estado}</Badge> },
 ];
@@ -44,6 +45,7 @@ export default function MantenimientoPage() {
     { name: "descripcion", label: "Detalle técnico (falla / diagnóstico / solución)", type: "text", required: true, full: true, placeholder: "Cambio de pastillas y discos de freno", default: o?.descripcion },
     { name: "responsable", label: "Responsable (mecánico o taller)", type: "text", placeholder: "Taller Diesel Pro", default: o?.responsable },
     { name: "conductor", label: "Conductor asignado", type: "select", options: conductores.map((c) => c.nombre), default: o?.conductor },
+    { name: "kilometraje", label: "Kilometraje", type: "number", default: o?.kilometraje ?? 0 },
     { name: "costo", label: "Costo (S/)", type: "number", default: o?.costo ?? 0 },
     { name: "estado", label: "Estado", type: "select", options: ["Abierta", "En proceso", "Cerrada"], default: o?.estado },
   ];
@@ -51,7 +53,7 @@ export default function MantenimientoPage() {
   function toBody(v: FormValues) {
     return {
       fecha: String(v.fecha), placa: String(v.placa), tipo: v.tipo as OrdenTrabajo["tipo"], descripcion: String(v.descripcion),
-      responsable: String(v.responsable), conductor: String(v.conductor), costo: Number(v.costo), estado: v.estado as OrdenTrabajo["estado"],
+      responsable: String(v.responsable), conductor: String(v.conductor), kilometraje: Number(v.kilometraje), costo: Number(v.costo), estado: v.estado as OrdenTrabajo["estado"],
     };
   }
   function guardar(v: FormValues) { addOrden(toBody(v)); }

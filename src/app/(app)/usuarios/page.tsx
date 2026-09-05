@@ -9,11 +9,11 @@ import { useData } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import type { Rol, Usuario } from "@/lib/types";
 
-const rolTone: Record<Rol, "orange" | "blue" | "gray" | "green"> = {
-  Administrador: "orange", Operador: "blue", Mecánico: "gray", Conductor: "green",
+const rolTone: Record<Rol, "orange" | "blue" | "gray" | "green" | "amber"> = {
+  Administrador: "orange", Operador: "blue", Mecánico: "gray", Conductor: "green", Contable: "amber",
 };
 
-const ROLES = ["Administrador", "Operador", "Mecánico", "Conductor"];
+const ROLES = ["Administrador", "Operador", "Mecánico", "Conductor", "Contable"];
 
 const crearFields: Field[] = [
   { name: "nombre", label: "Nombre completo", type: "text", required: true, placeholder: "Rosa Quispe", full: true },
