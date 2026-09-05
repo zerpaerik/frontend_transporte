@@ -53,20 +53,14 @@ function iniciales(nombre: string) {
 }
 
 export function planillaPDF(p: PlanillaPdfData) {
-  const empresa = p.empresa?.nombre || "Transporte de Carga Pesada";
-  const rucNum = p.empresa?.ruc;
-  const codigo = p.empresa?.codigo;
-  const logo = codigo ? `/sedes/${encodeURIComponent(codigo)}.jpg` : "";
   const emitido = new Date().toLocaleDateString("es-PE", { day: "2-digit", month: "long", year: "numeric", timeZone: "America/Lima" });
   const pagada = p.estado === "Pagada";
-  const folio = p.folio ? esc(p.folio) : "—";
 
   const filas = p.lineas
     .map(
       (l) => `
       <tr>
         <td class="nowrap">${esc(fecha(l.fecha))}</td>
-        <td class="strong">${esc(l.cliente) || DASH}</td>
         <td>${ruta(l.origen, l.destino)}</td>
         <td class="muted">${esc(l.concepto) || DASH}</td>
         <td class="num">${money(l.sueldoDia)}</td>
@@ -77,7 +71,7 @@ export function planillaPDF(p: PlanillaPdfData) {
     .join("");
 
   const sinLineas = p.lineas.length === 0
-    ? `<tr><td colspan="7" class="empty">Sin líneas registradas para esta semana.</td></tr>`
+    ? `<tr><td colspan="6" class="empty">Sin líneas registradas para esta semana.</td></tr>`
     : "";
 
   const totalDescuento = p.descuentos.reduce((s, d) => s + (d.monto || 0), 0);
@@ -89,11 +83,6 @@ export function planillaPDF(p: PlanillaPdfData) {
   const totalDescRow = p.descuentos.length > 1
     ? `<div class="r"><span class="lbl">Total descuentos</span><span class="amt rojo">− ${esc(soles(totalDescuento))}</span></div>`
     : "";
-
-  // La cabecera con logo cae de vuelta al monograma si la imagen no carga.
-  const logoBox = logo
-    ? `<div class="logo"><img src="${logo}" alt="" onerror="var b=this.parentNode;b.className='logo mono';b.textContent='${esc(iniciales(empresa))}';"></div>`
-    : `<div class="logo mono">${esc(iniciales(empresa))}</div>`;
 
   const html = `<!doctype html>
 <html lang="es"><head><meta charset="utf-8">
@@ -191,17 +180,9 @@ export function planillaPDF(p: PlanillaPdfData) {
   <div class="doc">
 
     <div class="lh">
-      <div class="lh-left">
-        ${logoBox}
-        <div class="co">
-          <h1>${esc(empresa)}</h1>
-          ${rucNum ? `<div class="ruc">RUC ${esc(rucNum)}</div>` : ""}
-        </div>
-      </div>
+      <div></div>
       <div class="lh-right">
-        <div class="title">Liquidación de planilla</div>
         <table class="metatab">
-          <tr><td class="k">Folio</td><td class="v">${folio}</td></tr>
           <tr><td class="k">Periodo</td><td class="v">${esc(fecha(p.semanaDesde))} – ${esc(fecha(p.semanaHasta))}</td></tr>
           <tr><td class="k">Emitido</td><td class="v">${esc(emitido)}</td></tr>
         </table>
@@ -224,14 +205,14 @@ export function planillaPDF(p: PlanillaPdfData) {
     <table>
       <thead>
         <tr>
-          <th style="width:74px">Fecha</th><th>Cliente</th><th>Ruta</th><th>Concepto</th>
+          <th style="width:74px">Fecha</th><th>Ruta</th><th>Concepto</th>
           <th class="num">Sueldo/día</th><th class="num">Comisión</th><th class="num">Viáticos</th>
         </tr>
       </thead>
       <tbody>${filas}${sinLineas}</tbody>
       <tfoot>
         <tr>
-          <td class="lbl" colspan="4">Totales de la semana</td>
+          <td class="lbl" colspan="3">Totales de la semana</td>
           <td class="num">${esc(soles(p.totalSueldo))}</td>
           <td class="num">${esc(soles(p.totalComision))}</td>
           <td class="num">${esc(soles(p.totalViaticos))}</td>
@@ -255,15 +236,6 @@ export function planillaPDF(p: PlanillaPdfData) {
       </div>
     </div>
 
-    <div class="firmas">
-      <div class="firma"><div class="ln">${esc(p.conductor)}</div><div class="sub">Recibí conforme · Conductor · DNI ____________</div></div>
-      <div class="firma"><div class="ln">${p.aprobadaPor ? esc(p.aprobadaPor) : "&nbsp;"}</div><div class="sub">${p.aprobadaPor ? "Aprobó · Administración" : "Administración"}</div></div>
-    </div>
-
-    <div class="pie">
-      <span>${esc(empresa)}${rucNum ? " · RUC " + esc(rucNum) : ""}</span>
-      <span>Documento generado por el sistema · ${esc(emitido)}</span>
-    </div>
   </div>
   <script>window.onload = function(){ setTimeout(function(){ window.print(); }, 300); };</script>
 </body></html>`;
