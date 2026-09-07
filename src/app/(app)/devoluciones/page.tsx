@@ -1,12 +1,23 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { PackageCheck, Search, Paperclip, Download, Save, Settings2, X, Plus, Trash2, Container, Clock } from "lucide-react";
+import { PackageCheck, Search, Paperclip, Download, Save, Settings2, X, Plus, Trash2, Container, Clock, TriangleAlert } from "lucide-react";
 import { PageHeader, StatCard, Card } from "@/components/ui";
 import { apiDevoluciones, apiLugares, fileToBase64, downloadBase64, type Devolucion, type LugarGuardado } from "@/lib/api";
+import { fecha, diasRestantes } from "@/lib/format";
 
 const ESTADOS = ["Pendiente", "En proceso", "Devuelto"] as const;
 type Estado = (typeof ESTADOS)[number];
+
+// Alerta de cita por vencer: solo si tiene fecha y aún no está devuelto.
+function citaAlerta(d: Devolucion): { nivel: "vencida" | "hoy" | "manana"; texto: string } | null {
+  if (!d.citaFecha || d.estadoDevolucion === "Devuelto") return null;
+  const dias = diasRestantes(d.citaFecha);
+  if (dias < 0) return { nivel: "vencida", texto: `CITA VENCIDA · ${fecha(d.citaFecha)}` };
+  if (dias === 0) return { nivel: "hoy", texto: "CITA VENCE HOY" };
+  if (dias === 1) return { nivel: "manana", texto: "CITA VENCE MAÑANA" };
+  return null;
+}
 
 const btnEstadoCls: Record<string, string> = {
   Pendiente: "bg-amber-500 text-white border-amber-500",
@@ -24,6 +35,7 @@ function DevolucionCard({ d, lugares, onSaved }: { d: Devolucion; lugares: Lugar
   const fileRef = useRef<HTMLInputElement>(null);
 
   const punto = d.devolucion || d.destino || "—";
+  const alerta = citaAlerta(d);
 
   async function guardar() {
     setBusy(true); setMsg("");
@@ -62,11 +74,16 @@ function DevolucionCard({ d, lugares, onSaved }: { d: Devolucion; lugares: Lugar
   }
 
   return (
-    <Card className="overflow-hidden">
+    <Card className={`overflow-hidden ${alerta ? "ring-2 ring-rose-400 cita-ring" : ""}`}>
       {/* Cabecera: datos del viaje (solo lectura) */}
-      <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 bg-slate-50/70 px-4 py-3">
+      <div className={`flex flex-wrap items-center gap-3 border-b border-slate-100 px-4 py-3 ${alerta ? "bg-rose-50" : "bg-slate-50/70"}`}>
         <span className="inline-flex items-center gap-1.5 font-bold text-brand-600"><Container size={15} /> {d.codigo || "—"}</span>
         <span className="text-sm text-slate-500">{d.contenedor || "—"}{d.tamanio ? ` · ${d.tamanio}` : ""}</span>
+        {alerta ? (
+          <span className="cita-blink inline-flex items-center gap-1.5 rounded-full bg-rose-600 px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-white shadow-sm">
+            <TriangleAlert size={14} /> {alerta.texto}
+          </span>
+        ) : null}
         <span className="ml-auto inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide ring-1 ring-inset ring-steel-200 bg-steel-50 text-steel-700">{d.operacion}</span>
       </div>
 
@@ -207,9 +224,28 @@ export default function DevolucionesPage() {
 
   const filtros: Array<"todos" | Estado> = ["todos", "Pendiente", "En proceso", "Devuelto"];
 
+  const alertas = useMemo(() => items.map((d) => ({ d, a: citaAlerta(d) })).filter((x) => x.a), [items]);
+
   return (
     <div>
       <PageHeader modulo="07" title="Devolución de contenedores" subtitle="Se alimenta de los viajes de importación. Registra la cita, el lugar de guardado, el estado y adjunta la cita del puerto." />
+
+      {alertas.length > 0 ? (
+        <button
+          onClick={() => setFiltro("todos")}
+          className="cita-ring mb-5 flex w-full items-center gap-3 rounded-xl border-2 border-rose-400 bg-rose-50 px-4 py-3 text-left"
+        >
+          <span className="cita-blink grid h-10 w-10 shrink-0 place-items-center rounded-full bg-rose-600 text-white"><TriangleAlert size={22} /></span>
+          <span className="min-w-0">
+            <span className="block text-sm font-extrabold uppercase tracking-wide text-rose-700">
+              ¡{alertas.length} cita{alertas.length === 1 ? "" : "s"} por vencer! Devuelve el contenedor a tiempo
+            </span>
+            <span className="block truncate text-xs font-medium text-rose-600">
+              {alertas.map((x) => `${x.d.codigo || x.d.contenedor} (${x.a!.texto.replace("CITA ", "")})`).join(" · ")}
+            </span>
+          </span>
+        </button>
+      ) : null}
 
       <div className="mb-6 grid grid-cols-3 gap-4">
         <StatCard label="Pendientes" value={counts.pendiente} icon={PackageCheck} tone="amber" />

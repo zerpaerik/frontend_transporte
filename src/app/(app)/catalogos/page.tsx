@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { FolderCog, Plus, Trash2, Pencil, Building2, Anchor, Tags } from "lucide-react";
+import { FolderCog, Plus, Trash2, Pencil, Building2, Anchor, Tags, MapPin, Save } from "lucide-react";
 import { PageHeader, Card } from "@/components/ui";
 import { FormModal, type Field, type FormValues } from "@/components/FormModal";
-import { apiClientes, apiPuertos, apiTipos, type Cliente, type Puerto, type TipoOperacion } from "@/lib/api";
+import { apiClientes, apiPuertos, apiTipos, apiComisiones, type Cliente, type Puerto, type TipoOperacion, type Tarifa } from "@/lib/api";
 
 export default function CatalogosPage() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
@@ -18,6 +18,9 @@ export default function CatalogosPage() {
   const [cDireccion, setCDireccion] = useState("");
   const [pNombre, setPNombre] = useState("");
   const [tNombre, setTNombre] = useState("");
+  const [tarifas, setTarifas] = useState<Tarifa[]>([]);
+  const [editsT, setEditsT] = useState<Record<string, { gral: number; imo: number; reefer: number }>>({});
+  const [nuevoT, setNuevoT] = useState({ destino: "", gral: "", imo: "", reefer: "" });
   const [busy, setBusy] = useState(false);
   const [editC, setEditC] = useState<Cliente | null>(null);
   const [editP, setEditP] = useState<Puerto | null>(null);
@@ -49,8 +52,29 @@ export default function CatalogosPage() {
     apiClientes.list().then(setClientes).catch(() => setClientes([]));
     apiPuertos.list().then(setPuertos).catch(() => setPuertos([]));
     apiTipos.list().then(setTipos).catch(() => setTipos([]));
+    apiComisiones.tarifario().then((t) => {
+      setTarifas(t);
+      setEditsT(Object.fromEntries(t.map((x) => [x.id, { gral: x.gral, imo: x.imo, reefer: x.reefer }])));
+    }).catch(() => setTarifas([]));
   }
   useEffect(() => { cargar(); }, []);
+
+  async function addTarifa(e: React.FormEvent) {
+    e.preventDefault(); if (!nuevoT.destino.trim()) return; setBusy(true);
+    try {
+      await apiComisiones.crearTarifa({ destino: nuevoT.destino.trim().toUpperCase(), gral: Number(nuevoT.gral || 0), imo: Number(nuevoT.imo || 0), reefer: Number(nuevoT.reefer || 0) });
+      setNuevoT({ destino: "", gral: "", imo: "", reefer: "" }); cargar();
+    } finally { setBusy(false); }
+  }
+  async function guardarTarifa(id: string) {
+    setBusy(true);
+    try { await apiComisiones.actualizarTarifa(id, editsT[id]); cargar(); } finally { setBusy(false); }
+  }
+  async function borrarTarifa(id: string, destino: string) {
+    if (!confirm(`¿Eliminar el destino ${destino} y su bono?`)) return;
+    setBusy(true);
+    try { await apiComisiones.borrarTarifa(id); cargar(); } finally { setBusy(false); }
+  }
 
   async function addCliente(e: React.FormEvent) {
     e.preventDefault(); if (!cNombre.trim()) return; setBusy(true);
@@ -153,6 +177,58 @@ export default function CatalogosPage() {
           </ul>
         </Card>
       </div>
+
+      {/* Destinos y bonos (tarifario) */}
+      <Card className="mt-6 flex flex-col p-5">
+        <div className="mb-4 flex items-center gap-2">
+          <span className="grid h-8 w-8 place-items-center rounded-lg bg-emerald-50 text-emerald-600"><MapPin size={16} /></span>
+          <h2 className="font-bold text-slate-800">Destinos y bonos</h2>
+          <span className="ml-auto text-xs text-slate-400">{tarifas.length}</span>
+        </div>
+        <p className="mb-3 text-xs text-slate-400">El bono se asigna automáticamente al chofer según el destino del viaje y el tipo de carga (GRAL, IMO o REEFER).</p>
+
+        <form onSubmit={addTarifa} className="mb-4 flex flex-wrap items-end gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50/60 p-3">
+          <div className="flex-1 min-w-[180px]"><label className="mb-1 block text-xs font-medium text-slate-500">Destino (distrito)</label><input value={nuevoT.destino} onChange={(e) => setNuevoT({ ...nuevoT, destino: e.target.value })} placeholder="Ej. LA MOLINA" className={`${inp} w-full`} /></div>
+          <div><label className="mb-1 block text-xs font-medium text-slate-500">GRAL</label><input type="number" value={nuevoT.gral} onChange={(e) => setNuevoT({ ...nuevoT, gral: e.target.value })} className={`${inp} w-24`} /></div>
+          <div><label className="mb-1 block text-xs font-medium text-slate-500">IMO</label><input type="number" value={nuevoT.imo} onChange={(e) => setNuevoT({ ...nuevoT, imo: e.target.value })} className={`${inp} w-24`} /></div>
+          <div><label className="mb-1 block text-xs font-medium text-slate-500">REEFER</label><input type="number" value={nuevoT.reefer} onChange={(e) => setNuevoT({ ...nuevoT, reefer: e.target.value })} className={`${inp} w-24`} /></div>
+          <button type="submit" disabled={busy} className={addBtn}><Plus size={15} /> Agregar</button>
+        </form>
+
+        <div className="max-h-[420px] overflow-auto">
+          <table className="w-full min-w-[520px] text-left text-sm">
+            <thead className="sticky top-0">
+              <tr>
+                {["Destino", "GRAL", "IMO", "REEFER", ""].map((h, i) => (
+                  <th key={i} className={`whitespace-nowrap border-b border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500 ${i > 0 && i < 4 ? "text-right" : ""}`}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {tarifas.length === 0 ? <tr><td colSpan={5} className="px-3 py-6 text-center text-sm text-slate-400">Sin destinos. Agrega el primero.</td></tr> : null}
+              {tarifas.map((t) => {
+                const e = editsT[t.id] ?? { gral: t.gral, imo: t.imo, reefer: t.reefer };
+                const changed = e.gral !== t.gral || e.imo !== t.imo || e.reefer !== t.reefer;
+                const setF = (k: "gral" | "imo" | "reefer", v: string) => setEditsT((s) => ({ ...s, [t.id]: { ...e, [k]: Number(v || 0) } }));
+                return (
+                  <tr key={t.id} className="border-b border-slate-100 hover:bg-slate-50/60">
+                    <td className="px-3 py-2 font-medium text-slate-800">{t.destino}</td>
+                    {(["gral", "imo", "reefer"] as const).map((k) => (
+                      <td key={k} className="px-3 py-2 text-right"><input type="number" value={e[k]} onChange={(ev) => setF(k, ev.target.value)} className="w-20 rounded-md border border-slate-200 px-2 py-1 text-right text-sm tabular outline-none focus:border-brand-500" /></td>
+                    ))}
+                    <td className="px-3 py-2">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button disabled={busy || !changed} onClick={() => guardarTarifa(t.id)} title="Guardar" className="rounded-md p-1.5 text-slate-500 hover:bg-emerald-50 hover:text-emerald-600 disabled:opacity-30"><Save size={15} /></button>
+                        <button disabled={busy} onClick={() => borrarTarifa(t.id, t.destino)} title="Eliminar" className="rounded-md p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-600"><Trash2 size={15} /></button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </Card>
 
       <div className="mt-5 flex items-center gap-1.5 text-xs text-slate-400"><FolderCog size={12} /> Estos catálogos aparecen como opciones en el formulario de Operaciones.</div>
 

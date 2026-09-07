@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Plus, IdCard, Phone, AlertTriangle, Search, FileSpreadsheet, FileText, ChevronLeft, ChevronRight, FolderOpen, Pencil } from "lucide-react";
+import { Plus, IdCard, Phone, AlertTriangle, Search, FileSpreadsheet, FileText, ChevronLeft, ChevronRight, FolderOpen, Pencil, Trash2 } from "lucide-react";
 import { PageHeader, StatCard, Card, Badge } from "@/components/ui";
 import { FormModal, type Field, type FormValues } from "@/components/FormModal";
 import { DocumentosModal } from "@/components/DocumentosModal";
@@ -24,9 +24,14 @@ const fields: Field[] = [
 const PAGE = 6;
 
 export default function ConductoresPage() {
-  const { conductores, addConductor, updateConductor, reload } = useData();
+  const { conductores, addConductor, updateConductor, removeConductor, reload } = useData();
   const { user } = useAuth();
   const readOnly = user?.rol === "Conductor";
+  const puedeEliminar = user?.rol === "Administrador";
+
+  function eliminarConductor(c: any) {
+    if (confirm(`¿Eliminar al conductor ${c.nombre}? Esta acción no se puede deshacer.`)) removeConductor(c.id);
+  }
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
@@ -130,6 +135,11 @@ export default function ConductoresPage() {
                 {!readOnly ? (
                   <button onClick={() => setEditCond(c)} title="Editar conductor" className="rounded-md border border-slate-200 p-1.5 text-slate-500 hover:border-brand-300 hover:text-brand-600">
                     <Pencil size={13} />
+                  </button>
+                ) : null}
+                {puedeEliminar ? (
+                  <button onClick={() => eliminarConductor(c)} title="Eliminar conductor" className="rounded-md border border-slate-200 p-1.5 text-slate-500 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-600">
+                    <Trash2 size={13} />
                   </button>
                 ) : null}
               </div>

@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Menu, LogOut, ChevronDown, Building2, Check } from "lucide-react";
+import { Menu, LogOut, ChevronDown, Building2, Check, TriangleAlert } from "lucide-react";
 import { useAuth } from "@/lib/auth";
-import { apiGetSedes, type Sede } from "@/lib/api";
+import { apiGetSedes, apiDevoluciones, type Sede } from "@/lib/api";
+import { diasRestantes } from "@/lib/format";
 import { NAV } from "@/lib/nav";
 
 const LOGO: Record<string, string> = { mgr: "/sedes/mgr.jpg", mjg: "/sedes/mjg.jpg", mgrsi: "/sedes/mgr.jpg" };
@@ -16,12 +17,24 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [sedes, setSedes] = useState<Sede[]>([]);
   const [busy, setBusy] = useState(false);
+  const [citas, setCitas] = useState(0);
 
   useEffect(() => {
     if (menuOpen && sedes.length === 0) {
       apiGetSedes().then(setSedes).catch(() => setSedes([]));
     }
   }, [menuOpen, sedes.length]);
+
+  // Alerta global de citas por vencer (hoy, mañana o vencidas). Refresca cada 90s.
+  useEffect(() => {
+    let alive = true;
+    const cargar = () => apiDevoluciones.list()
+      .then((ds) => { if (alive) setCitas(ds.filter((d) => d.citaFecha && d.estadoDevolucion !== "Devuelto" && diasRestantes(d.citaFecha) <= 1).length); })
+      .catch(() => { if (alive) setCitas(0); });
+    cargar();
+    const t = setInterval(cargar, 90000);
+    return () => { alive = false; clearInterval(t); };
+  }, [user?.sede?.id]);
 
   async function elegirSede(sedeId: string) {
     if (busy || sedeId === user?.sede?.id) { setMenuOpen(false); return; }
@@ -51,6 +64,15 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
           <Menu size={20} />
         </button>
         <div className="text-sm font-semibold text-slate-700">{current?.label ?? "Panel"}</div>
+        {citas > 0 ? (
+          <button
+            onClick={() => router.push("/devoluciones")}
+            title="Hay citas de devolución por vencer"
+            className="cita-blink inline-flex items-center gap-1.5 rounded-full bg-rose-600 px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-white shadow-sm"
+          >
+            <TriangleAlert size={14} /> {citas} cita{citas === 1 ? "" : "s"} por vencer
+          </button>
+        ) : null}
         {user?.sede ? (
           <div className="ml-1 hidden items-center gap-2 border-l border-slate-200 pl-3 sm:flex">
             {LOGO[user.sede.codigo] ? (
