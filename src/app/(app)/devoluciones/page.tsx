@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { PackageCheck, Search, Paperclip, Download, Save, Settings2, X, Plus, Trash2, Container, Clock, TriangleAlert } from "lucide-react";
+import { PackageCheck, Search, Paperclip, Download, Save, Settings2, X, Plus, Trash2, Container, Clock, TriangleAlert, Check, RotateCcw } from "lucide-react";
 import { PageHeader, StatCard, Card } from "@/components/ui";
 import { apiDevoluciones, apiLugares, fileToBase64, downloadBase64, type Devolucion, type LugarGuardado } from "@/lib/api";
 import { fecha, diasRestantes } from "@/lib/format";
@@ -36,6 +36,8 @@ function DevolucionCard({ d, lugares, onSaved }: { d: Devolucion; lugares: Lugar
 
   const punto = d.devolucion || d.destino || "—";
   const alerta = citaAlerta(d);
+  // La tarjeta queda en solo lectura una vez devuelto (se reabre con "Reabrir").
+  const locked = d.estadoDevolucion === "Devuelto";
 
   async function guardar() {
     setBusy(true); setMsg("");
@@ -45,6 +47,16 @@ function DevolucionCard({ d, lugares, onSaved }: { d: Devolucion; lugares: Lugar
       setMsg("Guardado");
       setTimeout(() => setMsg(""), 1500);
     } catch (e) { setMsg((e as Error).message || "No se pudo guardar."); }
+    finally { setBusy(false); }
+  }
+
+  async function reabrir() {
+    setBusy(true); setMsg("");
+    try {
+      const upd = await apiDevoluciones.update(d.id, { citaFecha: citaFecha || null, citaHora, lugarGuardado: lugar, estadoDevolucion: "En proceso" });
+      onSaved(upd);
+      setEstado("En proceso");
+    } catch (e) { setMsg((e as Error).message || "No se pudo reabrir."); }
     finally { setBusy(false); }
   }
 
@@ -74,12 +86,16 @@ function DevolucionCard({ d, lugares, onSaved }: { d: Devolucion; lugares: Lugar
   }
 
   return (
-    <Card className={`overflow-hidden ${alerta ? "ring-2 ring-rose-400 cita-ring" : ""}`}>
+    <Card className={`overflow-hidden ${alerta ? "ring-2 ring-rose-400 cita-ring" : locked ? "ring-1 ring-emerald-200" : ""}`}>
       {/* Cabecera: datos del viaje (solo lectura) */}
-      <div className={`flex flex-wrap items-center gap-3 border-b border-slate-100 px-4 py-3 ${alerta ? "bg-rose-50" : "bg-slate-50/70"}`}>
+      <div className={`flex flex-wrap items-center gap-3 border-b border-slate-100 px-4 py-3 ${locked ? "bg-emerald-50/70" : alerta ? "bg-rose-50" : "bg-slate-50/70"}`}>
         <span className="inline-flex items-center gap-1.5 font-bold text-brand-600"><Container size={15} /> {d.codigo || "—"}</span>
         <span className="text-sm text-slate-500">{d.contenedor || "—"}{d.tamanio ? ` · ${d.tamanio}` : ""}</span>
-        {alerta ? (
+        {locked ? (
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-white shadow-sm">
+            <Check size={14} /> Devuelto
+          </span>
+        ) : alerta ? (
           <span className="cita-blink inline-flex items-center gap-1.5 rounded-full bg-rose-600 px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-white shadow-sm">
             <TriangleAlert size={14} /> {alerta.texto}
           </span>
@@ -97,27 +113,36 @@ function DevolucionCard({ d, lugares, onSaved }: { d: Devolucion; lugares: Lugar
       {/* Estado en grande */}
       <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 px-4 py-3">
         <span className="mr-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Estado</span>
-        {ESTADOS.map((e) => (
-          <button key={e} onClick={() => setEstado(e)}
-            className={`rounded-lg border px-3.5 py-2 text-sm font-bold transition ${estado === e ? btnEstadoCls[e] : "border-slate-300 bg-white text-slate-500 hover:border-slate-400"}`}>
-            {e}
-          </button>
-        ))}
+        {locked ? (
+          <>
+            <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-2 text-sm font-bold text-white"><Check size={16} /> Devuelto</span>
+            <button disabled={busy} onClick={reabrir} className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-600 hover:border-brand-300 hover:text-brand-600 disabled:opacity-50">
+              <RotateCcw size={15} /> Reabrir
+            </button>
+          </>
+        ) : (
+          ESTADOS.map((e) => (
+            <button key={e} onClick={() => setEstado(e)}
+              className={`rounded-lg border px-3.5 py-2 text-sm font-bold transition ${estado === e ? btnEstadoCls[e] : "border-slate-300 bg-white text-slate-500 hover:border-slate-400"}`}>
+              {e}
+            </button>
+          ))
+        )}
       </div>
 
       {/* Campos editables */}
       <div className="grid grid-cols-1 gap-3 px-4 pb-2 sm:grid-cols-3">
         <div>
           <label className="mb-1 block text-xs font-medium text-slate-500">Día de la cita</label>
-          <input type="date" value={citaFecha} onChange={(e) => setCitaFecha(e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500" />
+          <input type="date" disabled={locked} value={citaFecha} onChange={(e) => setCitaFecha(e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500 disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed" />
         </div>
         <div>
           <label className="mb-1 flex items-center gap-1 text-xs font-medium text-slate-500"><Clock size={12} /> Hora de devolución</label>
-          <input type="time" value={citaHora} onChange={(e) => setCitaHora(e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500" />
+          <input type="time" disabled={locked} value={citaHora} onChange={(e) => setCitaHora(e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500 disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed" />
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-slate-500">Lugar de guardado</label>
-          <input list={`dl-${d.id}`} value={lugar} onChange={(e) => setLugar(e.target.value)} placeholder="COLAN, MAQHER, con tracto…" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500" />
+          <input list={`dl-${d.id}`} disabled={locked} value={lugar} onChange={(e) => setLugar(e.target.value)} placeholder="COLAN, MAQHER, con tracto…" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500 disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed" />
           <datalist id={`dl-${d.id}`}>{lugares.map((l) => <option key={l.id} value={l.nombre} />)}</datalist>
         </div>
       </div>
@@ -128,18 +153,24 @@ function DevolucionCard({ d, lugares, onSaved }: { d: Devolucion; lugares: Lugar
         {d.citaArchivos.map((a) => (
           <span key={a.id} className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white py-1 pl-2 pr-1 text-xs text-slate-600">
             <button onClick={() => descargar(a)} title="Descargar" className="inline-flex items-center gap-1 hover:text-brand-600"><Download size={13} /> <span className="max-w-[160px] truncate">{a.nombre}</span></button>
-            <button disabled={busy} onClick={() => quitar(a.id)} title="Quitar" className="rounded p-0.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50"><X size={12} /></button>
+            {!locked ? <button disabled={busy} onClick={() => quitar(a.id)} title="Quitar" className="rounded p-0.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50"><X size={12} /></button> : null}
           </span>
         ))}
-        <label className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-dashed border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:border-brand-300 hover:text-brand-600">
-          <Plus size={13} /> Adjuntar
-          <input ref={fileRef} type="file" accept="application/pdf,image/*" className="hidden" onChange={subirArchivo} />
-        </label>
+        {!locked ? (
+          <label className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-dashed border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:border-brand-300 hover:text-brand-600">
+            <Plus size={13} /> Adjuntar
+            <input ref={fileRef} type="file" accept="application/pdf,image/*" className="hidden" onChange={subirArchivo} />
+          </label>
+        ) : null}
         <div className="ml-auto flex items-center gap-3">
           {msg ? <span className="text-xs text-slate-400">{msg}</span> : null}
-          <button disabled={busy} onClick={guardar} className="inline-flex items-center gap-1.5 rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-60">
-            <Save size={15} /> {busy ? "Guardando…" : "Guardar"}
-          </button>
+          {locked ? (
+            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-600"><Check size={14} /> Devolución cerrada · solo lectura</span>
+          ) : (
+            <button disabled={busy} onClick={guardar} className="inline-flex items-center gap-1.5 rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-60">
+              <Save size={15} /> {busy ? "Guardando…" : "Guardar"}
+            </button>
+          )}
         </div>
       </div>
     </Card>
