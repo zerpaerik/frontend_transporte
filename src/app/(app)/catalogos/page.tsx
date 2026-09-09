@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { FolderCog, Plus, Trash2, Pencil, Building2, Anchor, Tags, MapPin, Save, Store } from "lucide-react";
+import { FolderCog, Plus, Trash2, Pencil, Building2, Anchor, Tags, MapPin, Save, Store, Search } from "lucide-react";
 import { PageHeader, Card } from "@/components/ui";
 import { FormModal, type Field, type FormValues } from "@/components/FormModal";
 import { apiClientes, apiPuertos, apiTipos, apiComisiones, apiProveedores, type Cliente, type Puerto, type TipoOperacion, type Tarifa, type Proveedor } from "@/lib/api";
@@ -10,6 +10,7 @@ export default function CatalogosPage() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [puertos, setPuertos] = useState<Puerto[]>([]);
   const [tipos, setTipos] = useState<TipoOperacion[]>([]);
+  const [qCli, setQCli] = useState("");
   const [cNombre, setCNombre] = useState("");
   const [cRuc, setCRuc] = useState("");
   const [cEmail, setCEmail] = useState("");
@@ -140,23 +141,33 @@ export default function CatalogosPage() {
               <button type="submit" disabled={busy} className={addBtn}><Plus size={15} /></button>
             </div>
           </form>
-          <ul className="max-h-80 divide-y divide-slate-100 overflow-y-auto">
-            {clientes.map((c) => (
-              <li key={c.id} className="flex items-start justify-between gap-2 py-2">
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-medium text-slate-800">{c.nombre}</div>
-                  <div className="text-xs text-slate-400">RUC {c.ruc || "—"}{c.contacto ? ` · ${c.contacto}` : ""}</div>
-                  {(c.telefono || c.email) ? <div className="truncate text-xs text-slate-400">{[c.telefono, c.email].filter(Boolean).join(" · ")}</div> : null}
-                  {c.direccion ? <div className="truncate text-xs text-slate-400">📍 {c.direccion}</div> : null}
-                </div>
-                <div className="flex items-center gap-1">
-                  <button onClick={() => setEditC(c)} title="Editar" className={editBtn}><Pencil size={14} /></button>
-                  <button onClick={() => { if (confirm(`¿Eliminar ${c.nombre}?`)) apiClientes.remove(c.id).then(cargar); }} className={delBtn}><Trash2 size={15} /></button>
-                </div>
-              </li>
-            ))}
-            {clientes.length === 0 ? <li className="py-4 text-center text-sm text-slate-400">Sin clientes</li> : null}
-          </ul>
+          <div className="relative mb-2">
+            <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input value={qCli} onChange={(e) => setQCli(e.target.value)} placeholder="Buscar cliente, RUC, correo…" className={`${inp} w-full pl-9`} />
+          </div>
+          {(() => {
+            const q = qCli.trim().toLowerCase();
+            const lista = q ? clientes.filter((c) => `${c.nombre} ${c.ruc} ${c.email} ${c.contacto} ${c.telefono}`.toLowerCase().includes(q)) : clientes;
+            return (
+              <ul className="max-h-80 divide-y divide-slate-100 overflow-y-auto">
+                {lista.map((c) => (
+                  <li key={c.id} className="flex items-start justify-between gap-2 py-2">
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-medium text-slate-800">{c.nombre}</div>
+                      <div className="text-xs text-slate-400">RUC {c.ruc || "—"}{c.contacto ? ` · ${c.contacto}` : ""}</div>
+                      {(c.telefono || c.email) ? <div className="truncate text-xs text-slate-400">{[c.telefono, c.email].filter(Boolean).join(" · ")}</div> : null}
+                      {c.direccion ? <div className="truncate text-xs text-slate-400">📍 {c.direccion}</div> : null}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => setEditC(c)} title="Editar" className={editBtn}><Pencil size={14} /></button>
+                      <button onClick={() => { if (confirm(`¿Eliminar ${c.nombre}?`)) apiClientes.remove(c.id).then(cargar); }} className={delBtn}><Trash2 size={15} /></button>
+                    </div>
+                  </li>
+                ))}
+                {lista.length === 0 ? <li className="py-4 text-center text-sm text-slate-400">{clientes.length === 0 ? "Sin clientes" : "Sin resultados"}</li> : null}
+              </ul>
+            );
+          })()}
         </Card>
 
         {/* Puertos */}
