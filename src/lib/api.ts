@@ -124,7 +124,7 @@ export const apiClientes = {
   remove: (id: string) => api.del<void>(`/clientes/${id}`),
 };
 
-export interface Agenda { id: string; fecha: string; cliente: string; origen: string; devolucion: string; tipoCarga: string; unidades: number; observacion: string; estado: string; }
+export interface Agenda { id: string; fecha: string; cliente: string; origen: string; destino: string; devolucion: string; tipoCarga: string; unidades: number; observacion: string; estado: string; }
 export const apiAgenda = {
   list: () => api.get<Agenda[]>("/agenda"),
   create: (b: Partial<Omit<Agenda, "id">>) => api.post<Agenda>("/agenda", b),

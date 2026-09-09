@@ -5,7 +5,7 @@ import { Plus, CalendarClock, Truck, Users, Pencil, Trash2, ChevronLeft, Chevron
 import { PageHeader, StatCard, Badge, Card } from "@/components/ui";
 import { DataTable, type Column, type Filter } from "@/components/DataTable";
 import { FormModal, type Field, type FormValues } from "@/components/FormModal";
-import { apiAgenda, apiClientes, apiPuertos, type Agenda } from "@/lib/api";
+import { apiAgenda, apiClientes, apiPuertos, apiComisiones, type Agenda } from "@/lib/api";
 import { fecha } from "@/lib/format";
 
 const hoyISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
@@ -24,6 +24,7 @@ export default function AgendaPage() {
   const [items, setItems] = useState<Agenda[]>([]);
   const [clientes, setClientes] = useState<string[]>([]);
   const [puertos, setPuertos] = useState<string[]>([]);
+  const [distritos, setDistritos] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState<Agenda | null>(null);
   const [nuevaFecha, setNuevaFecha] = useState<string | undefined>(undefined);
@@ -44,6 +45,7 @@ export default function AgendaPage() {
     cargar();
     apiClientes.list().then((cs) => setClientes(cs.map((c) => c.nombre))).catch(() => setClientes([]));
     apiPuertos.list().then((ps) => setPuertos(ps.map((p) => p.nombre))).catch(() => setPuertos([]));
+    apiComisiones.tarifario().then((ts) => setDistritos(ts.map((t) => t.destino))).catch(() => setDistritos([]));
   }, []);
 
   const activos = items.filter((a) => a.estado !== "Realizado" && a.estado !== "Cancelado");
@@ -67,8 +69,9 @@ export default function AgendaPage() {
 
   const fieldsFor = (a?: Agenda): Field[] => [
     { name: "fecha", label: "Fecha del servicio", type: "date", required: true, default: a?.fecha ?? nuevaFecha ?? hoyISO() },
-    { name: "cliente", label: "Cliente", type: "select", options: ["", ...clientes], required: true, default: a?.cliente },
+    { name: "cliente", label: "Cliente", type: "combo", options: clientes, required: true, placeholder: "Buscar cliente…", default: a?.cliente },
     { name: "origen", label: "Origen — desde dónde sale la carga", type: "select", options: ["", ...puertos], default: a?.origen },
+    { name: "destino", label: "Destino (distrito)", type: "select", options: ["", ...distritos], default: a?.destino },
     { name: "devolucion", label: "Punto de devolución", type: "select", options: ["", ...puertos], default: a?.devolucion },
     { name: "tipoCarga", label: "Tipo de carga", type: "select", options: ["GENERAL", "IMO", "REEFER"], default: a?.tipoCarga },
     { name: "unidades", label: "Unidades comprometidas", type: "number", default: a?.unidades ?? 1 },
@@ -78,7 +81,7 @@ export default function AgendaPage() {
 
   function toBody(v: FormValues) {
     return {
-      fecha: String(v.fecha), cliente: String(v.cliente), origen: String(v.origen || ""), devolucion: String(v.devolucion || ""),
+      fecha: String(v.fecha), cliente: String(v.cliente), origen: String(v.origen || ""), destino: String(v.destino || ""), devolucion: String(v.devolucion || ""),
       tipoCarga: String(v.tipoCarga || "GENERAL"), unidades: Number(v.unidades), estado: String(v.estado || "Programado"), observacion: String(v.observacion || ""),
     };
   }
@@ -93,6 +96,7 @@ export default function AgendaPage() {
     { key: "fecha", header: "Fecha", sortable: true, value: (a) => a.fecha, render: (a) => <span className="tabular whitespace-nowrap font-medium">{fecha(a.fecha)}</span> },
     { key: "cliente", header: "Cliente", sortable: true, render: (a) => <span className="block max-w-[220px] truncate font-medium text-slate-800" title={a.cliente}>{a.cliente}</span> },
     { key: "origen", header: "Origen", render: (a) => a.origen || <span className="text-slate-300">—</span> },
+    { key: "destino", header: "Destino", render: (a) => a.destino || <span className="text-slate-300">—</span> },
     { key: "devolucion", header: "Devolución", render: (a) => a.devolucion || <span className="text-slate-300">—</span> },
     { key: "tipoCarga", header: "Carga", render: (a) => <span className="text-xs font-semibold text-slate-500">{a.tipoCarga}</span> },
     { key: "unidades", header: "Unidades", align: "right", sortable: true, value: (a) => a.unidades, render: (a) => <span className="tabular font-semibold">{a.unidades}</span> },
@@ -214,8 +218,10 @@ export default function AgendaPage() {
             <Badge tone={estadoTone(hover.s.estado)}>{hover.s.estado}</Badge>
           </div>
           <div className="text-slate-500">{fecha(hover.s.fecha)}</div>
-          <div className="mt-1.5 flex items-center gap-1 text-slate-700">
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-1 gap-y-0.5 text-slate-700">
             <span className="truncate">{hover.s.origen || "—"}</span>
+            <ArrowRight size={12} className="shrink-0 text-slate-400" />
+            <span className="truncate font-medium">{hover.s.destino || "—"}</span>
             <ArrowRight size={12} className="shrink-0 text-slate-400" />
             <span className="truncate">{hover.s.devolucion || "—"}</span>
           </div>

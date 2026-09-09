@@ -159,7 +159,7 @@ export default function OperacionesPage() {
         ? [{ name: "carretaPlaca", label: "Placa de la carreta alquilada", type: "text" as const, required: true, placeholder: "Ej. B7A-845", full: true, default: alquiladaGuardada ? carretaGuardada : "" }]
         : []),
       { name: "conductor", label: "Conductor", type: "select", options: ["", ...conductores.map((c) => c.nombre)], default: g("conductor") },
-      { name: "cliente", label: "Cliente", type: "select", options: clientes, required: true, default: g("cliente") },
+      { name: "cliente", label: "Cliente", type: "combo", options: clientes, required: true, placeholder: "Buscar cliente…", default: g("cliente") },
       { name: "fechaViaje", label: "Fecha del viaje", type: "date", default: g("fechaViaje", hoyISO) },
       { name: "nOrden", label: "Orden", type: "text", placeholder: "26/03000251", default: g("nOrden") },
       { name: "greRemitente", label: "Guía de remisión", type: "text", placeholder: "T001-26916", default: g("greRemitente") },

@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { X, Search } from "lucide-react";
 
 export type Field =
   | { name: string; label: string; type: "text" | "date"; required?: boolean; placeholder?: string; full?: boolean; default?: string }
   | { name: string; label: string; type: "number"; required?: boolean; placeholder?: string; step?: number; full?: boolean; default?: number }
-  | { name: string; label: string; type: "select"; options: string[]; required?: boolean; full?: boolean; default?: string };
+  | { name: string; label: string; type: "select"; options: string[]; required?: boolean; full?: boolean; default?: string }
+  | { name: string; label: string; type: "combo"; options: string[]; required?: boolean; full?: boolean; default?: string; placeholder?: string };
 
 export type FormValues = Record<string, string | number>;
 
@@ -14,9 +15,50 @@ function fieldDefault(f: Field): string {
   // Un select sin default toma su primera opción (usar || para que "" caiga a la primera:
   // así el estado coincide con lo que muestra el navegador y no falla el "obligatorio").
   if (f.type === "select") return f.default || f.options[0] || "";
+  // El combo (buscable) arranca vacío para que el usuario escriba y busque.
+  if (f.type === "combo") return f.default != null ? String(f.default) : "";
   // Los numéricos en 0 arrancan vacíos para no mostrar el "0" antes del número.
   if (f.type === "number") return f.default != null && f.default !== 0 ? String(f.default) : "";
   return f.default != null ? String(f.default) : "";
+}
+
+// Select con buscador (para listas largas, p. ej. clientes).
+function SearchCombo({ value, options, placeholder, onChange }: { value: string; options: string[]; placeholder?: string; onChange: (v: string) => void }) {
+  const [openList, setOpenList] = useState(false);
+  const [q, setQ] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpenList(false); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
+  const query = q.trim().toLowerCase();
+  const filtered = (query ? options.filter((o) => o.toLowerCase().includes(query)) : options).slice(0, 60);
+  return (
+    <div ref={ref} className="relative">
+      <div className="relative">
+        <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+        <input
+          value={openList ? q : value}
+          placeholder={placeholder || "Buscar…"}
+          onFocus={() => { setQ(""); setOpenList(true); }}
+          onChange={(e) => { setQ(e.target.value); setOpenList(true); }}
+          className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30"
+        />
+      </div>
+      {openList ? (
+        <div className="absolute z-30 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-slate-200 bg-white py-1 shadow-xl">
+          {filtered.length === 0 ? <div className="px-3 py-2 text-sm text-slate-400">Sin resultados</div> : null}
+          {filtered.map((o) => (
+            <button type="button" key={o} onMouseDown={(e) => { e.preventDefault(); onChange(o); setQ(""); setOpenList(false); }}
+              className={`block w-full truncate px-3 py-1.5 text-left text-sm hover:bg-brand-50 ${o === value ? "font-semibold text-brand-700" : "text-slate-700"}`}>
+              {o || "— (ninguno)"}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 // Inicializa en varias pasadas para resolver campos que aparecen según otros
@@ -104,7 +146,9 @@ export function FormModal({
                 <label className="mb-1 block text-sm font-medium text-slate-700">
                   {f.label} {f.required ? <span className="text-brand-600">*</span> : null}
                 </label>
-                {f.type === "select" ? (
+                {f.type === "combo" ? (
+                  <SearchCombo value={values[f.name] ?? ""} options={f.options} placeholder={f.placeholder} onChange={(v) => set(f.name, v)} />
+                ) : f.type === "select" ? (
                   <select
                     value={values[f.name] ?? ""}
                     onChange={(e) => set(f.name, e.target.value)}
