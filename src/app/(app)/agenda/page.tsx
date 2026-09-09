@@ -69,7 +69,7 @@ export default function AgendaPage() {
 
   const fieldsFor = (a?: Agenda): Field[] => [
     { name: "fecha", label: "Fecha del servicio", type: "date", required: true, default: a?.fecha ?? nuevaFecha ?? hoyISO() },
-    { name: "cliente", label: "Cliente", type: "combo", options: clientes, required: true, placeholder: "Buscar cliente…", default: a?.cliente },
+    { name: "cliente", label: "Cliente (opcional)", type: "combo", options: ["POR ASIGNAR", ...clientes], placeholder: "Buscar cliente… o dejar POR ASIGNAR", default: a?.cliente },
     { name: "origen", label: "Origen — desde dónde sale la carga", type: "select", options: ["", ...puertos], default: a?.origen },
     { name: "destino", label: "Destino (distrito)", type: "select", options: ["", ...distritos], default: a?.destino },
     { name: "devolucion", label: "Punto de devolución", type: "select", options: ["", ...puertos], default: a?.devolucion },
@@ -81,7 +81,7 @@ export default function AgendaPage() {
 
   function toBody(v: FormValues) {
     return {
-      fecha: String(v.fecha), cliente: String(v.cliente), origen: String(v.origen || ""), destino: String(v.destino || ""), devolucion: String(v.devolucion || ""),
+      fecha: String(v.fecha), cliente: String(v.cliente || "").trim() || "POR ASIGNAR", origen: String(v.origen || ""), destino: String(v.destino || ""), devolucion: String(v.devolucion || ""),
       tipoCarga: String(v.tipoCarga || "GENERAL"), unidades: Number(v.unidades), estado: String(v.estado || "Programado"), observacion: String(v.observacion || ""),
     };
   }
