@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Plus, CalendarClock, Truck, Users, Pencil, Trash2, ChevronLeft, ChevronRight, CalendarDays, List } from "lucide-react";
+import { Plus, CalendarClock, Truck, Users, Pencil, Trash2, ChevronLeft, ChevronRight, CalendarDays, List, ArrowRight } from "lucide-react";
 import { PageHeader, StatCard, Badge, Card } from "@/components/ui";
 import { DataTable, type Column, type Filter } from "@/components/DataTable";
 import { FormModal, type Field, type FormValues } from "@/components/FormModal";
@@ -29,6 +29,15 @@ export default function AgendaPage() {
   const [nuevaFecha, setNuevaFecha] = useState<string | undefined>(undefined);
   const [vista, setVista] = useState<"calendario" | "lista">("calendario");
   const [mesRef, setMesRef] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); });
+  const [hover, setHover] = useState<{ s: Agenda; top: number; left: number; below: boolean } | null>(null);
+
+  function onChipEnter(e: React.MouseEvent, s: Agenda) {
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const W = 248, H = 150;
+    const below = r.top < H + 16;
+    const left = Math.max(8, Math.min(r.left + r.width / 2 - W / 2, window.innerWidth - W - 8));
+    setHover({ s, top: below ? r.bottom + 8 : r.top - 8, left, below });
+  }
 
   function cargar() { apiAgenda.list().then(setItems).catch(() => setItems([])); }
   useEffect(() => {
@@ -154,7 +163,7 @@ export default function AgendaPage() {
                   <div className="space-y-1">
                     {servicios.slice(0, 3).map((s) => (
                       <button key={s.id} onClick={(e) => { e.stopPropagation(); setEdit(s); }}
-                        title={`${s.cliente} · ${s.unidades} und · ${s.estado}`}
+                        onMouseEnter={(e) => onChipEnter(e, s)} onMouseLeave={() => setHover(null)}
                         className={`block w-full truncate rounded px-1.5 py-0.5 text-left text-[11px] font-medium ring-1 ring-inset ${chipCls(s.estado)}`}>
                         <span className="tabular font-bold">{s.unidades}</span> · {s.cliente}
                       </button>
@@ -194,6 +203,27 @@ export default function AgendaPage() {
           <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-emerald-300" /> Realizado</span>
           <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-rose-300" /> Cancelado</span>
           <span className="ml-auto">Clic en un día para agendar · clic en un servicio para editarlo</span>
+        </div>
+      ) : null}
+
+      {hover ? (
+        <div className="pointer-events-none fixed z-50 rounded-xl border border-slate-200 bg-white p-3 text-xs shadow-xl"
+          style={{ top: hover.top, left: hover.left, width: 248, transform: hover.below ? undefined : "translateY(-100%)" }}>
+          <div className="mb-1 flex items-center justify-between gap-2">
+            <span className="truncate font-bold text-slate-800">{hover.s.cliente}</span>
+            <Badge tone={estadoTone(hover.s.estado)}>{hover.s.estado}</Badge>
+          </div>
+          <div className="text-slate-500">{fecha(hover.s.fecha)}</div>
+          <div className="mt-1.5 flex items-center gap-1 text-slate-700">
+            <span className="truncate">{hover.s.origen || "—"}</span>
+            <ArrowRight size={12} className="shrink-0 text-slate-400" />
+            <span className="truncate">{hover.s.devolucion || "—"}</span>
+          </div>
+          <div className="mt-1.5 flex items-center gap-2">
+            <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">{hover.s.tipoCarga}</span>
+            <span className="font-semibold text-slate-700">{hover.s.unidades} unidad{hover.s.unidades === 1 ? "" : "es"}</span>
+          </div>
+          {hover.s.observacion ? <div className="mt-1.5 border-t border-slate-100 pt-1.5 text-slate-500">{hover.s.observacion}</div> : null}
         </div>
       ) : null}
 
