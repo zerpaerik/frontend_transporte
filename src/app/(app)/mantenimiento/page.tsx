@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus, Wrench, Pencil, Trash2 } from "lucide-react";
 import { PageHeader, StatCard, Badge } from "@/components/ui";
 import { DataTable, type Column, type Filter } from "@/components/DataTable";
 import { FormModal, type Field, type FormValues } from "@/components/FormModal";
 import { useData } from "@/lib/store";
+import { apiProveedores } from "@/lib/api";
 import { soles, fecha } from "@/lib/format";
 import type { TipoMantenimiento, OrdenTrabajo } from "@/lib/types";
 
@@ -34,6 +35,9 @@ export default function MantenimientoPage() {
   const { ordenes, vehiculos, conductores, addOrden, updateOrden, removeOrden } = useData();
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState<OrdenTrabajo | null>(null);
+  const [proveedores, setProveedores] = useState<string[]>([]);
+  useEffect(() => { apiProveedores.list().then((ps) => setProveedores(ps.map((p) => p.razonSocial))).catch(() => setProveedores([])); }, []);
+  const provOpts = (actual?: string) => ["", ...Array.from(new Set([actual, ...proveedores].filter(Boolean) as string[]))];
 
   const abiertas = ordenes.filter((o) => o.estado !== "Cerrada").length;
   const gasto = ordenes.reduce((s, o) => s + o.costo, 0);
@@ -43,7 +47,7 @@ export default function MantenimientoPage() {
     { name: "placa", label: "Vehículo (tracto o carreta)", type: "select", options: vehiculos.map((v) => v.placa), default: o?.placa },
     { name: "tipo", label: "Tipo de mantenimiento", type: "select", options: ["Preventivo", "Correctivo", "Predictivo"], default: o?.tipo },
     { name: "descripcion", label: "Detalle técnico (falla / diagnóstico / solución)", type: "text", required: true, full: true, placeholder: "Cambio de pastillas y discos de freno", default: o?.descripcion },
-    { name: "responsable", label: "Responsable (mecánico o taller)", type: "text", placeholder: "Taller Diesel Pro", default: o?.responsable },
+    { name: "responsable", label: "Responsable / taller (proveedor)", type: "select", options: provOpts(o?.responsable), default: o?.responsable },
     { name: "conductor", label: "Conductor asignado", type: "select", options: conductores.map((c) => c.nombre), default: o?.conductor },
     { name: "kilometraje", label: "Kilometraje", type: "number", default: o?.kilometraje ?? 0 },
     { name: "costo", label: "Costo (S/)", type: "number", default: o?.costo ?? 0 },

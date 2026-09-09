@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus, Package, Pencil, Trash2 } from "lucide-react";
 import { PageHeader, StatCard, Badge } from "@/components/ui";
 import { DataTable, type Column, type Filter } from "@/components/DataTable";
 import { FormModal, type Field, type FormValues } from "@/components/FormModal";
 import { useData } from "@/lib/store";
+import { apiProveedores } from "@/lib/api";
 import { soles, fecha } from "@/lib/format";
 import type { CalidadRepuesto, Repuesto } from "@/lib/types";
 
@@ -13,7 +14,7 @@ const calidadTone: Record<CalidadRepuesto, "green" | "blue" | "amber"> = {
   Original: "green", Alternativo: "blue", Remanufacturado: "amber",
 };
 
-const fieldsFor = (placas: string[], r?: Repuesto): Field[] => [
+const fieldsFor = (placas: string[], proveedores: string[], r?: Repuesto): Field[] => [
   { name: "nombre", label: "Repuesto", type: "text", required: true, placeholder: "Pastillas de freno", full: true, default: r?.nombre },
   { name: "placa", label: "Vehículo (tracto o carreta)", type: "select", options: ["", ...placas], default: r?.placa },
   { name: "kilometraje", label: "Kilometraje", type: "number", default: r?.kilometraje ?? 0 },
@@ -21,7 +22,7 @@ const fieldsFor = (placas: string[], r?: Repuesto): Field[] => [
   { name: "calidad", label: "Calidad", type: "select", options: ["Original", "Alternativo", "Remanufacturado"], default: r?.calidad },
   { name: "cantidad", label: "Cantidad", type: "number", default: r?.cantidad ?? 1 },
   { name: "garantia", label: "Garantía", type: "text", placeholder: "12 meses", default: r?.garantia },
-  { name: "proveedor", label: "Proveedor / tienda", type: "text", placeholder: "Repuestos DP", default: r?.proveedor },
+  { name: "proveedor", label: "Proveedor / tienda", type: "select", options: ["", ...Array.from(new Set([r?.proveedor, ...proveedores].filter(Boolean) as string[]))], default: r?.proveedor },
   { name: "costo", label: "Costo (S/)", type: "number", default: r?.costo ?? 0 },
   { name: "fecha", label: "Fecha de compra", type: "date", required: true, default: r?.fecha },
 ];
@@ -48,6 +49,8 @@ export default function RepuestosPage() {
   const { repuestos, vehiculos, addRepuesto, updateRepuesto, removeRepuesto } = useData();
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState<Repuesto | null>(null);
+  const [proveedores, setProveedores] = useState<string[]>([]);
+  useEffect(() => { apiProveedores.list().then((ps) => setProveedores(ps.map((p) => p.razonSocial))).catch(() => setProveedores([])); }, []);
 
   const placas = vehiculos.map((v) => v.placa);
   const gasto = repuestos.reduce((s, r) => s + r.costo, 0);
@@ -95,8 +98,8 @@ export default function RepuestosPage() {
         }
       />
 
-      <FormModal open={open} title="Nuevo repuesto" subtitle="Registra un repuesto o accesorio con su calidad, garantía y costo." fields={fieldsFor(placas)} onSubmit={guardar} onClose={() => setOpen(false)} />
-      {edit ? <FormModal open title={`Editar repuesto — ${edit.nombre}`} subtitle="Corrige los datos del repuesto." fields={fieldsFor(placas, edit)} submitLabel="Guardar cambios" onSubmit={guardarEdit} onClose={() => setEdit(null)} /> : null}
+      <FormModal open={open} title="Nuevo repuesto" subtitle="Registra un repuesto o accesorio con su calidad, garantía y costo." fields={fieldsFor(placas, proveedores)} onSubmit={guardar} onClose={() => setOpen(false)} />
+      {edit ? <FormModal open title={`Editar repuesto — ${edit.nombre}`} subtitle="Corrige los datos del repuesto." fields={fieldsFor(placas, proveedores, edit)} submitLabel="Guardar cambios" onSubmit={guardarEdit} onClose={() => setEdit(null)} /> : null}
     </div>
   );
 }

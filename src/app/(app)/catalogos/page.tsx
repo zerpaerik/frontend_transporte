@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { FolderCog, Plus, Trash2, Pencil, Building2, Anchor, Tags, MapPin, Save } from "lucide-react";
+import { FolderCog, Plus, Trash2, Pencil, Building2, Anchor, Tags, MapPin, Save, Coins, Store } from "lucide-react";
 import { PageHeader, Card } from "@/components/ui";
 import { FormModal, type Field, type FormValues } from "@/components/FormModal";
-import { apiClientes, apiPuertos, apiTipos, apiComisiones, type Cliente, type Puerto, type TipoOperacion, type Tarifa } from "@/lib/api";
+import { apiClientes, apiPuertos, apiTipos, apiComisiones, apiPeajes, apiProveedores, type Cliente, type Puerto, type TipoOperacion, type Tarifa, type Peaje, type Proveedor } from "@/lib/api";
 
 export default function CatalogosPage() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
@@ -21,10 +21,16 @@ export default function CatalogosPage() {
   const [tarifas, setTarifas] = useState<Tarifa[]>([]);
   const [editsT, setEditsT] = useState<Record<string, { gral: number; imo: number; reefer: number }>>({});
   const [nuevoT, setNuevoT] = useState({ destino: "", gral: "", imo: "", reefer: "" });
+  const [peajes, setPeajes] = useState<Peaje[]>([]);
+  const [editsPe, setEditsPe] = useState<Record<string, { ejes: number; monto: number }>>({});
+  const [nuevoPe, setNuevoPe] = useState({ destino: "", ejes: "", monto: "" });
+  const [proveedores, setProveedores] = useState<Proveedor[]>([]);
+  const [nuevoProv, setNuevoProv] = useState({ razonSocial: "", ruc: "", direccion: "", contacto: "", telefono: "" });
   const [busy, setBusy] = useState(false);
   const [editC, setEditC] = useState<Cliente | null>(null);
   const [editP, setEditP] = useState<Puerto | null>(null);
   const [editT, setEditT] = useState<TipoOperacion | null>(null);
+  const [editProv, setEditProv] = useState<Proveedor | null>(null);
 
   const clienteFields = (c: Cliente): Field[] => [
     { name: "nombre", label: "Nombre del cliente", type: "text", required: true, full: true, default: c.nombre },
@@ -56,8 +62,50 @@ export default function CatalogosPage() {
       setTarifas(t);
       setEditsT(Object.fromEntries(t.map((x) => [x.id, { gral: x.gral, imo: x.imo, reefer: x.reefer }])));
     }).catch(() => setTarifas([]));
+    apiPeajes.list().then((ps) => {
+      setPeajes(ps);
+      setEditsPe(Object.fromEntries(ps.map((x) => [x.id, { ejes: x.ejes, monto: x.monto }])));
+    }).catch(() => setPeajes([]));
+    apiProveedores.list().then(setProveedores).catch(() => setProveedores([]));
   }
   useEffect(() => { cargar(); }, []);
+
+  async function addPeaje(e: React.FormEvent) {
+    e.preventDefault(); if (!nuevoPe.destino.trim()) return; setBusy(true);
+    try {
+      await apiPeajes.create({ destino: nuevoPe.destino.trim().toUpperCase(), ejes: Number(nuevoPe.ejes || 0), monto: Number(nuevoPe.monto || 0) });
+      setNuevoPe({ destino: "", ejes: "", monto: "" }); cargar();
+    } finally { setBusy(false); }
+  }
+  async function guardarPeaje(id: string) {
+    setBusy(true);
+    try { await apiPeajes.update(id, editsPe[id]); cargar(); } finally { setBusy(false); }
+  }
+  async function borrarPeaje(id: string, destino: string) {
+    if (!confirm(`¿Eliminar el peaje de ${destino}?`)) return;
+    setBusy(true);
+    try { await apiPeajes.remove(id); cargar(); } finally { setBusy(false); }
+  }
+
+  async function addProveedor(e: React.FormEvent) {
+    e.preventDefault(); if (!nuevoProv.razonSocial.trim()) return; setBusy(true);
+    try {
+      await apiProveedores.create({ razonSocial: nuevoProv.razonSocial.trim(), ruc: nuevoProv.ruc.trim(), direccion: nuevoProv.direccion.trim(), contacto: nuevoProv.contacto.trim(), telefono: nuevoProv.telefono.trim() });
+      setNuevoProv({ razonSocial: "", ruc: "", direccion: "", contacto: "", telefono: "" }); cargar();
+    } finally { setBusy(false); }
+  }
+  const proveedorFields = (p: Proveedor): Field[] => [
+    { name: "razonSocial", label: "Razón social", type: "text", required: true, full: true, default: p.razonSocial },
+    { name: "ruc", label: "RUC", type: "text", default: p.ruc },
+    { name: "telefono", label: "Teléfono", type: "text", default: p.telefono },
+    { name: "contacto", label: "Contacto", type: "text", default: p.contacto },
+    { name: "direccion", label: "Dirección", type: "text", full: true, default: p.direccion },
+  ];
+  async function guardarProveedor(v: FormValues) {
+    if (!editProv) return;
+    await apiProveedores.update(editProv.id, { razonSocial: String(v.razonSocial), ruc: String(v.ruc), telefono: String(v.telefono), contacto: String(v.contacto), direccion: String(v.direccion) });
+    cargar();
+  }
 
   async function addTarifa(e: React.FormEvent) {
     e.preventDefault(); if (!nuevoT.destino.trim()) return; setBusy(true);
@@ -185,7 +233,7 @@ export default function CatalogosPage() {
           <h2 className="font-bold text-slate-800">Destinos y bonos</h2>
           <span className="ml-auto text-xs text-slate-400">{tarifas.length}</span>
         </div>
-        <p className="mb-3 text-xs text-slate-400">El bono se asigna automáticamente al chofer según el destino del viaje y el tipo de carga (GRAL, IMO o REEFER).</p>
+        <p className="mb-3 text-xs text-slate-400">El bono se asigna automáticamente al chofer según el destino del viaje y el tipo de carga (GRAL, IMO o REEFER). <span className="font-medium text-slate-500">Para editar, cambia el monto en la casilla y pulsa el botón <span className="text-brand-600">Guardar</span> que aparece.</span></p>
 
         <form onSubmit={addTarifa} className="mb-4 flex flex-wrap items-end gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50/60 p-3">
           <div className="flex-1 min-w-[180px]"><label className="mb-1 block text-xs font-medium text-slate-500">Destino (distrito)</label><input value={nuevoT.destino} onChange={(e) => setNuevoT({ ...nuevoT, destino: e.target.value })} placeholder="Ej. LA MOLINA" className={`${inp} w-full`} /></div>
@@ -214,11 +262,11 @@ export default function CatalogosPage() {
                   <tr key={t.id} className="border-b border-slate-100 hover:bg-slate-50/60">
                     <td className="px-3 py-2 font-medium text-slate-800">{t.destino}</td>
                     {(["gral", "imo", "reefer"] as const).map((k) => (
-                      <td key={k} className="px-3 py-2 text-right"><input type="number" value={e[k]} onChange={(ev) => setF(k, ev.target.value)} className="w-20 rounded-md border border-slate-200 px-2 py-1 text-right text-sm tabular outline-none focus:border-brand-500" /></td>
+                      <td key={k} className="px-3 py-2 text-right"><input type="number" value={e[k]} onChange={(ev) => setF(k, ev.target.value)} className={`w-20 rounded-md border px-2 py-1 text-right text-sm tabular outline-none focus:border-brand-500 ${changed ? "border-brand-400 bg-brand-50/40" : "border-slate-200"}`} /></td>
                     ))}
                     <td className="px-3 py-2">
                       <div className="flex items-center justify-end gap-1.5">
-                        <button disabled={busy || !changed} onClick={() => guardarTarifa(t.id)} title="Guardar" className="rounded-md p-1.5 text-slate-500 hover:bg-emerald-50 hover:text-emerald-600 disabled:opacity-30"><Save size={15} /></button>
+                        {changed ? <button disabled={busy} onClick={() => guardarTarifa(t.id)} className="inline-flex items-center gap-1 rounded-md bg-brand-500 px-2.5 py-1 text-xs font-semibold text-white hover:bg-brand-600 disabled:opacity-50"><Save size={13} /> Guardar</button> : null}
                         <button disabled={busy} onClick={() => borrarTarifa(t.id, t.destino)} title="Eliminar" className="rounded-md p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-600"><Trash2 size={15} /></button>
                       </div>
                     </td>
@@ -230,11 +278,111 @@ export default function CatalogosPage() {
         </div>
       </Card>
 
+      {/* Peajes */}
+      <Card className="mt-6 flex flex-col p-5">
+        <div className="mb-4 flex items-center gap-2">
+          <span className="grid h-8 w-8 place-items-center rounded-lg bg-amber-50 text-amber-600"><Coins size={16} /></span>
+          <h2 className="font-bold text-slate-800">Peajes</h2>
+          <span className="ml-auto text-xs text-slate-400">{peajes.length}</span>
+        </div>
+        <p className="mb-3 text-xs text-slate-400">Costo del peaje por destino y número de ejes. <span className="font-medium text-slate-500">Para editar, cambia el monto y pulsa <span className="text-brand-600">Guardar</span>.</span></p>
+
+        <form onSubmit={addPeaje} className="mb-4 flex flex-wrap items-end gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50/60 p-3">
+          <div className="flex-1 min-w-[180px]"><label className="mb-1 block text-xs font-medium text-slate-500">Destino</label><input value={nuevoPe.destino} onChange={(e) => setNuevoPe({ ...nuevoPe, destino: e.target.value })} placeholder="Ej. PISCO" className={`${inp} w-full`} /></div>
+          <div><label className="mb-1 block text-xs font-medium text-slate-500">Ejes</label><input type="number" value={nuevoPe.ejes} onChange={(e) => setNuevoPe({ ...nuevoPe, ejes: e.target.value })} className={`${inp} w-24`} /></div>
+          <div><label className="mb-1 block text-xs font-medium text-slate-500">Monto (S/)</label><input type="number" value={nuevoPe.monto} onChange={(e) => setNuevoPe({ ...nuevoPe, monto: e.target.value })} className={`${inp} w-28`} /></div>
+          <button type="submit" disabled={busy} className={addBtn}><Plus size={15} /> Agregar</button>
+        </form>
+
+        <div className="max-h-[420px] overflow-auto">
+          <table className="w-full min-w-[480px] text-left text-sm">
+            <thead className="sticky top-0">
+              <tr>
+                {["Destino", "Ejes", "Monto", ""].map((h, i) => (
+                  <th key={i} className={`whitespace-nowrap border-b border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500 ${i > 0 && i < 3 ? "text-right" : ""}`}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {peajes.length === 0 ? <tr><td colSpan={4} className="px-3 py-6 text-center text-sm text-slate-400">Sin peajes. Agrega el primero.</td></tr> : null}
+              {peajes.map((p) => {
+                const e = editsPe[p.id] ?? { ejes: p.ejes, monto: p.monto };
+                const changed = e.ejes !== p.ejes || e.monto !== p.monto;
+                const setF = (k: "ejes" | "monto", v: string) => setEditsPe((s) => ({ ...s, [p.id]: { ...e, [k]: Number(v || 0) } }));
+                return (
+                  <tr key={p.id} className="border-b border-slate-100 hover:bg-slate-50/60">
+                    <td className="px-3 py-2 font-medium text-slate-800">{p.destino}</td>
+                    <td className="px-3 py-2 text-right"><input type="number" value={e.ejes} onChange={(ev) => setF("ejes", ev.target.value)} className={`w-16 rounded-md border px-2 py-1 text-right text-sm tabular outline-none focus:border-brand-500 ${changed ? "border-brand-400 bg-brand-50/40" : "border-slate-200"}`} /></td>
+                    <td className="px-3 py-2 text-right"><input type="number" value={e.monto} onChange={(ev) => setF("monto", ev.target.value)} className={`w-24 rounded-md border px-2 py-1 text-right text-sm tabular outline-none focus:border-brand-500 ${changed ? "border-brand-400 bg-brand-50/40" : "border-slate-200"}`} /></td>
+                    <td className="px-3 py-2">
+                      <div className="flex items-center justify-end gap-1.5">
+                        {changed ? <button disabled={busy} onClick={() => guardarPeaje(p.id)} className="inline-flex items-center gap-1 rounded-md bg-brand-500 px-2.5 py-1 text-xs font-semibold text-white hover:bg-brand-600 disabled:opacity-50"><Save size={13} /> Guardar</button> : null}
+                        <button disabled={busy} onClick={() => borrarPeaje(p.id, p.destino)} title="Eliminar" className="rounded-md p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-600"><Trash2 size={15} /></button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {/* Proveedores */}
+      <Card className="mt-6 flex flex-col p-5">
+        <div className="mb-4 flex items-center gap-2">
+          <span className="grid h-8 w-8 place-items-center rounded-lg bg-steel-50 text-steel-600"><Store size={16} /></span>
+          <h2 className="font-bold text-slate-800">Proveedores</h2>
+          <span className="ml-auto text-xs text-slate-400">{proveedores.length}</span>
+        </div>
+        <p className="mb-3 text-xs text-slate-400">Aparecen para seleccionar en Mantenimiento (responsable / taller) y Repuestos (proveedor).</p>
+
+        <form onSubmit={addProveedor} className="mb-4 flex flex-wrap items-end gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50/60 p-3">
+          <div className="flex-1 min-w-[200px]"><label className="mb-1 block text-xs font-medium text-slate-500">Razón social</label><input value={nuevoProv.razonSocial} onChange={(e) => setNuevoProv({ ...nuevoProv, razonSocial: e.target.value })} placeholder="Taller Diesel Pro S.A.C." className={`${inp} w-full`} /></div>
+          <div><label className="mb-1 block text-xs font-medium text-slate-500">RUC</label><input value={nuevoProv.ruc} onChange={(e) => setNuevoProv({ ...nuevoProv, ruc: e.target.value })} className={`${inp} w-36`} /></div>
+          <div><label className="mb-1 block text-xs font-medium text-slate-500">Teléfono</label><input value={nuevoProv.telefono} onChange={(e) => setNuevoProv({ ...nuevoProv, telefono: e.target.value })} className={`${inp} w-32`} /></div>
+          <div className="flex-1 min-w-[160px]"><label className="mb-1 block text-xs font-medium text-slate-500">Contacto</label><input value={nuevoProv.contacto} onChange={(e) => setNuevoProv({ ...nuevoProv, contacto: e.target.value })} className={`${inp} w-full`} /></div>
+          <div className="flex-1 min-w-[200px]"><label className="mb-1 block text-xs font-medium text-slate-500">Dirección</label><input value={nuevoProv.direccion} onChange={(e) => setNuevoProv({ ...nuevoProv, direccion: e.target.value })} className={`${inp} w-full`} /></div>
+          <button type="submit" disabled={busy} className={addBtn}><Plus size={15} /> Agregar</button>
+        </form>
+
+        <div className="max-h-[420px] overflow-auto">
+          <table className="w-full min-w-[640px] text-left text-sm">
+            <thead className="sticky top-0">
+              <tr>
+                {["Razón social", "RUC", "Contacto", "Teléfono", "Dirección", ""].map((h, i) => (
+                  <th key={i} className="whitespace-nowrap border-b border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {proveedores.length === 0 ? <tr><td colSpan={6} className="px-3 py-6 text-center text-sm text-slate-400">Sin proveedores. Agrega el primero.</td></tr> : null}
+              {proveedores.map((p) => (
+                <tr key={p.id} className="border-b border-slate-100 hover:bg-slate-50/60">
+                  <td className="px-3 py-2 font-medium text-slate-800">{p.razonSocial}</td>
+                  <td className="px-3 py-2 text-slate-600">{p.ruc || "—"}</td>
+                  <td className="px-3 py-2 text-slate-600">{p.contacto || "—"}</td>
+                  <td className="px-3 py-2 text-slate-600">{p.telefono || "—"}</td>
+                  <td className="px-3 py-2 text-slate-600"><span className="block max-w-[220px] truncate" title={p.direccion}>{p.direccion || "—"}</span></td>
+                  <td className="px-3 py-2">
+                    <div className="flex items-center justify-end gap-1.5">
+                      <button onClick={() => setEditProv(p)} title="Editar" className={editBtn}><Pencil size={14} /></button>
+                      <button disabled={busy} onClick={() => { if (confirm(`¿Eliminar el proveedor ${p.razonSocial}?`)) apiProveedores.remove(p.id).then(cargar); }} className={delBtn}><Trash2 size={15} /></button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
       <div className="mt-5 flex items-center gap-1.5 text-xs text-slate-400"><FolderCog size={12} /> Estos catálogos aparecen como opciones en el formulario de Operaciones.</div>
 
       {editC ? <FormModal open title={`Editar cliente — ${editC.nombre}`} subtitle="Modifica los datos del cliente." fields={clienteFields(editC)} submitLabel="Guardar cambios" onSubmit={guardarCliente} onClose={() => setEditC(null)} /> : null}
       {editP ? <FormModal open title="Editar puerto / depósito" fields={[{ name: "nombre", label: "Nombre del puerto / depósito", type: "text", required: true, full: true, default: editP.nombre }]} submitLabel="Guardar cambios" onSubmit={guardarPuerto} onClose={() => setEditP(null)} /> : null}
       {editT ? <FormModal open title="Editar tipo de operación" fields={[{ name: "nombre", label: "Nombre del tipo", type: "text", required: true, full: true, default: editT.nombre }]} submitLabel="Guardar cambios" onSubmit={guardarTipo} onClose={() => setEditT(null)} /> : null}
+      {editProv ? <FormModal open title={`Editar proveedor — ${editProv.razonSocial}`} subtitle="Modifica los datos del proveedor." fields={proveedorFields(editProv)} submitLabel="Guardar cambios" onSubmit={guardarProveedor} onClose={() => setEditProv(null)} /> : null}
     </div>
   );
 }

@@ -124,6 +124,22 @@ export const apiClientes = {
   remove: (id: string) => api.del<void>(`/clientes/${id}`),
 };
 
+export interface Peaje { id: string; destino: string; ejes: number; monto: number; }
+export const apiPeajes = {
+  list: () => api.get<Peaje[]>("/peajes"),
+  create: (b: { destino: string; ejes?: number; monto?: number }) => api.post<Peaje>("/peajes", b),
+  update: (id: string, b: Partial<{ destino: string; ejes: number; monto: number }>) => api.patch<Peaje>(`/peajes/${id}`, b),
+  remove: (id: string) => api.del<void>(`/peajes/${id}`),
+};
+
+export interface Proveedor { id: string; razonSocial: string; ruc: string; direccion: string; contacto: string; telefono: string; }
+export const apiProveedores = {
+  list: () => api.get<Proveedor[]>("/proveedores"),
+  create: (b: { razonSocial: string; ruc?: string; direccion?: string; contacto?: string; telefono?: string }) => api.post<Proveedor>("/proveedores", b),
+  update: (id: string, b: Partial<Omit<Proveedor, "id">>) => api.patch<Proveedor>(`/proveedores/${id}`, b),
+  remove: (id: string) => api.del<void>(`/proveedores/${id}`),
+};
+
 export interface Puerto { id: string; nombre: string; }
 export const apiPuertos = {
   list: () => api.get<Puerto[]>("/puertos"),
