@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Menu, LogOut, ChevronDown, Building2, Check, TriangleAlert } from "lucide-react";
 import { useAuth } from "@/lib/auth";
-import { apiGetSedes, apiDevoluciones, type Sede } from "@/lib/api";
+import { api, apiGetSedes, apiDevoluciones, type Sede } from "@/lib/api";
 import { diasRestantes } from "@/lib/format";
 import { NAV } from "@/lib/nav";
 
@@ -18,6 +18,7 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
   const [sedes, setSedes] = useState<Sede[]>([]);
   const [busy, setBusy] = useState(false);
   const [citas, setCitas] = useState(0);
+  const [memos, setMemos] = useState(0);
 
   useEffect(() => {
     if (menuOpen && sedes.length === 0) {
@@ -25,12 +26,18 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
     }
   }, [menuOpen, sedes.length]);
 
-  // Alerta global de citas por vencer (hoy, mañana o vencidas). Refresca cada 90s.
+  // Alerta global de citas y MEMO por vencer. Refresca cada 90s.
   useEffect(() => {
     let alive = true;
-    const cargar = () => apiDevoluciones.list()
-      .then((ds) => { if (alive) setCitas(ds.filter((d) => d.citaFecha && d.estadoDevolucion !== "Devuelto" && diasRestantes(d.citaFecha) <= 1).length); })
-      .catch(() => { if (alive) setCitas(0); });
+    const cerrado = ["Culminado", "Devuelto", "Cancelado"];
+    const cargar = () => {
+      apiDevoluciones.list()
+        .then((ds) => { if (alive) setCitas(ds.filter((d) => d.citaFecha && d.estadoDevolucion !== "Devuelto" && diasRestantes(d.citaFecha) <= 1).length); })
+        .catch(() => { if (alive) setCitas(0); });
+      api.get<any[]>("/viajes")
+        .then((vs) => { if (alive) setMemos(vs.filter((v) => v.memo && !cerrado.includes(v.estado) && diasRestantes(v.memo) <= 3).length); })
+        .catch(() => { if (alive) setMemos(0); });
+    };
     cargar();
     const t = setInterval(cargar, 90000);
     return () => { alive = false; clearInterval(t); };
@@ -71,6 +78,15 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
             className="cita-blink inline-flex items-center gap-1.5 rounded-full bg-rose-600 px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-white shadow-sm"
           >
             <TriangleAlert size={14} /> {citas} cita{citas === 1 ? "" : "s"} por vencer
+          </button>
+        ) : null}
+        {memos > 0 ? (
+          <button
+            onClick={() => router.push("/operaciones")}
+            title="Hay MEMO por vencer (72h)"
+            className="cita-blink inline-flex items-center gap-1.5 rounded-full bg-rose-600 px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-white shadow-sm"
+          >
+            <TriangleAlert size={14} /> {memos} MEMO por vencer
           </button>
         ) : null}
         {user?.sede ? (

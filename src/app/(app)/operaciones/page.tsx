@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Container, ArrowDownToLine, ArrowUpFromLine, Settings2, FileText, Trash2, Pencil } from "lucide-react";
+import { Plus, Container, ArrowDownToLine, ArrowUpFromLine, Settings2, FileText, Trash2, Pencil, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { PageHeader, StatCard, Badge } from "@/components/ui";
 import { DataTable, type Column, type Filter } from "@/components/DataTable";
@@ -32,6 +32,16 @@ function Semaforo({ iso, estado }: { iso?: string; estado: EstadoViaje }) {
   return <Badge tone="green">{d} días</Badge>;
 }
 
+// Alerta del MEMO: avisa 72 horas (3 días) antes de su vencimiento.
+function memoAlerta(v: Viaje): { texto: string } | null {
+  if (!v.memo || v.estado === "Culminado" || v.estado === "Devuelto" || v.estado === "Cancelado") return null;
+  const d = diasRestantes(v.memo);
+  if (d < 0) return { texto: "MEMO VENCIDO" };
+  if (d === 0) return { texto: "MEMO VENCE HOY" };
+  if (d <= 3) return { texto: `MEMO EN ${d}D` };
+  return null;
+}
+
 // Lista completa de campos del despacho. El código queda fijo a la izquierda y las
 // acciones fijas a la derecha, para no tener que hacer scroll hasta el final.
 const dash = <span className="text-slate-300">—</span>;
@@ -58,6 +68,16 @@ const columns: Column<Viaje>[] = [
   { key: "devolucion", header: "Devolución", render: (v) => v.devolucion ? <span className="block max-w-[150px] truncate" title={v.devolucion}>{v.devolucion}</span> : dash },
   { key: "ubicacion", header: "Ubicación", render: (v) => v.ubicacion ? <span className="block max-w-[170px] truncate" title={v.ubicacion}>{v.ubicacion}</span> : dash },
   { key: "fechaLimite", header: "F. límite", sortable: true, value: (v) => v.fechaLimite || "", render: (v) => v.fechaLimite ? <span className="tabular whitespace-nowrap">{fecha(v.fechaLimite)}</span> : dash },
+  { key: "memo", header: "MEMO", sortable: true, value: (v) => v.memo || "", render: (v) => {
+    if (!v.memo) return dash;
+    const a = memoAlerta(v);
+    return (
+      <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+        <span className="tabular">{fecha(v.memo)}</span>
+        {a ? <span className="cita-blink inline-flex items-center gap-1 rounded-full bg-rose-600 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-white">{a.texto}</span> : null}
+      </span>
+    );
+  } },
   { key: "semaforo", header: "Devolver", align: "center", render: (v) => <Semaforo iso={v.fechaLimite || undefined} estado={v.estado} /> },
   { key: "greRemitente", header: "N° Guía", value: (v) => v.greRemitente, render: (v) => v.greRemitente ? <span className="tabular whitespace-nowrap">{v.greRemitente}</span> : dash },
   { key: "facturado", header: "Facturado", value: (v) => (v.factura ? "Sí" : "No"), render: (v) => v.factura ? <Badge tone="green">Facturado · {v.factura}</Badge> : <Badge tone="amber">No facturado</Badge> },
@@ -166,6 +186,7 @@ export default function OperacionesPage() {
       { name: "ubicacion", label: "Ubicación", type: "text", full: true, placeholder: "Dirección / link de Maps de la entrega", default: g("ubicacion") },
       { name: "observacion", label: "Observación", type: "text", full: true, placeholder: "Notas del viaje (opcional)", default: g("observacion") },
       { name: "fechaLimite", label: "Fecha límite devolución (opcional)", type: "date", default: g("fechaLimite") },
+      { name: "memo", label: "MEMO (vence — alerta 72h antes)", type: "date", default: g("memo") },
       { name: "estado", label: "Estado", type: "select", options: ["Programado", "En curso", "Culminado", "Devuelto", "Cancelado"], default: g("estado", "Programado") },
     ];
   };
@@ -184,6 +205,7 @@ export default function OperacionesPage() {
       fechaLimite: v.fechaLimite ? String(v.fechaLimite) : undefined,
       fechaCliente: v.fechaCliente ? String(v.fechaCliente) : undefined,
       fechaViaje: v.fechaViaje ? String(v.fechaViaje) : undefined,
+      memo: v.memo ? String(v.memo) : undefined,
     };
     return body;
   }
@@ -204,6 +226,19 @@ export default function OperacionesPage() {
         <StatCard label="Exportación" value={expo} icon={ArrowUpFromLine} tone="green" />
         <StatCard label="Total viajes" value={viajes.length} icon={Container} tone="gray" />
       </div>
+
+      {(() => {
+        const ma = viajes.filter((v) => memoAlerta(v));
+        return ma.length > 0 ? (
+          <div className="cita-ring mb-4 flex items-center gap-3 rounded-xl border-2 border-rose-400 bg-rose-50 px-4 py-3">
+            <span className="cita-blink grid h-10 w-10 shrink-0 place-items-center rounded-full bg-rose-600 text-white"><TriangleAlert size={22} /></span>
+            <span className="min-w-0">
+              <span className="block text-sm font-extrabold uppercase tracking-wide text-rose-700">¡{ma.length} MEMO por vencer (72h)!</span>
+              <span className="block truncate text-xs font-medium text-rose-600">{ma.map((v) => `${(v as any).codigo || v.contenedor} (${memoAlerta(v)!.texto.replace("MEMO ", "")})`).join(" · ")}</span>
+            </span>
+          </div>
+        ) : null;
+      })()}
 
       {vehiculos.filter((x) => x.tipo === "Tracto").length === 0 ? (
         <div className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700 ring-1 ring-inset ring-amber-200">

@@ -106,6 +106,7 @@ export interface Viaje {
   devolucion: string;
   ubicacion?: string;
   fechaViaje?: string; // fecha del viaje (manual)
+  memo?: string; // vencimiento del MEMO
   observacion?: string;
   fechaLimite: string; // ISO date
   estado: EstadoViaje;
