@@ -94,6 +94,7 @@ export interface Viaje {
   carreta: string;
   conductor: string;
   cliente: string;
+  clienteFactura?: string;
   operacion: "IMPO" | "EXPO";
   contenedor: string;
   tamanio: string;

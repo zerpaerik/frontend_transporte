@@ -51,7 +51,8 @@ export function DetalleViaje({ viaje, onClose }: { viaje: Viaje; onClose: () => 
             <Campo label="Tracto" value={viaje.placaTracto} />
             <Campo label="Carreta" value={viaje.carreta} />
             <Campo label="Conductor" value={viaje.conductor} />
-            <Campo label="Cliente" value={viaje.cliente} />
+            <Campo label="Cliente (solicita)" value={viaje.cliente} />
+            <Campo label="Factura a" value={(viaje as any).clienteFactura || viaje.cliente} />
             <Campo label="Fecha viaje" value={v.fechaViaje ? fecha(v.fechaViaje) : ""} />
             <Campo label="N° Orden" value={viaje.nOrden} />
           </Grupo>

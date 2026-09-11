@@ -161,7 +161,8 @@ export default function OperacionesPage() {
         ? [{ name: "carretaPlaca", label: "Placa de la carreta alquilada", type: "text" as const, required: true, placeholder: "Ej. B7A-845", full: true, default: alquiladaGuardada ? carretaGuardada : "" }]
         : []),
       { name: "conductor", label: "Conductor", type: "select", options: ["", ...conductores.map((c) => c.nombre)], default: g("conductor") },
-      { name: "cliente", label: "Cliente", type: "combo", options: ["POR ASIGNAR", ...clientes], required: true, placeholder: "Buscar cliente… o POR ASIGNAR", default: g("cliente") },
+      { name: "cliente", label: "Cliente (solicita el servicio)", type: "combo", options: ["POR ASIGNAR", ...clientes], required: true, placeholder: "Buscar cliente… o POR ASIGNAR", default: g("cliente") },
+      { name: "clienteFactura", label: "Cliente a facturar (vacío = el solicitante)", type: "combo", options: ["", ...clientes], placeholder: "Buscar cliente a facturar…", default: g("clienteFactura") },
       { name: "fechaViaje", label: "Fecha del viaje", type: "date", default: g("fechaViaje", hoyISO) },
       { name: "nOrden", label: "Orden", type: "text", placeholder: "26/03000251", default: g("nOrden") },
       { name: "greRemitente", label: "Guía de remisión (remitente)", type: "text", placeholder: "T001-26916", default: g("greRemitente") },
@@ -199,7 +200,7 @@ export default function OperacionesPage() {
     const body: any = {
       placaTracto: String(v.placaTracto),
       carreta: v.carreta === ALQ_CARRETA ? String(v.carretaPlaca || "").toUpperCase() : String(v.carreta || ""),
-      conductor: String(v.conductor || ""), cliente: String(v.cliente),
+      conductor: String(v.conductor || ""), cliente: String(v.cliente), clienteFactura: String(v.clienteFactura || ""),
       operacion: String(v.operacion), contenedor: String(v.contenedor).toUpperCase(), tamanio: String(v.tamanio || ""),
       tipoCarga: String(v.tipoCarga || "GENERAL"), horaCita: String(v.horaCita || ""), horaCliente: String(v.horaCliente || ""), origen: String(v.origen || ""),
       destino: String(v.destino || ""), devolucion: String(v.devolucion || ""), ubicacion: String(v.ubicacion || ""),
