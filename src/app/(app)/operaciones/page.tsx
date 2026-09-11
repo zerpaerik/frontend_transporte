@@ -152,6 +152,8 @@ export default function OperacionesPage() {
     const carretasFlota = vehiculos.filter((x) => x.tipo === "Carreta").map((x) => x.placa);
     const carretaGuardada = g("carreta");
     const alquiladaGuardada = !!carretaGuardada && !carretasFlota.includes(carretaGuardada);
+    // Incluye el valor guardado en las opciones para que al EDITAR no se pierda (si no está en el catálogo).
+    const opt = (arr: string[], cur: string) => (cur && !arr.includes(cur) ? [cur, ...arr] : arr);
     return [
       { name: "placaTracto", label: "Placa tracto", type: "select", options: vehiculos.filter((x) => x.tipo === "Tracto").map((x) => x.placa), required: true, default: g("placaTracto") },
       { name: "carreta", label: "Carreta", type: "select", options: ["", ...carretasFlota, ALQ_CARRETA], default: alquiladaGuardada ? ALQ_CARRETA : carretaGuardada },
@@ -159,10 +161,11 @@ export default function OperacionesPage() {
         ? [{ name: "carretaPlaca", label: "Placa de la carreta alquilada", type: "text" as const, required: true, placeholder: "Ej. B7A-845", full: true, default: alquiladaGuardada ? carretaGuardada : "" }]
         : []),
       { name: "conductor", label: "Conductor", type: "select", options: ["", ...conductores.map((c) => c.nombre)], default: g("conductor") },
-      { name: "cliente", label: "Cliente", type: "combo", options: clientes, required: true, placeholder: "Buscar cliente…", default: g("cliente") },
+      { name: "cliente", label: "Cliente", type: "combo", options: ["POR ASIGNAR", ...clientes], required: true, placeholder: "Buscar cliente… o POR ASIGNAR", default: g("cliente") },
       { name: "fechaViaje", label: "Fecha del viaje", type: "date", default: g("fechaViaje", hoyISO) },
       { name: "nOrden", label: "Orden", type: "text", placeholder: "26/03000251", default: g("nOrden") },
-      { name: "greRemitente", label: "Guía de remisión", type: "text", placeholder: "T001-26916", default: g("greRemitente") },
+      { name: "greRemitente", label: "Guía de remisión (remitente)", type: "text", placeholder: "T001-26916", default: g("greRemitente") },
+      { name: "greTransporte", label: "Guía de transportista", type: "text", placeholder: "V001-01028", default: g("greTransporte") },
       { name: "tarifa", label: "Tarifa (S/) — se jala en la factura", type: "number", default: g("tarifa", "0") },
       { name: "operacion", label: "Tipo de operación", type: "select", options: tipos, default: g("operacion", tipos[0]) },
       { name: "contenedor", label: "Contenedor", type: "text", placeholder: "Opcional — se puede registrar luego al editar", default: g("contenedor") },
@@ -178,15 +181,16 @@ export default function OperacionesPage() {
         : []),
       suelta
         ? { name: "origen", label: "Origen (texto libre)", type: "text", placeholder: "Escribe el origen", default: g("origen") }
-        : { name: "origen", label: expo ? "Puerto de recojo" : "Origen (puerto)", type: "select", options: puertoOpts, default: g("origen") },
-      { name: "destino", label: "Destino (distrito)", type: "select", options: distritoOpts, default: g("destino") },
+        : { name: "origen", label: expo ? "Puerto de recojo" : "Origen (puerto)", type: "select", options: opt(puertoOpts, g("origen")), default: g("origen") },
+      { name: "destino", label: "Destino (distrito)", type: "select", options: opt(distritoOpts, g("destino")), default: g("destino") },
       suelta
         ? { name: "devolucion", label: "Punto de devolución (texto libre)", type: "text", placeholder: "Escribe el punto de devolución", default: g("devolucion") }
-        : { name: "devolucion", label: expo ? "Puerto de ingreso" : "Punto de devolución", type: "select", options: puertoOpts, default: g("devolucion") },
+        : { name: "devolucion", label: expo ? "Puerto de ingreso" : "Punto de devolución", type: "select", options: opt(puertoOpts, g("devolucion")), default: g("devolucion") },
       { name: "ubicacion", label: "Ubicación", type: "text", full: true, placeholder: "Dirección / link de Maps de la entrega", default: g("ubicacion") },
       { name: "observacion", label: "Observación", type: "text", full: true, placeholder: "Notas del viaje (opcional)", default: g("observacion") },
       { name: "fechaLimite", label: "Fecha límite devolución (opcional)", type: "date", default: g("fechaLimite") },
       { name: "memo", label: "MEMO (vence — alerta 72h antes)", type: "date", default: g("memo") },
+      { name: "factura", label: "N° de factura (vacío = no facturado)", type: "text", placeholder: "F001-00123", default: g("factura") },
       { name: "estado", label: "Estado", type: "select", options: ["Programado", "En curso", "Culminado", "Devuelto", "Cancelado"], default: g("estado", "Programado") },
     ];
   };
@@ -201,6 +205,7 @@ export default function OperacionesPage() {
       destino: String(v.destino || ""), devolucion: String(v.devolucion || ""), ubicacion: String(v.ubicacion || ""),
       observacion: String(v.observacion || ""),
       estado: String(v.estado || "Programado"), nOrden: String(v.nOrden || ""), greRemitente: String(v.greRemitente || ""),
+      greTransporte: String(v.greTransporte || ""), factura: String(v.factura || ""),
       tarifa: Number(v.tarifa || 0),
       fechaLimite: v.fechaLimite ? String(v.fechaLimite) : undefined,
       fechaCliente: v.fechaCliente ? String(v.fechaCliente) : undefined,
@@ -209,7 +214,7 @@ export default function OperacionesPage() {
     };
     return body;
   }
-  function guardar(v: FormValues) { addViaje({ ...toBody(v), greTransporte: "", factura: "" }); }
+  function guardar(v: FormValues) { addViaje(toBody(v)); }
   function guardarEdit(v: FormValues) { if (editViaje) updateViaje(editViaje.id, toBody(v)); }
 
   async function guardarTipo(v: FormValues) {
