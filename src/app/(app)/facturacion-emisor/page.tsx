@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Building2, Save, ShieldCheck, TriangleAlert, CheckCircle2 } from "lucide-react";
 import { PageHeader, Card, Badge } from "@/components/ui";
-import { apiEmisor, type EmisorConfig, type EmisorRespuesta } from "@/lib/api";
+import { apiEmisor, type EmisorConfig, type EmisorRespuesta, type CorrelativoTipo } from "@/lib/api";
 
 type Form = Omit<EmisorConfig, "id" | "sedeId">;
 
@@ -27,7 +27,8 @@ function Campo({ label, hint, children }: { label: string; hint?: string; childr
 const inputCls = "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100";
 
 export default function EmisorPage() {
-  const [meta, setMeta] = useState<Omit<EmisorRespuesta, "config"> | null>(null);
+  const [meta, setMeta] = useState<{ ambiente: "demo" | "prod"; esProd: boolean; integracionConfigurada: boolean } | null>(null);
+  const [correlativos, setCorrelativos] = useState<CorrelativoTipo[]>([]);
   const [f, setF] = useState<Form>(VACIO);
   const [cargando, setCargando] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -39,6 +40,7 @@ export default function EmisorPage() {
     void _id; void _sedeId;
     setF(rest);
     setMeta({ ambiente: r.ambiente, esProd: r.esProd, integracionConfigurada: r.integracionConfigurada });
+    setCorrelativos(r.correlativos || []);
   }
 
   useEffect(() => {
@@ -60,6 +62,11 @@ export default function EmisorPage() {
     } finally {
       setBusy(false);
     }
+  }
+
+  async function fijar(tipoDoc: string, desde: number) {
+    try { aplicar(await apiEmisor.setCorrelativo(tipoDoc, desde)); }
+    catch (e) { alert((e as Error).message || "No se pudo fijar el correlativo."); }
   }
 
   const esProd = meta?.esProd;
@@ -134,6 +141,8 @@ export default function EmisorPage() {
         </Card>
       </div>
 
+      {correlativos.length ? <div className="mt-5"><Numeracion items={correlativos} onFijar={fijar} /></div> : null}
+
       <div className="mt-5 flex items-center gap-3">
         <button disabled={busy || cargando} onClick={guardar}
           className="inline-flex items-center gap-2 rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-50">
@@ -142,5 +151,42 @@ export default function EmisorPage() {
         {ok ? <span className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600"><CheckCircle2 size={16} /> Guardado</span> : null}
       </div>
     </div>
+  );
+}
+
+function Numeracion({ items, onFijar }: { items: CorrelativoTipo[]; onFijar: (tipoDoc: string, desde: number) => Promise<void> }) {
+  const [edit, setEdit] = useState<Record<string, string>>({});
+  const [busyTipo, setBusyTipo] = useState("");
+  async function fijar(t: CorrelativoTipo) {
+    const val = Number(edit[t.tipoDoc]);
+    if (!val || val < 1) { alert("Ingresa un número válido (1 o mayor)."); return; }
+    setBusyTipo(t.tipoDoc);
+    try { await onFijar(t.tipoDoc, val); setEdit((e) => ({ ...e, [t.tipoDoc]: "" })); }
+    finally { setBusyTipo(""); }
+  }
+  return (
+    <Card className="p-5">
+      <h3 className="mb-1 text-sm font-bold uppercase tracking-wide text-slate-500">Numeración (correlativo por tipo)</h3>
+      <p className="mb-4 text-xs text-slate-400">Cada tipo de comprobante lleva su propio contador por serie. El correlativo solo puede avanzar (no bajar), para no repetir números ya emitidos. Fija el número inicial antes de emitir en producción.</p>
+      <div className="space-y-2">
+        {items.map((t) => (
+          <div key={t.tipoDoc} className="flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 p-3">
+            <div className="min-w-[130px]">
+              <div className="text-sm font-semibold text-slate-700">{t.etiqueta}</div>
+              <div className="text-xs text-slate-400">Serie {t.serie}</div>
+            </div>
+            <div className="text-sm text-slate-500">Próximo: <span className="tabular font-bold text-slate-800">{t.serie}-{t.siguiente}</span></div>
+            <div className="ml-auto flex items-center gap-2">
+              <input type="number" min="1" placeholder="Fijar desde…" value={edit[t.tipoDoc] ?? ""} onChange={(e) => setEdit((s) => ({ ...s, [t.tipoDoc]: e.target.value }))}
+                className="w-32 rounded-lg border border-slate-300 px-3 py-1.5 text-right text-sm tabular outline-none focus:border-brand-500" />
+              <button disabled={busyTipo === t.tipoDoc} onClick={() => fijar(t)}
+                className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-50">
+                {busyTipo === t.tipoDoc ? "…" : "Fijar"}
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Card>
   );
 }

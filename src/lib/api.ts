@@ -246,8 +246,15 @@ export interface EmisorConfig {
   correoEnvio: string;
   activo: boolean;
 }
+export interface CorrelativoTipo {
+  tipoDoc: string; // 01 · 03 · 07
+  etiqueta: string; // Factura · Boleta · Nota de crédito
+  serie: string;
+  siguiente: string; // próximo correlativo (8 dígitos)
+}
 export interface EmisorRespuesta {
   config: EmisorConfig;
+  correlativos: CorrelativoTipo[];
   ambiente: "demo" | "prod";
   esProd: boolean;
   integracionConfigurada: boolean; // hay URL base + token para el ambiente actual
@@ -255,11 +262,13 @@ export interface EmisorRespuesta {
 export const apiEmisor = {
   get: () => api.get<EmisorRespuesta>("/emisor"),
   update: (b: Partial<Omit<EmisorConfig, "id" | "sedeId">>) => api.patch<EmisorRespuesta>("/emisor", b),
+  setCorrelativo: (tipoDoc: string, desde: number) => api.patch<EmisorRespuesta>("/emisor/correlativo", { tipoDoc, desde }),
 };
 
 // Acciones de facturación electrónica sobre un comprobante ya registrado.
 export interface EmitirRespuesta { respuesta: { estado_documento: string; errors: string; sunat_description: string } }
 export const apiFacturasE = {
+  actualizar: (id: string, body: Record<string, unknown>) => api.patch<unknown>(`/facturas/${id}`, body),
   emitir: (id: string) => api.post<EmitirRespuesta>(`/facturas/${id}/emitir`, {}),
   estado: (id: string) => api.post<unknown>(`/facturas/${id}/estado`, {}),
   pdf: (id: string) => api.get<{ nombre: string; mime: string; base64: string }>(`/facturas/${id}/pdf`),

@@ -8,7 +8,7 @@ import { FormModal, type Field, type FormValues } from "@/components/FormModal";
 import { useData } from "@/lib/store";
 import { apiViajePorCodigo, apiEmisor, apiFacturasE, downloadBase64, type EmisorRespuesta } from "@/lib/api";
 import { soles, fecha } from "@/lib/format";
-import type { Factura } from "@/lib/types";
+import type { Factura, FacturaItem } from "@/lib/types";
 
 type Tone = "gray" | "amber" | "green" | "blue" | "red";
 const ESTADO_DOC: Record<string, { label: string; tone: Tone }> = {
@@ -169,11 +169,26 @@ function Dato({ k, v }: { k: string; v: React.ReactNode }) {
   return <div className="flex justify-between gap-4 border-b border-slate-100 py-2 text-sm"><span className="text-slate-500">{k}</span><span className="break-words text-right font-medium text-slate-800">{v}</span></div>;
 }
 
+const num = (v: string) => Number(String(v).replace(",", ".") || 0);
+
 function ComprobanteModal({ f, listo, onClose, onChanged }: { f: Factura; listo: boolean; onClose: () => void; onChanged: () => void }) {
   const [busy, setBusy] = useState("");
   const est = estDoc(f);
   const emitido = !!f.estadoDocumento;
   const aceptado = f.estadoDocumento === "102" || f.estadoDocumento === "103";
+
+  // Líneas editables mientras el comprobante no esté emitido. Si no hay guardadas,
+  // se arranca con una línea a partir del monto/tarifa del viaje.
+  const [lineas, setLineas] = useState<FacturaItem[]>(() =>
+    f.items?.length ? f.items.map((i) => ({ ...i })) : [{ descripcion: `SERVICIO DE TRANSPORTE${f.viaje && f.viaje !== "-" ? " " + f.viaje : ""}`.trim(), cantidad: 1, valorUnitario: f.monto || 0 }],
+  );
+  const setLinea = (i: number, patch: Partial<FacturaItem>) => setLineas((ls) => ls.map((l, j) => (j === i ? { ...l, ...patch } : l)));
+  const agregar = () => setLineas((ls) => [...ls, { descripcion: "", cantidad: 1, valorUnitario: 0 }]);
+  const quitar = (i: number) => setLineas((ls) => ls.filter((_, j) => j !== i));
+  const lineasPayload = () => lineas.filter((l) => l.descripcion.trim() || l.valorUnitario).map((l) => ({ descripcion: l.descripcion, cantidad: l.cantidad || 1, valorUnitario: l.valorUnitario || 0 }));
+  const gravadoL = Math.round(lineas.reduce((s, l) => s + (l.valorUnitario || 0) * (l.cantidad || 1), 0) * 100) / 100;
+  const igvL = Math.round(gravadoL * 0.18 * 100) / 100;
+  const totalL = Math.round((gravadoL + igvL) * 100) / 100;
 
   async function correr(nombre: string, fn: () => Promise<unknown>, refrescar = true) {
     setBusy(nombre);
@@ -181,7 +196,10 @@ function ComprobanteModal({ f, listo, onClose, onChanged }: { f: Factura; listo:
     catch (e) { alert((e as Error).message || "No se pudo completar la operación."); }
     finally { setBusy(""); }
   }
+  const guardarLineas = () => correr("lineas", () => apiFacturasE.actualizar(f.id, { items: lineasPayload(), monto: gravadoL }));
   const emitir = () => correr("emitir", async () => {
+    // Se persisten las líneas actuales antes de emitir, para que el comprobante use lo editado.
+    if (!emitido) await apiFacturasE.actualizar(f.id, { items: lineasPayload(), monto: gravadoL });
     const r = await apiFacturasE.emitir(f.id);
     const e = r.respuesta;
     alert(e.estado_documento === "102" ? `✅ Aceptado por SUNAT: ${e.sunat_description}` : `Estado ${e.estado_documento || "?"}: ${e.errors || e.sunat_description || "sin detalle"}`);
@@ -209,9 +227,30 @@ function ComprobanteModal({ f, listo, onClose, onChanged }: { f: Factura; listo:
 
         <div className="px-6 py-3">
           <Dato k="RUC / DNI" v={f.ruc} />
-          <Dato k="Monto gravado" v={soles(f.gravado || f.monto)} />
-          <Dato k="IGV (18%)" v={soles(f.igv)} />
-          <Dato k="Total" v={<b>{soles(f.total || f.monto + f.igv)}</b>} />
+
+          {!emitido ? (
+            <div className="my-3">
+              <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">Líneas del comprobante</div>
+              <div className="space-y-2">
+                {lineas.map((l, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <input value={l.descripcion} onChange={(e) => setLinea(i, { descripcion: e.target.value })} placeholder="Descripción del servicio" className="min-w-0 flex-1 rounded-md border border-slate-200 px-2 py-1 text-sm outline-none focus:border-brand-500" />
+                    <input type="number" step="any" min="0" value={l.cantidad ?? 1} onChange={(e) => setLinea(i, { cantidad: num(e.target.value) })} title="Cantidad" className="w-14 rounded-md border border-slate-200 px-2 py-1 text-right text-sm tabular outline-none focus:border-brand-500" />
+                    <input type="number" step="any" min="0" value={l.valorUnitario || ""} onChange={(e) => setLinea(i, { valorUnitario: num(e.target.value) })} placeholder="0.00" title="Valor unitario (sin IGV)" className="w-24 rounded-md border border-slate-200 px-2 py-1 text-right text-sm tabular outline-none focus:border-brand-500" />
+                    {lineas.length > 1 ? <button onClick={() => quitar(i)} title="Quitar" className="rounded p-1 text-slate-400 hover:text-rose-600"><X size={15} /></button> : <span className="w-6" />}
+                  </div>
+                ))}
+              </div>
+              <div className="mt-2 flex items-center justify-between">
+                <button onClick={agregar} className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:border-brand-300 hover:text-brand-600"><Plus size={13} /> Agregar línea</button>
+                <button disabled={!!busy} onClick={guardarLineas} className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-50">{busy === "lineas" ? "Guardando…" : "Guardar líneas"}</button>
+              </div>
+            </div>
+          ) : null}
+
+          <Dato k="Monto gravado" v={soles(emitido ? (f.gravado || f.monto) : gravadoL)} />
+          <Dato k="IGV (18%)" v={soles(emitido ? f.igv : igvL)} />
+          <Dato k="Total" v={<b>{soles(emitido ? (f.total || f.monto + f.igv) : totalL)}</b>} />
           {f.sujetoDetraccion ? <Dato k="Detracción (4%)" v={<span className="text-rose-500">−{soles(f.montoDetraccion || 0)} · cta {f.ctaDetraccion || "—"}</span>} /> : null}
           {f.valorReferencial ? <Dato k="Valor referencial" v={soles(f.valorReferencial)} /> : null}
           {f.hash ? <Dato k="Hash" v={<span className="tabular text-xs">{f.hash}</span>} /> : null}
