@@ -225,6 +225,38 @@ export const apiPlanillas = {
   remove: (id: string) => api.del<void>(`/planillas/${id}`),
 };
 
+// --- Facturación electrónica: datos del emisor (MiFact / SUNAT) ---
+export interface EmisorConfig {
+  id: string;
+  sedeId: string;
+  ruc: string;
+  razonSocial: string;
+  nombreComercial: string;
+  ubigeo: string;
+  direccionFiscal: string;
+  codAnexo: string;
+  serieFactura: string;
+  serieBoleta: string;
+  serieNotaCredito: string;
+  puntoVenta: string;
+  ctaDetraccion: string;
+  porcDetraccion: number;
+  codDetraccion: string;
+  umbralDetraccion: number;
+  correoEnvio: string;
+  activo: boolean;
+}
+export interface EmisorRespuesta {
+  config: EmisorConfig;
+  ambiente: "demo" | "prod";
+  esProd: boolean;
+  integracionConfigurada: boolean; // hay URL base + token para el ambiente actual
+}
+export const apiEmisor = {
+  get: () => api.get<EmisorRespuesta>("/emisor"),
+  update: (b: Partial<Omit<EmisorConfig, "id" | "sedeId">>) => api.patch<EmisorRespuesta>("/emisor", b),
+};
+
 // --- Devolución de contenedores (importación) ---
 export interface Devolucion {
   id: string;
