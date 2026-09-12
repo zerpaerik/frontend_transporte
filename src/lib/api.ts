@@ -257,6 +257,16 @@ export const apiEmisor = {
   update: (b: Partial<Omit<EmisorConfig, "id" | "sedeId">>) => api.patch<EmisorRespuesta>("/emisor", b),
 };
 
+// Acciones de facturación electrónica sobre un comprobante ya registrado.
+export interface EmitirRespuesta { respuesta: { estado_documento: string; errors: string; sunat_description: string } }
+export const apiFacturasE = {
+  emitir: (id: string) => api.post<EmitirRespuesta>(`/facturas/${id}/emitir`, {}),
+  estado: (id: string) => api.post<unknown>(`/facturas/${id}/estado`, {}),
+  pdf: (id: string) => api.get<{ nombre: string; mime: string; base64: string }>(`/facturas/${id}/pdf`),
+  anular: (id: string, motivo: string) => api.post<unknown>(`/facturas/${id}/anular`, { motivo }),
+  correo: (id: string, correo: string) => api.post<{ ok: boolean; mensaje: string }>(`/facturas/${id}/correo`, { correo }),
+};
+
 // --- Devolución de contenedores (importación) ---
 export interface Devolucion {
   id: string;
