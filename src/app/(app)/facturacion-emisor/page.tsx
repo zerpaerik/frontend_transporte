@@ -35,9 +35,11 @@ export default function EmisorPage() {
   const [ok, setOk] = useState(false);
 
   function aplicar(r: EmisorRespuesta) {
-    // id/sedeId no se editan: se separan del resto de campos del formulario.
-    const { id: _id, sedeId: _sedeId, ...rest } = r.config;
-    void _id; void _sedeId;
+    // La API devuelve la fila completa; se quitan los campos que no se editan ni se deben
+    // reenviar (id, sedeId, createdAt, updatedAt) para no chocar con la validación del backend.
+    const { id: _id, sedeId: _sedeId, createdAt: _c, updatedAt: _u, ...rest } =
+      r.config as EmisorConfig & { createdAt?: unknown; updatedAt?: unknown };
+    void _id; void _sedeId; void _c; void _u;
     setF(rest);
     setMeta({ ambiente: r.ambiente, esProd: r.esProd, integracionConfigurada: r.integracionConfigurada });
     setCorrelativos(r.correlativos || []);
