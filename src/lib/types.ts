@@ -20,6 +20,7 @@ export interface Vehiculo {
   anio: number;
   kilometraje: number;
   estado: "Operativo" | "En taller" | "Inactivo";
+  constanciaTuc?: string;
   foto?: string | null;
 }
 
@@ -35,6 +36,7 @@ export interface Conductor {
   id: string;
   nombre: string;
   licencia: string;
+  dni?: string;
   categoria: string;
   telefono: string;
   descuentoMensual?: number;

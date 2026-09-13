@@ -9,7 +9,7 @@ type Form = Omit<EmisorConfig, "id" | "sedeId">;
 
 const VACIO: Form = {
   ruc: "", razonSocial: "", nombreComercial: "", ubigeo: "", direccionFiscal: "", codAnexo: "0000",
-  serieFactura: "FN01", serieBoleta: "BN01", serieNotaCredito: "FN01", puntoVenta: "",
+  serieFactura: "FN01", serieBoleta: "BN01", serieNotaCredito: "FN01", serieGuiaTransportista: "V001", registroMtc: "", puntoVenta: "",
   ctaDetraccion: "", porcDetraccion: 4, codDetraccion: "027", umbralDetraccion: 700,
   correoEnvio: "", activo: false,
 };
@@ -100,6 +100,7 @@ export default function EmisorPage() {
             <Campo label="RUC"><input className={inputCls} value={f.ruc} onChange={(e) => set("ruc", e.target.value)} placeholder="20616110340" /></Campo>
             <Campo label="Ubigeo" hint="6 dígitos del distrito (ej. Lima 150101)"><input className={inputCls} value={f.ubigeo} onChange={(e) => set("ubigeo", e.target.value)} placeholder="150101" /></Campo>
             <Campo label="Código de anexo" hint="Local anexo (0000 si es el principal)"><input className={inputCls} value={f.codAnexo} onChange={(e) => set("codAnexo", e.target.value)} placeholder="0000" /></Campo>
+            <Campo label="Registro MTC" hint="N° de registro del transportista (para la GRE)"><input className={inputCls} value={f.registroMtc} onChange={(e) => set("registroMtc", e.target.value)} placeholder="15174917CNG" /></Campo>
             <div className="sm:col-span-2"><Campo label="Dirección fiscal"><input className={inputCls} value={f.direccionFiscal} onChange={(e) => set("direccionFiscal", e.target.value)} placeholder="Av. ... Lima" /></Campo></div>
           </div>
         </Card>
@@ -111,6 +112,7 @@ export default function EmisorPage() {
             <Campo label="Serie de factura" hint="Distinta a la del portal MiFact"><input className={inputCls} value={f.serieFactura} onChange={(e) => set("serieFactura", e.target.value)} placeholder="FN01" /></Campo>
             <Campo label="Serie de boleta"><input className={inputCls} value={f.serieBoleta} onChange={(e) => set("serieBoleta", e.target.value)} placeholder="BN01" /></Campo>
             <Campo label="Serie de nota de crédito"><input className={inputCls} value={f.serieNotaCredito} onChange={(e) => set("serieNotaCredito", e.target.value)} placeholder="FN01" /></Campo>
+            <Campo label="Serie de GRE (transportista)" hint="Guía de remisión electrónica"><input className={inputCls} value={f.serieGuiaTransportista} onChange={(e) => set("serieGuiaTransportista", e.target.value)} placeholder="V001" /></Campo>
             <Campo label="Punto de venta" hint="COD_PTO_VENTA"><input className={inputCls} value={f.puntoVenta} onChange={(e) => set("puntoVenta", e.target.value)} /></Campo>
             <div className="sm:col-span-2"><Campo label="Correo de envío" hint="Copia opcional al emitir"><input className={inputCls} value={f.correoEnvio} onChange={(e) => set("correoEnvio", e.target.value)} placeholder="facturacion@empresa.com" /></Campo></div>
           </div>

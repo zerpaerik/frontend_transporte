@@ -20,6 +20,7 @@ function buildFields(v?: Vehiculo): Field[] {
     { name: "modelo", label: "Modelo", type: "text", placeholder: "FH 460", default: v?.modelo },
     { name: "anio", label: "Año", type: "number", default: v?.anio ?? 2022 },
     { name: "kilometraje", label: "Kilometraje", type: "number", default: v?.kilometraje ?? 0 },
+    { name: "constanciaTuc", label: "Constancia / TUC (GRE)", type: "text", placeholder: "15M26028531E", default: v?.constanciaTuc },
     { name: "estado", label: "Estado", type: "select", options: ["Operativo", "En taller", "Inactivo"], full: true, default: v?.estado },
   ];
 }
@@ -66,6 +67,7 @@ export default function VehiculosPage() {
     return {
       placa: String(v.placa).toUpperCase(), tipo: v.tipo as Vehiculo["tipo"], marca: String(v.marca),
       modelo: String(v.modelo), anio: Number(v.anio), kilometraje: Number(v.kilometraje), estado: v.estado as Vehiculo["estado"],
+      constanciaTuc: String(v.constanciaTuc || ""),
     };
   }
   function guardar(v: FormValues) { addVehiculo(toDto(v)); }
