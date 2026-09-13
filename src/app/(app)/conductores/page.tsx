@@ -14,6 +14,7 @@ import { exportCSV, exportPDF } from "@/lib/export";
 const fields: Field[] = [
   { name: "nombre", label: "Nombre completo", type: "text", required: true, placeholder: "Julio Grimaldo", full: true },
   { name: "licencia", label: "N° de licencia", type: "text", required: true, placeholder: "Q40128761" },
+  { name: "dni", label: "DNI", type: "text", placeholder: "40000455" },
   { name: "categoria", label: "Categoría", type: "select", options: ["A-IIIC", "A-IIIB", "A-IIIA", "A-IIB"] },
   { name: "telefono", label: "Teléfono", type: "text", placeholder: "987 654 321" },
   { name: "descuentoMensual", label: "Descuento de planilla mensual (S/)", type: "number", default: 0 },
@@ -41,12 +42,13 @@ export default function ConductoresPage() {
   const editFields = (c: any): Field[] => [
     { name: "nombre", label: "Nombre completo", type: "text", required: true, full: true, default: c?.nombre },
     { name: "licencia", label: "N° de licencia", type: "text", required: true, default: c?.licencia },
+    { name: "dni", label: "DNI", type: "text", default: c?.dni },
     { name: "categoria", label: "Categoría", type: "select", options: ["A-IIIC", "A-IIIB", "A-IIIA", "A-IIB"], default: c?.categoria },
     { name: "telefono", label: "Teléfono", type: "text", default: c?.telefono },
     { name: "descuentoMensual", label: "Descuento de planilla mensual (S/)", type: "number", default: c?.descuentoMensual ?? 0 },
   ];
   function guardarEdit(v: FormValues) {
-    if (editCond) updateConductor(editCond.id, { nombre: String(v.nombre), licencia: String(v.licencia), categoria: String(v.categoria), telefono: String(v.telefono), descuentoMensual: Number(v.descuentoMensual) });
+    if (editCond) updateConductor(editCond.id, { nombre: String(v.nombre), licencia: String(v.licencia), dni: String(v.dni || ""), categoria: String(v.categoria), telefono: String(v.telefono), descuentoMensual: Number(v.descuentoMensual) });
   }
 
   const docsEstados = conductores.flatMap((c) => c.documentos.map((d) => estadoDocumento(d.vencimiento)));
@@ -65,7 +67,7 @@ export default function ConductoresPage() {
 
   function guardar(v: FormValues) {
     addConductor({
-      nombre: String(v.nombre), licencia: String(v.licencia), categoria: String(v.categoria), telefono: String(v.telefono), descuentoMensual: Number(v.descuentoMensual),
+      nombre: String(v.nombre), licencia: String(v.licencia), dni: String(v.dni || ""), categoria: String(v.categoria), telefono: String(v.telefono), descuentoMensual: Number(v.descuentoMensual),
       documentos: [{ tipo: String(v.docTipo), numero: String(v.licencia), vencimiento: String(v.docVencimiento) }],
     });
   }

@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Container, ArrowDownToLine, ArrowUpFromLine, Settings2, FileText, Trash2, Pencil, TriangleAlert } from "lucide-react";
+import { Plus, Container, ArrowDownToLine, ArrowUpFromLine, Settings2, FileText, Trash2, Pencil, TriangleAlert, ScrollText } from "lucide-react";
 import Link from "next/link";
 import { PageHeader, StatCard, Badge } from "@/components/ui";
 import { DataTable, type Column, type Filter } from "@/components/DataTable";
 import { FormModal, type Field, type FormValues } from "@/components/FormModal";
 import { TicketViaje } from "@/components/TicketViaje";
 import { DetalleViaje } from "@/components/DetalleViaje";
+import { GuiaModal } from "@/components/GuiaModal";
 import { useData } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { apiTipos, apiClientes, apiPuertos, apiComisiones } from "@/lib/api";
@@ -90,12 +91,16 @@ const filters: Filter<Viaje>[] = [
   { key: "cliente", label: "Cliente", value: (v) => v.cliente },
 ];
 
-function AccionesViaje({ v, onTicket, onEdit, onDelete }: { v: Viaje; onTicket: (v: Viaje) => void; onEdit: (v: Viaje) => void; onDelete: (v: Viaje) => void }) {
+function AccionesViaje({ v, onTicket, onGre, onEdit, onDelete }: { v: Viaje; onTicket: (v: Viaje) => void; onGre: (v: Viaje) => void; onEdit: (v: Viaje) => void; onDelete: (v: Viaje) => void }) {
   return (
     <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
       <button onClick={() => onTicket(v)} title="Ver ticket / PDF / WhatsApp"
         className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:border-brand-300 hover:text-brand-600">
         <FileText size={13} /> Ticket
+      </button>
+      <button onClick={() => onGre(v)} title="Guía de Remisión (transportista)"
+        className="rounded-md border border-slate-200 p-1.5 text-slate-500 hover:border-brand-300 hover:text-brand-600">
+        <ScrollText size={13} />
       </button>
       <button onClick={() => onEdit(v)} title="Editar viaje"
         className="rounded-md border border-slate-200 p-1.5 text-slate-500 hover:border-brand-300 hover:text-brand-600">
@@ -117,6 +122,7 @@ export default function OperacionesPage() {
   const [editViaje, setEditViaje] = useState<Viaje | null>(null);
   const [ticketViaje, setTicketViaje] = useState<Viaje | null>(null);
   const [detalle, setDetalle] = useState<Viaje | null>(null);
+  const [greViaje, setGreViaje] = useState<Viaje | null>(null);
   const [tipos, setTipos] = useState<string[]>(["IMPO", "EXPO"]);
   const [clientes, setClientes] = useState<string[]>([]);
   const [puertos, setPuertos] = useState<string[]>([]);
@@ -270,7 +276,7 @@ export default function OperacionesPage() {
         minWidth="min-w-[1500px]"
         pageSize={9}
         onRowClick={setDetalle}
-        rowActions={(v) => <AccionesViaje v={v} onTicket={setTicketViaje} onEdit={setEditViaje} onDelete={eliminarViaje} />}
+        rowActions={(v) => <AccionesViaje v={v} onTicket={setTicketViaje} onGre={setGreViaje} onEdit={setEditViaje} onDelete={eliminarViaje} />}
         searchPlaceholder="Buscar por código, contenedor, cliente…"
         toolbar={
           <>
@@ -312,6 +318,7 @@ export default function OperacionesPage() {
 
       {ticketViaje ? <TicketViaje viaje={ticketViaje} empresa={user?.sede ? { nombre: user.sede.nombre, ruc: user.sede.ruc, codigo: user.sede.codigo } : undefined} onClose={() => setTicketViaje(null)} /> : null}
       {detalle ? <DetalleViaje viaje={detalle} onClose={() => setDetalle(null)} /> : null}
+      {greViaje ? <GuiaModal viaje={greViaje} onClose={() => setGreViaje(null)} /> : null}
     </div>
   );
 }

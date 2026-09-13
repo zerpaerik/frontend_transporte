@@ -225,6 +225,96 @@ export const apiPlanillas = {
   remove: (id: string) => api.del<void>(`/planillas/${id}`),
 };
 
+// --- Facturación electrónica: datos del emisor (MiFact / SUNAT) ---
+export interface EmisorConfig {
+  id: string;
+  sedeId: string;
+  ruc: string;
+  razonSocial: string;
+  nombreComercial: string;
+  ubigeo: string;
+  direccionFiscal: string;
+  codAnexo: string;
+  serieFactura: string;
+  serieBoleta: string;
+  serieNotaCredito: string;
+  serieGuiaTransportista: string;
+  registroMtc: string;
+  puntoVenta: string;
+  ctaDetraccion: string;
+  porcDetraccion: number;
+  codDetraccion: string;
+  umbralDetraccion: number;
+  correoEnvio: string;
+  activo: boolean;
+}
+export interface CorrelativoTipo {
+  tipoDoc: string; // 01 · 03 · 07
+  etiqueta: string; // Factura · Boleta · Nota de crédito
+  serie: string;
+  siguiente: string; // próximo correlativo (8 dígitos)
+}
+export interface EmisorRespuesta {
+  config: EmisorConfig;
+  correlativos: CorrelativoTipo[];
+  ambiente: "demo" | "prod";
+  esProd: boolean;
+  integracionConfigurada: boolean; // hay URL base + token para el ambiente actual
+}
+export const apiEmisor = {
+  get: () => api.get<EmisorRespuesta>("/emisor"),
+  update: (b: Partial<Omit<EmisorConfig, "id" | "sedeId">>) => api.patch<EmisorRespuesta>("/emisor", b),
+  setCorrelativo: (tipoDoc: string, desde: number) => api.patch<EmisorRespuesta>("/emisor/correlativo", { tipoDoc, desde }),
+};
+
+// Acciones de facturación electrónica sobre un comprobante ya registrado.
+export interface EmitirRespuesta { respuesta: { estado_documento: string; errors: string; sunat_description: string } }
+export const apiFacturasE = {
+  actualizar: (id: string, body: Record<string, unknown>) => api.patch<unknown>(`/facturas/${id}`, body),
+  emitir: (id: string) => api.post<EmitirRespuesta>(`/facturas/${id}/emitir`, {}),
+  estado: (id: string) => api.post<unknown>(`/facturas/${id}/estado`, {}),
+  pdf: (id: string) => api.get<{ nombre: string; mime: string; base64: string }>(`/facturas/${id}/pdf`),
+  anular: (id: string, motivo: string) => api.post<unknown>(`/facturas/${id}/anular`, { motivo }),
+  correo: (id: string, correo: string) => api.post<{ ok: boolean; mensaje: string }>(`/facturas/${id}/correo`, { correo }),
+};
+
+// --- Guía de Remisión electrónica del transportista (GRE) ---
+export interface GuiaTransportista {
+  id: string;
+  viajeId: string;
+  serie: string;
+  correlativo: string;
+  estadoDocumento: string;
+  sunatDescripcion: string;
+  hash: string;
+  fechaEmision: string | null;
+  fechaTraslado: string | null;
+  remitenteRazon: string;
+  destinatarioRazon: string;
+  pesoBruto: number;
+  docRefNumero: string;
+}
+export interface GuiaInput {
+  fechaTraslado?: string;
+  partidaDir?: string; partidaUbigeo?: string;
+  llegadaDir?: string; llegadaUbigeo?: string;
+  destinatarioRuc?: string; destinatarioRazon?: string;
+  pesoBruto?: number;
+  docRefTipo?: string; docRefNumero?: string;
+  pagadorFlete?: "remitente" | "tercero" | "subcontratado";
+  terceroRuc?: string; terceroRazon?: string;
+  observaciones?: string;
+  items?: { descripcion: string; cantidad?: number; peso?: number; unidad?: string }[];
+}
+export const apiGre = {
+  listar: (viajeId: string) => api.get<GuiaTransportista[]>(`/gre/viaje/${viajeId}`),
+  preview: (viajeId: string, body: GuiaInput) => api.post<{ ambiente: string; greConfigurada: boolean; payload: Record<string, unknown> }>(`/gre/viaje/${viajeId}/preview`, body),
+  emitir: (viajeId: string, body: GuiaInput) => api.post<{ guia: GuiaTransportista; respuesta: { estado_documento: string; errors: string; sunat_description: string } }>(`/gre/viaje/${viajeId}/emitir`, body),
+  estado: (id: string) => api.post<GuiaTransportista>(`/gre/${id}/estado`, {}),
+  pdf: (id: string) => api.get<{ nombre: string; mime: string; base64: string }>(`/gre/${id}/pdf`),
+  anular: (id: string, motivo: string) => api.post<GuiaTransportista>(`/gre/${id}/anular`, { motivo }),
+};
+
 // --- Devolución de contenedores (importación) ---
 export interface Devolucion {
   id: string;

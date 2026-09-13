@@ -20,6 +20,7 @@ export interface Vehiculo {
   anio: number;
   kilometraje: number;
   estado: "Operativo" | "En taller" | "Inactivo";
+  constanciaTuc?: string;
   foto?: string | null;
 }
 
@@ -35,6 +36,7 @@ export interface Conductor {
   id: string;
   nombre: string;
   licencia: string;
+  dni?: string;
   categoria: string;
   telefono: string;
   descuentoMensual?: number;
@@ -119,6 +121,14 @@ export interface Viaje {
 
 export type EstadoFactura = "Emitida" | "Aceptada" | "Pagada" | "Anulada";
 
+export interface FacturaItem {
+  id?: string;
+  descripcion: string;
+  cantidad?: number;
+  valorUnitario: number;
+  afectacion?: string;
+  unidad?: string;
+}
 export interface Factura {
   id: string;
   serie: string;
@@ -131,6 +141,27 @@ export interface Factura {
   monto: number;
   igv: number;
   estadoSunat: EstadoFactura;
+  // Facturación electrónica (opcionales — llegan del backend)
+  tipoDocCodigo?: string;
+  correlativo?: string;
+  moneda?: string;
+  gravado?: number;
+  total?: number;
+  sujetoDetraccion?: boolean;
+  montoDetraccion?: number;
+  ctaDetraccion?: string;
+  valorReferencial?: number;
+  referenciaVR?: string;
+  ubigeoOrigen?: string;
+  ubigeoDestino?: string;
+  detalleViaje?: string;
+  formaPago?: string;
+  fechaVencimiento?: string | null;
+  estadoDocumento?: string; // 101..108
+  sunatDescripcion?: string;
+  hash?: string;
+  qr?: string;
+  items?: FacturaItem[];
 }
 
 export interface Empleado {
