@@ -278,6 +278,43 @@ export const apiFacturasE = {
   correo: (id: string, correo: string) => api.post<{ ok: boolean; mensaje: string }>(`/facturas/${id}/correo`, { correo }),
 };
 
+// --- Guía de Remisión electrónica del transportista (GRE) ---
+export interface GuiaTransportista {
+  id: string;
+  viajeId: string;
+  serie: string;
+  correlativo: string;
+  estadoDocumento: string;
+  sunatDescripcion: string;
+  hash: string;
+  fechaEmision: string | null;
+  fechaTraslado: string | null;
+  remitenteRazon: string;
+  destinatarioRazon: string;
+  pesoBruto: number;
+  docRefNumero: string;
+}
+export interface GuiaInput {
+  fechaTraslado?: string;
+  partidaDir?: string; partidaUbigeo?: string;
+  llegadaDir?: string; llegadaUbigeo?: string;
+  destinatarioRuc?: string; destinatarioRazon?: string;
+  pesoBruto?: number;
+  docRefTipo?: string; docRefNumero?: string;
+  pagadorFlete?: "remitente" | "tercero" | "subcontratado";
+  terceroRuc?: string; terceroRazon?: string;
+  observaciones?: string;
+  items?: { descripcion: string; cantidad?: number; peso?: number; unidad?: string }[];
+}
+export const apiGre = {
+  listar: (viajeId: string) => api.get<GuiaTransportista[]>(`/gre/viaje/${viajeId}`),
+  preview: (viajeId: string, body: GuiaInput) => api.post<{ ambiente: string; greConfigurada: boolean; payload: Record<string, unknown> }>(`/gre/viaje/${viajeId}/preview`, body),
+  emitir: (viajeId: string, body: GuiaInput) => api.post<{ guia: GuiaTransportista; respuesta: { estado_documento: string; errors: string; sunat_description: string } }>(`/gre/viaje/${viajeId}/emitir`, body),
+  estado: (id: string) => api.post<GuiaTransportista>(`/gre/${id}/estado`, {}),
+  pdf: (id: string) => api.get<{ nombre: string; mime: string; base64: string }>(`/gre/${id}/pdf`),
+  anular: (id: string, motivo: string) => api.post<GuiaTransportista>(`/gre/${id}/anular`, { motivo }),
+};
+
 // --- Devolución de contenedores (importación) ---
 export interface Devolucion {
   id: string;
