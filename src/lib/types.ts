@@ -154,6 +154,14 @@ export interface Factura {
   montoDetraccion?: number;
   ctaDetraccion?: string;
   valorReferencial?: number;
+  // Insumos del valor referencial (tablas DS 022-2025-MTC)
+  vrAmbito?: string;
+  vrRuta?: string;
+  vrDestino?: string;
+  vrPuerto?: string;
+  vrZona?: string;
+  vrTipoCarga?: string;
+  pesoTM?: number;
   referenciaVR?: string;
   guia?: string;
   ubigeoOrigen?: string;

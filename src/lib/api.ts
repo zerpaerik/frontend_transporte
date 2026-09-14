@@ -267,6 +267,32 @@ export const apiEmisor = {
   setCorrelativo: (tipoDoc: string, desde: number) => api.patch<EmisorRespuesta>("/emisor/correlativo", { tipoDoc, desde }),
 };
 
+// --- Valor referencial de la detracción (tablas del DS 022-2025-MTC) ---
+export interface TarifasMeta {
+  vigencia: string;
+  tiposCarga: { key: string; etiqueta: string; porViaje: boolean }[];
+  puertos: { puerto: string; zonas: string[] }[];
+  rutas: { ruta: string; destinos: { destino: string; sxTM: number }[] }[];
+}
+export interface ValorRefInput {
+  ambito: "local" | "nacional";
+  pesoTM?: number;
+  ruta?: string; destino?: string;
+  puerto?: string; zona?: string; tipoCarga?: string;
+}
+export interface ValorRefResultado {
+  valorReferencial: number;
+  base: "viaje" | "tonelada";
+  tarifa: number;
+  pesoTM: number;
+  detalle: string;
+  vigencia: string;
+}
+export const apiTarifas = {
+  meta: () => api.get<TarifasMeta>("/facturacion/tarifas/meta"),
+  calcular: (input: ValorRefInput) => api.post<ValorRefResultado>("/facturacion/tarifas/valor-referencial", input),
+};
+
 // Acciones de facturación electrónica sobre un comprobante ya registrado.
 export interface EmitirRespuesta { respuesta: { estado_documento: string; errors: string; sunat_description: string } }
 export const apiFacturasE = {

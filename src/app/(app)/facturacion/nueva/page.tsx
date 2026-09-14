@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Search, Plus, X, Save } from "lucide-react";
 import { Card } from "@/components/ui";
 import { useData } from "@/lib/store";
-import { apiViajePorCodigo } from "@/lib/api";
+import { apiViajePorCodigo, apiTarifas, type TarifasMeta } from "@/lib/api";
 import { soles, hoyPeru, fecha } from "@/lib/format";
 import type { Factura } from "@/lib/types";
 
@@ -40,6 +40,16 @@ export default function NuevoComprobantePage() {
   const [ubigeoOrigen, setUbigeoOrigen] = useState("");
   const [ubigeoDestino, setUbigeoDestino] = useState("");
   const [detalleViaje, setDetalleViaje] = useState("");
+  // Calculador del valor referencial (tablas DS 022-2025-MTC)
+  const [meta, setMeta] = useState<TarifasMeta | null>(null);
+  const [vrAmbito, setVrAmbito] = useState(""); // "" manual | local | nacional
+  const [vrRuta, setVrRuta] = useState("");
+  const [vrDestino, setVrDestino] = useState("");
+  const [vrPuerto, setVrPuerto] = useState("");
+  const [vrZona, setVrZona] = useState("");
+  const [vrTipoCarga, setVrTipoCarga] = useState("");
+  const [pesoTM, setPesoTM] = useState("");
+  const [vrDetalle, setVrDetalle] = useState("");
   const [plazo, setPlazo] = useState("Contado"); // Contado | Crédito 15 días | Crédito 30 días
   const [lineas, setLineas] = useState<Linea[]>([{ descripcion: "SERVICIO DE TRANSPORTE", cantidad: 1, valorUnitario: 0 }]);
 
@@ -92,6 +102,30 @@ export default function NuevoComprobantePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Catálogo de tarifas referenciales (rutas/puertos) del DS 022-2025-MTC.
+  useEffect(() => { apiTarifas.meta().then(setMeta).catch(() => {}); }, []);
+
+  const tipoCargaPorViaje = meta?.tiposCarga.find((t) => t.key === vrTipoCarga)?.porViaje ?? false;
+
+  // Recalcula el valor referencial desde las tablas cuando cambian los insumos.
+  useEffect(() => {
+    if (!vrAmbito) return; // modo manual: no toca el campo
+    const listo = vrAmbito === "nacional"
+      ? !!(vrRuta && vrDestino && Number(pesoTM) > 0)
+      : !!(vrPuerto && vrZona && vrTipoCarga && (tipoCargaPorViaje || Number(pesoTM) > 0));
+    if (!listo) { setVrDetalle(""); return; }
+    let cancel = false;
+    apiTarifas.calcular({
+      ambito: vrAmbito as "local" | "nacional", pesoTM: Number(pesoTM) || 0,
+      ruta: vrRuta, destino: vrDestino, puerto: vrPuerto, zona: vrZona, tipoCarga: vrTipoCarga,
+    }).then((r) => {
+      if (cancel) return;
+      setValorReferencial(String(r.valorReferencial));
+      setVrDetalle(r.detalle);
+    }).catch(() => { if (!cancel) setVrDetalle(""); });
+    return () => { cancel = true; };
+  }, [vrAmbito, vrRuta, vrDestino, vrPuerto, vrZona, vrTipoCarga, pesoTM, tipoCargaPorViaje]);
+
   async function guardar() {
     if (!cliente.trim()) { setMsg("Falta el cliente."); return; }
     setBusy(true);
@@ -103,6 +137,7 @@ export default function NuevoComprobantePage() {
         fecha: fechaEmision, viaje: viaje || "-", monto: gravado, igv, estadoSunat: "Emitida",
         items,
         valorReferencial: valorReferencial ? Number(valorReferencial) : 0,
+        vrAmbito, vrRuta, vrDestino, vrPuerto, vrZona, vrTipoCarga, pesoTM: pesoTM ? Number(pesoTM) : 0,
         referenciaVR: referenciaOrden.trim(), guia: guia.trim(),
         ubigeoOrigen: ubigeoOrigen.trim(), ubigeoDestino: ubigeoDestino.trim(), detalleViaje: detalleViaje.trim(),
         formaPago: esCredito ? "Credito" : "Contado",
@@ -171,14 +206,67 @@ export default function NuevoComprobantePage() {
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
         {/* Detracción / transporte */}
         <Card className="p-5">
-          <h2 className="mb-4 text-sm font-bold uppercase tracking-wide text-slate-500">Detracción (transporte)</h2>
+          <h2 className="mb-1 text-sm font-bold uppercase tracking-wide text-slate-500">Detracción (transporte)</h2>
+          <p className="mb-3 text-xs text-slate-400">El valor referencial se calcula con las tablas del MTC ({meta?.vigencia || "DS 022-2025-MTC"}). La detracción (4%) se aplica sobre el mayor entre el total y el valor referencial.</p>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <label className="sm:col-span-2"><span className={lbl}>Base del valor referencial</span>
+              <select className={inp} value={vrAmbito} onChange={(e) => { setVrAmbito(e.target.value); setVrDetalle(""); }}>
+                <option value="">Manual (lo ingreso yo)</option>
+                <option value="nacional">Provincia / nacional (S/ x TM × peso)</option>
+                <option value="local">Local / puerto (por viaje o por tonelada)</option>
+              </select>
+            </label>
+
+            {vrAmbito === "nacional" ? (
+              <>
+                <label className="sm:col-span-2"><span className={lbl}>Ruta (desde Lima)</span>
+                  <select className={inp} value={vrRuta} onChange={(e) => { setVrRuta(e.target.value); setVrDestino(""); }}>
+                    <option value="">Elige la ruta…</option>
+                    {meta?.rutas.map((r) => <option key={r.ruta} value={r.ruta}>{r.ruta}</option>)}
+                  </select>
+                </label>
+                <label><span className={lbl}>Destino</span>
+                  <select className={inp} value={vrDestino} onChange={(e) => setVrDestino(e.target.value)} disabled={!vrRuta}>
+                    <option value="">Elige el destino…</option>
+                    {meta?.rutas.find((r) => r.ruta === vrRuta)?.destinos.map((d) => (
+                      <option key={d.destino} value={d.destino}>{d.destino} — S/ {d.sxTM.toFixed(2)}/TM</option>
+                    ))}
+                  </select>
+                </label>
+                <label><span className={lbl}>Peso transportado (TM)</span><input type="number" step="any" min="0" className={inp} value={pesoTM} onChange={(e) => setPesoTM(e.target.value)} placeholder="Ej. 20" /></label>
+              </>
+            ) : vrAmbito === "local" ? (
+              <>
+                <label><span className={lbl}>Puerto</span>
+                  <select className={inp} value={vrPuerto} onChange={(e) => { setVrPuerto(e.target.value); setVrZona(""); }}>
+                    <option value="">Elige el puerto…</option>
+                    {meta?.puertos.map((p) => <option key={p.puerto} value={p.puerto}>{p.puerto}</option>)}
+                  </select>
+                </label>
+                <label><span className={lbl}>Zona</span>
+                  <select className={inp} value={vrZona} onChange={(e) => setVrZona(e.target.value)} disabled={!vrPuerto}>
+                    <option value="">Elige la zona…</option>
+                    {meta?.puertos.find((p) => p.puerto === vrPuerto)?.zonas.map((z) => <option key={z} value={z}>{z}</option>)}
+                  </select>
+                </label>
+                <label><span className={lbl}>Tipo de carga</span>
+                  <select className={inp} value={vrTipoCarga} onChange={(e) => setVrTipoCarga(e.target.value)}>
+                    <option value="">Elige el tipo…</option>
+                    {meta?.tiposCarga.map((t) => <option key={t.key} value={t.key}>{t.etiqueta}</option>)}
+                  </select>
+                </label>
+                <label><span className={lbl}>Peso (TM){tipoCargaPorViaje ? " — no aplica" : ""}</span><input type="number" step="any" min="0" className={inp} value={pesoTM} onChange={(e) => setPesoTM(e.target.value)} placeholder={tipoCargaPorViaje ? "Por viaje" : "Ej. 20"} disabled={tipoCargaPorViaje} /></label>
+              </>
+            ) : null}
+
+            <label className="sm:col-span-2"><span className={lbl}>Valor referencial (S/){vrAmbito ? " — calculado" : ""}</span>
+              <input type="number" step="any" min="0" className={inp} value={valorReferencial} onChange={(e) => setValorReferencial(e.target.value)} placeholder="Tablas del MTC" readOnly={!!vrAmbito} />
+            </label>
+            {vrDetalle ? <p className="sm:col-span-2 -mt-2 text-xs text-slate-500">{vrDetalle}</p> : null}
+
             <label className="sm:col-span-2"><span className={lbl}>Detalle del viaje</span><input className={inp} value={detalleViaje} onChange={(e) => setDetalleViaje(e.target.value)} placeholder="TRANSPORTE VENTANILLA → CALLAO" /></label>
-            <label><span className={lbl}>Valor referencial (S/)</span><input type="number" step="any" min="0" className={inp} value={valorReferencial} onChange={(e) => setValorReferencial(e.target.value)} placeholder="Tablas del MTC" /></label>
-            <div className="grid grid-cols-2 gap-3">
-              <label><span className={lbl}>Ubigeo origen</span><input className={inp} value={ubigeoOrigen} onChange={(e) => setUbigeoOrigen(e.target.value)} placeholder="070101" /></label>
-              <label><span className={lbl}>Ubigeo destino</span><input className={inp} value={ubigeoDestino} onChange={(e) => setUbigeoDestino(e.target.value)} placeholder="150101" /></label>
-            </div>
+            <label><span className={lbl}>Ubigeo origen</span><input className={inp} value={ubigeoOrigen} onChange={(e) => setUbigeoOrigen(e.target.value)} placeholder="070101" /></label>
+            <label><span className={lbl}>Ubigeo destino</span><input className={inp} value={ubigeoDestino} onChange={(e) => setUbigeoDestino(e.target.value)} placeholder="150101" /></label>
           </div>
         </Card>
 
