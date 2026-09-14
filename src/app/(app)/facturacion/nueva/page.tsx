@@ -35,6 +35,7 @@ export default function NuevoComprobantePage() {
   const [fechaEmision, setFechaEmision] = useState(hoyPeru());
   const [viaje, setViaje] = useState("-");
   const [referenciaOrden, setReferenciaOrden] = useState("");
+  const [guia, setGuia] = useState("");
   const [valorReferencial, setValorReferencial] = useState("");
   const [ubigeoOrigen, setUbigeoOrigen] = useState("");
   const [ubigeoDestino, setUbigeoDestino] = useState("");
@@ -66,6 +67,7 @@ export default function NuevoComprobantePage() {
       setDireccion(String(v.clienteDireccion || ""));
       setViaje(String(v.contenedor || "-"));
       setReferenciaOrden(String(v.nOrden || ""));
+      setGuia(String(v.greRemitente || v.greTransporte || ""));
       const ruta = [v.origen, v.destino].filter(Boolean).join(" → ");
       setDetalleViaje(ruta ? `TRANSPORTE ${ruta}` : "");
       // Línea de servicio con el detalle del viaje (como en la factura real).
@@ -101,7 +103,7 @@ export default function NuevoComprobantePage() {
         fecha: fechaEmision, viaje: viaje || "-", monto: gravado, igv, estadoSunat: "Emitida",
         items,
         valorReferencial: valorReferencial ? Number(valorReferencial) : 0,
-        referenciaVR: referenciaOrden.trim(),
+        referenciaVR: referenciaOrden.trim(), guia: guia.trim(),
         ubigeoOrigen: ubigeoOrigen.trim(), ubigeoDestino: ubigeoDestino.trim(), detalleViaje: detalleViaje.trim(),
         formaPago: esCredito ? "Credito" : "Contado",
         fechaVencimiento: esCredito ? vencimiento : null,
@@ -144,6 +146,7 @@ export default function NuevoComprobantePage() {
           <label className="sm:col-span-2"><span className={lbl}>Cliente (razón social)</span><input className={inp} value={cliente} onChange={(e) => setCliente(e.target.value)} placeholder="Cliente a facturar (viene de Operaciones)" /></label>
           <label><span className={lbl}>RUC / DNI</span><input className={inp} value={ruc} onChange={(e) => setRuc(e.target.value)} placeholder="20601847834" /></label>
           <label><span className={lbl}>Referencia / N° de orden</span><input className={inp} value={referenciaOrden} onChange={(e) => setReferenciaOrden(e.target.value)} placeholder="ORDEN 2440" /></label>
+          <label><span className={lbl}>Guía de remisión</span><input className={inp} value={guia} onChange={(e) => setGuia(e.target.value)} placeholder="T002-1668" /></label>
           <label className="sm:col-span-2"><span className={lbl}>Dirección del cliente</span><input className={inp} value={direccion} onChange={(e) => setDireccion(e.target.value)} /></label>
         </div>
       </Card>

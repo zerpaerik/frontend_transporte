@@ -155,6 +155,7 @@ export interface Factura {
   ctaDetraccion?: string;
   valorReferencial?: number;
   referenciaVR?: string;
+  guia?: string;
   ubigeoOrigen?: string;
   ubigeoDestino?: string;
   detalleViaje?: string;
