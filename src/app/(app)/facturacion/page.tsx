@@ -217,7 +217,7 @@ function ComprobanteModal({ f, listo, onClose, onChanged, onEdit }: { f: Factura
               <Pencil size={15} /> Editar
             </button>
           ) : null}
-          {!aceptado ? (
+          {editable ? (
             <button disabled={!!busy || !listo} onClick={emitir} title={listo ? "" : "Configura y activa el emisor primero"} className={`${btn} flex-1 justify-center bg-brand-500 text-white hover:bg-brand-600`}>
               <Send size={15} /> {busy === "emitir" ? "Emitiendo…" : "Emitir a SUNAT"}
             </button>
