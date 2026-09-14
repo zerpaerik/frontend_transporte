@@ -117,6 +117,9 @@ export interface Viaje {
   greRemitente: string;
   greTransporte: string;
   factura: string;
+  tarifa?: number;
+  clienteRuc?: string;
+  clienteDireccion?: string;
 }
 
 export type EstadoFactura = "Emitida" | "Aceptada" | "Pagada" | "Anulada";

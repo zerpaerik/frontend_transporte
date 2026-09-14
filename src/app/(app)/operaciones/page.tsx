@@ -12,7 +12,7 @@ import { GuiaModal } from "@/components/GuiaModal";
 import { useData } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { apiTipos, apiClientes, apiPuertos, apiComisiones } from "@/lib/api";
-import { fecha, diasRestantes } from "@/lib/format";
+import { fecha, diasRestantes, soles } from "@/lib/format";
 import type { EstadoViaje, Viaje } from "@/lib/types";
 
 // Opción del select de carreta para escribir una placa alquilada (fuera de la flota).
@@ -81,6 +81,7 @@ const columns: Column<Viaje>[] = [
   } },
   { key: "semaforo", header: "Devolver", align: "center", render: (v) => <Semaforo iso={v.fechaLimite || undefined} estado={v.estado} /> },
   { key: "greRemitente", header: "N° Guía", value: (v) => v.greRemitente, render: (v) => v.greRemitente ? <span className="tabular whitespace-nowrap">{v.greRemitente}</span> : dash },
+  { key: "tarifa", header: "Tarifa", align: "right", sortable: true, value: (v) => v.tarifa || 0, render: (v) => v.tarifa ? <span className="tabular whitespace-nowrap font-medium">{soles(v.tarifa)}</span> : dash },
   { key: "facturado", header: "Facturado", value: (v) => (v.factura ? "Sí" : "No"), render: (v) => v.factura ? <Badge tone="green">Facturado · {v.factura}</Badge> : <Badge tone="amber">No facturado</Badge> },
   { key: "estado", header: "Estado", sortable: true, render: (v) => <Badge tone={estadoTone[v.estado]}>{v.estado}</Badge> },
 ];

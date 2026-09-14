@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Plus, ReceiptText, Search, Send, FileDown, RefreshCw, Ban, Mail, X, ShieldCheck, TriangleAlert } from "lucide-react";
 import { PageHeader, StatCard, Badge } from "@/components/ui";
 import { DataTable, type Column, type Filter } from "@/components/DataTable";
-import { FormModal, type Field, type FormValues } from "@/components/FormModal";
 import { useData } from "@/lib/store";
-import { apiViajePorCodigo, apiEmisor, apiFacturasE, downloadBase64, type EmisorRespuesta } from "@/lib/api";
+import { apiEmisor, apiFacturasE, downloadBase64, type EmisorRespuesta } from "@/lib/api";
 import { soles, fecha } from "@/lib/format";
 import type { Factura, FacturaItem } from "@/lib/types";
 
@@ -27,14 +27,10 @@ const filters: Filter<Factura>[] = [
   { key: "cliente", label: "Cliente", value: (f) => f.cliente },
 ];
 
-interface Prefill { cliente?: string; ruc?: string; viaje?: string; direccion?: string; monto?: number; }
-
 export default function FacturacionPage() {
-  const { facturas, viajes, addFactura, reload } = useData();
-  const [open, setOpen] = useState(false);
+  const router = useRouter();
+  const { facturas, reload } = useData();
   const [codigo, setCodigo] = useState("");
-  const [lookMsg, setLookMsg] = useState("");
-  const [prefill, setPrefill] = useState<Prefill>({});
   const [emisor, setEmisor] = useState<EmisorRespuesta | null>(null);
   const [selId, setSelId] = useState<string | null>(null);
   const sel = facturas.find((f) => f.id === selId) || null;
@@ -57,49 +53,10 @@ export default function FacturacionPage() {
     { key: "acc", header: "", align: "right", render: (f) => <button onClick={() => setSelId(f.id)} className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:border-brand-300 hover:text-brand-600">Abrir</button> },
   ];
 
-  const fields: Field[] = [
-    { name: "tipo", label: "Tipo de comprobante", type: "select", options: ["Factura", "Boleta", "N. Crédito"] },
-    { name: "serie", label: "Serie", type: "text", placeholder: "Se asigna al emitir (según config del emisor)" },
-    { name: "cliente", label: "Cliente (razón social)", type: "text", required: true, placeholder: "LOGISTC WORLD INTERNATIONAL S.A.C.", default: prefill.cliente },
-    { name: "ruc", label: "RUC / DNI", type: "text", placeholder: "20613059548", default: prefill.ruc },
-    { name: "direccion", label: "Dirección del cliente", type: "text", full: true, default: prefill.direccion },
-    { name: "fecha", label: "Fecha de emisión", type: "date", required: true },
-    { name: "viaje", label: "Contenedor / viaje", type: "select", options: ["-", ...viajes.map((v) => v.contenedor)], default: prefill.viaje },
-    { name: "monto", label: "Monto neto (S/)", type: "number", default: prefill.monto ?? 0 },
-    { name: "detalleViaje", label: "Detalle del viaje (detracción)", type: "text", full: true, placeholder: "TRANSPORTE DE CONTENEDORES CALLAO → COMAS" },
-    { name: "valorReferencial", label: "Valor referencial (S/)", type: "number", placeholder: "Para la detracción del transporte" },
-    { name: "referenciaVR", label: "Referencia del valor ref.", type: "text", placeholder: "26/10000922" },
-    { name: "ubigeoOrigen", label: "Ubigeo origen", type: "text", placeholder: "070101" },
-    { name: "ubigeoDestino", label: "Ubigeo destino", type: "text", placeholder: "150112" },
-    { name: "formaPago", label: "Forma de pago", type: "select", options: ["Contado", "Credito"] },
-    { name: "fechaVencimiento", label: "Vencimiento (si crédito)", type: "date" },
-  ];
-
-  function guardar(v: FormValues) {
-    const monto = Number(v.monto || 0);
-    const body: Omit<Factura, "id"> = {
-      serie: String(v.serie || ""), tipo: v.tipo as Factura["tipo"], cliente: String(v.cliente), ruc: String(v.ruc) || "-",
-      direccion: String(v.direccion || ""), fecha: String(v.fecha), viaje: String(v.viaje || "-"),
-      monto, igv: Math.round(monto * 0.18 * 100) / 100, estadoSunat: "Emitida",
-      valorReferencial: Number(v.valorReferencial || 0), referenciaVR: String(v.referenciaVR || ""),
-      ubigeoOrigen: String(v.ubigeoOrigen || ""), ubigeoDestino: String(v.ubigeoDestino || ""),
-      detalleViaje: String(v.detalleViaje || ""), formaPago: (String(v.formaPago || "Contado") as string),
-      fechaVencimiento: v.fechaVencimiento ? String(v.fechaVencimiento) : null,
-    };
-    addFactura(body);
-  }
-
-  async function traerPorCodigo() {
-    if (!codigo.trim()) return;
-    setLookMsg("");
-    try {
-      const v = await apiViajePorCodigo(codigo.trim());
-      setPrefill({ cliente: v.cliente, ruc: v.clienteRuc || "", viaje: v.contenedor, direccion: v.clienteDireccion || "", monto: v.tarifa || 0 });
-      setOpen(true);
-      setCodigo("");
-    } catch {
-      setLookMsg("No se encontró un viaje con ese código.");
-    }
+  function irNuevo() { router.push("/facturacion/nueva"); }
+  function traer() {
+    const c = codigo.trim();
+    router.push(c ? `/facturacion/nueva?codigo=${encodeURIComponent(c)}` : "/facturacion/nueva");
   }
 
   const prod = emisor?.esProd;
@@ -126,8 +83,6 @@ export default function FacturacionPage() {
         <StatCard label="Ventas facturadas" value={soles(total)} icon={ReceiptText} tone="green" />
       </div>
 
-      {lookMsg ? <div className="mb-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700 ring-1 ring-inset ring-rose-200">{lookMsg}</div> : null}
-
       <DataTable
         title="Comprobantes SUNAT"
         exportName="facturacion-sunat"
@@ -140,24 +95,15 @@ export default function FacturacionPage() {
           <>
             <div className="flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-1.5 py-1">
               <Search size={14} className="text-slate-400" />
-              <input value={codigo} onChange={(e) => setCodigo(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") traerPorCodigo(); }}
+              <input value={codigo} onChange={(e) => setCodigo(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") traer(); }}
                 placeholder="Código de viaje (OP-0001)" className="w-40 text-sm outline-none" />
-              <button onClick={traerPorCodigo} className="rounded-md bg-steel-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-steel-700">Traer</button>
+              <button onClick={traer} className="rounded-md bg-steel-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-steel-700">Traer</button>
             </div>
-            <button onClick={() => { setPrefill({}); setOpen(true); }} className="flex items-center gap-2 rounded-lg bg-brand-500 px-3.5 py-2 text-sm font-semibold text-white hover:bg-brand-600">
+            <button onClick={irNuevo} className="flex items-center gap-2 rounded-lg bg-brand-500 px-3.5 py-2 text-sm font-semibold text-white hover:bg-brand-600">
               <Plus size={16} /> Nuevo comprobante
             </button>
           </>
         }
-      />
-
-      <FormModal
-        open={open}
-        title="Nuevo comprobante"
-        subtitle="El IGV (18%) y la detracción (4%) se calculan al emitir. Usa 'Traer' con el código del viaje para autocompletar."
-        fields={fields}
-        onSubmit={guardar}
-        onClose={() => setOpen(false)}
       />
 
       {sel ? <ComprobanteModal f={sel} listo={!!emisor?.integracionConfigurada && !!emisor?.config.activo} onClose={() => setSelId(null)} onChanged={reload} /> : null}
