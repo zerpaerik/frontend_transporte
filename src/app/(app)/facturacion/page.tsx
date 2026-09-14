@@ -144,6 +144,11 @@ function ComprobanteModal({ f, listo, onClose, onChanged }: { f: Factura; listo:
   }
   const guardarLineas = () => correr("lineas", () => apiFacturasE.actualizar(f.id, { items: lineasPayload(), monto: gravadoL }));
   const emitir = () => correr("emitir", async () => {
+    // SUNAT no acepta precios unitarios en 0: se avisa antes de enviar.
+    const pay = lineasPayload();
+    if (!pay.length || pay.some((l) => (l.valorUnitario || 0) <= 0)) {
+      throw new Error("Hay líneas con valor unitario en 0. Ponles la tarifa/valor (edita la línea) antes de emitir.");
+    }
     // Se persisten las líneas actuales antes de emitir, para que el comprobante use lo editado.
     if (!emitido) await apiFacturasE.actualizar(f.id, { items: lineasPayload(), monto: gravadoL });
     const r = await apiFacturasE.emitir(f.id);
