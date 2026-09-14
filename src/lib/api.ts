@@ -245,6 +245,7 @@ export interface EmisorConfig {
   porcDetraccion: number;
   codDetraccion: string;
   umbralDetraccion: number;
+  formatoImpresion: string;
   correoEnvio: string;
   activo: boolean;
 }

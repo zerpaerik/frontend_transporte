@@ -5,9 +5,16 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Search, Plus, X, Save } from "lucide-react";
 import { Card } from "@/components/ui";
 import { useData } from "@/lib/store";
-import { apiViajePorCodigo, apiTarifas, type TarifasMeta } from "@/lib/api";
+import { apiViajePorCodigo, apiTarifas, apiFacturasE, type TarifasMeta } from "@/lib/api";
 import { soles, hoyPeru, fecha } from "@/lib/format";
 import type { Factura } from "@/lib/types";
+
+// Traduce la forma de pago guardada (Contado/Credito + vencimiento) a la etiqueta del selector.
+function plazoDesde(f: Partial<Factura>): string {
+  if ((f.formaPago || "Contado") !== "Credito" || !f.fechaVencimiento) return "Contado";
+  const dias = Math.round((new Date(f.fechaVencimiento).getTime() - new Date(String(f.fecha)).getTime()) / 86_400_000);
+  return dias <= 15 ? "Crédito 15 días" : "Crédito 30 días";
+}
 
 type Linea = { descripcion: string; cantidad: number; valorUnitario: number };
 
@@ -26,7 +33,9 @@ const PLAZOS: Record<string, number> = { "Crédito 15 días": 15, "Crédito 30 d
 
 export default function NuevoComprobantePage() {
   const router = useRouter();
-  const { addFactura } = useData();
+  const { addFactura, facturas, reload } = useData();
+  const [editId, setEditId] = useState<string | null>(null);
+  const [prefilled, setPrefilled] = useState(false);
 
   const [tipo, setTipo] = useState<Factura["tipo"]>("Factura");
   const [cliente, setCliente] = useState("");
@@ -95,12 +104,44 @@ export default function NuevoComprobantePage() {
     }
   }
 
-  // Si llega ?codigo=OP-xxxx (desde Operaciones o el listado), autocompleta al abrir.
+  // Si llega ?codigo=OP-xxxx (desde Operaciones) autocompleta; si llega ?id=xxx edita.
   useEffect(() => {
-    const c = new URLSearchParams(window.location.search).get("codigo");
+    const p = new URLSearchParams(window.location.search);
+    const id = p.get("id");
+    if (id) { setEditId(id); return; }
+    const c = p.get("codigo");
     if (c) traer(c);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Modo edición: precarga TODOS los campos del comprobante a corregir (una sola vez).
+  useEffect(() => {
+    if (!editId || prefilled) return;
+    const f = facturas.find((x) => x.id === editId);
+    if (!f) return; // aún no cargan las facturas del store
+    setTipo(f.tipo);
+    setCliente(f.cliente || "");
+    setRuc(f.ruc && f.ruc !== "-" ? f.ruc : "");
+    setDireccion(f.direccion || "");
+    setFechaEmision(String(f.fecha).slice(0, 10));
+    setViaje(f.viaje || "-");
+    setReferenciaOrden(f.referenciaVR || "");
+    setGuia(f.guia || "");
+    setValorReferencial(f.valorReferencial ? String(f.valorReferencial) : "");
+    setUbigeoOrigen(f.ubigeoOrigen || "");
+    setUbigeoDestino(f.ubigeoDestino || "");
+    setDetalleViaje(f.detalleViaje || "");
+    setPlazo(plazoDesde(f));
+    setVrAmbito(f.vrAmbito || "");
+    setVrRuta(f.vrRuta || "");
+    setVrDestino(f.vrDestino || "");
+    setVrPuerto(f.vrPuerto || "");
+    setVrZona(f.vrZona || "");
+    setVrTipoCarga(f.vrTipoCarga || "");
+    setPesoTM(f.pesoTM ? String(f.pesoTM) : "");
+    if (f.items?.length) setLineas(f.items.map((i) => ({ descripcion: i.descripcion, cantidad: i.cantidad ?? 1, valorUnitario: i.valorUnitario ?? 0 })));
+    setPrefilled(true);
+  }, [editId, prefilled, facturas]);
 
   // Catálogo de tarifas referenciales (rutas/puertos) del DS 022-2025-MTC.
   useEffect(() => { apiTarifas.meta().then(setMeta).catch(() => {}); }, []);
@@ -143,7 +184,12 @@ export default function NuevoComprobantePage() {
         formaPago: esCredito ? "Credito" : "Contado",
         fechaVencimiento: esCredito ? vencimiento : null,
       };
-      await addFactura(body);
+      if (editId) {
+        await apiFacturasE.actualizar(editId, body as Record<string, unknown>);
+        await reload();
+      } else {
+        await addFactura(body);
+      }
       router.push("/facturacion");
     } catch (e) {
       setMsg((e as Error).message || "No se pudo guardar el comprobante.");
@@ -156,8 +202,8 @@ export default function NuevoComprobantePage() {
       <button onClick={() => router.push("/facturacion")} className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-brand-600">
         <ArrowLeft size={16} /> Volver a facturación
       </button>
-      <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">Nuevo comprobante</h1>
-      <p className="mt-1 text-sm text-slate-500">Trae los datos desde el código del viaje (Operaciones): cliente, tarifa, ruta y detalle. El IGV (18%) y la detracción (4%) se calculan al emitir.</p>
+      <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">{editId ? "Editar comprobante" : "Nuevo comprobante"}</h1>
+      <p className="mt-1 text-sm text-slate-500">{editId ? "Corrige los datos del comprobante antes de emitirlo a SUNAT (por ejemplo, los ubigeos de la detracción)." : "Trae los datos desde el código del viaje (Operaciones): cliente, tarifa, ruta y detalle. El IGV (18%) y la detracción (4%) se calculan al emitir."}</p>
 
       {/* Traer desde Operaciones */}
       <div className="mt-5 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/60 px-4 py-3">
@@ -289,7 +335,7 @@ export default function NuevoComprobantePage() {
 
       <div className="mt-5 flex items-center gap-3">
         <button disabled={busy} onClick={guardar} className="inline-flex items-center gap-2 rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-50">
-          <Save size={16} /> {busy ? "Guardando…" : "Guardar comprobante"}
+          <Save size={16} /> {busy ? "Guardando…" : editId ? "Guardar cambios" : "Guardar comprobante"}
         </button>
         <button onClick={() => router.push("/facturacion")} className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">Cancelar</button>
       </div>

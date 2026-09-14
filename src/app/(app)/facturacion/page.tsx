@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, ReceiptText, Search, Send, FileDown, RefreshCw, Ban, Mail, X, ShieldCheck, TriangleAlert } from "lucide-react";
+import { Plus, ReceiptText, Search, Send, FileDown, RefreshCw, Ban, Mail, X, ShieldCheck, TriangleAlert, Pencil } from "lucide-react";
 import { PageHeader, StatCard, Badge } from "@/components/ui";
 import { DataTable, type Column, type Filter } from "@/components/DataTable";
 import { useData } from "@/lib/store";
@@ -106,7 +106,7 @@ export default function FacturacionPage() {
         }
       />
 
-      {sel ? <ComprobanteModal f={sel} listo={!!emisor?.integracionConfigurada && !!emisor?.config.activo} onClose={() => setSelId(null)} onChanged={reload} /> : null}
+      {sel ? <ComprobanteModal f={sel} listo={!!emisor?.integracionConfigurada && !!emisor?.config.activo} onClose={() => setSelId(null)} onChanged={reload} onEdit={() => router.push(`/facturacion/nueva?id=${sel.id}`)} /> : null}
     </div>
   );
 }
@@ -117,11 +117,13 @@ function Dato({ k, v }: { k: string; v: React.ReactNode }) {
 
 const num = (v: string) => Number(String(v).replace(",", ".") || 0);
 
-function ComprobanteModal({ f, listo, onClose, onChanged }: { f: Factura; listo: boolean; onClose: () => void; onChanged: () => void }) {
+function ComprobanteModal({ f, listo, onClose, onChanged, onEdit }: { f: Factura; listo: boolean; onClose: () => void; onChanged: () => void; onEdit: () => void }) {
   const [busy, setBusy] = useState("");
   const est = estDoc(f);
   const emitido = !!f.estadoDocumento;
   const aceptado = f.estadoDocumento === "102" || f.estadoDocumento === "103";
+  // Editable mientras no esté aceptado ni anulado (sin emitir o rechazado).
+  const editable = !emitido || f.estadoDocumento === "104";
 
   // Líneas editables mientras el comprobante no esté emitido. Si no hay guardadas,
   // se arranca con una línea a partir del monto/tarifa del viaje.
@@ -210,6 +212,11 @@ function ComprobanteModal({ f, listo, onClose, onChanged }: { f: Factura; listo:
         </div>
 
         <div className="flex flex-wrap gap-2 border-t border-slate-200 px-6 py-4">
+          {editable ? (
+            <button disabled={!!busy} onClick={onEdit} title="Editar todos los datos (cliente, RUC, ubigeos de detracción, valor referencial, etc.)" className={`${btn} border border-slate-300 bg-white text-slate-700 hover:border-brand-300 hover:text-brand-600`}>
+              <Pencil size={15} /> Editar
+            </button>
+          ) : null}
           {!aceptado ? (
             <button disabled={!!busy || !listo} onClick={emitir} title={listo ? "" : "Configura y activa el emisor primero"} className={`${btn} flex-1 justify-center bg-brand-500 text-white hover:bg-brand-600`}>
               <Send size={15} /> {busy === "emitir" ? "Emitiendo…" : "Emitir a SUNAT"}

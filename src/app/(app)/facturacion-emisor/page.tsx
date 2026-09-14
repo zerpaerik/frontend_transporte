@@ -11,6 +11,7 @@ const VACIO: Form = {
   ruc: "", razonSocial: "", nombreComercial: "", ubigeo: "", direccionFiscal: "", codAnexo: "0000",
   serieFactura: "FN01", serieBoleta: "BN01", serieNotaCredito: "FN01", serieGuiaTransportista: "V001", registroMtc: "", puntoVenta: "",
   ctaDetraccion: "", porcDetraccion: 4, codDetraccion: "027", umbralDetraccion: 700,
+  formatoImpresion: "001",
   correoEnvio: "", activo: false,
 };
 
@@ -116,6 +117,7 @@ export default function EmisorPage() {
             <Campo label="Serie de nota de crédito"><input className={inputCls} value={f.serieNotaCredito} onChange={(e) => set("serieNotaCredito", e.target.value)} placeholder="FN01" /></Campo>
             <Campo label="Serie de GRE (transportista)" hint="Guía de remisión electrónica"><input className={inputCls} value={f.serieGuiaTransportista} onChange={(e) => set("serieGuiaTransportista", e.target.value)} placeholder="V001" /></Campo>
             <Campo label="Punto de venta" hint="COD_PTO_VENTA"><input className={inputCls} value={f.puntoVenta} onChange={(e) => set("puntoVenta", e.target.value)} /></Campo>
+            <Campo label="Formato de impresión (PDF)" hint="Código del formato en MiFact: 001 = básico. Pide a MiFact el código de tu formato personalizado."><input className={inputCls} value={f.formatoImpresion} onChange={(e) => set("formatoImpresion", e.target.value)} placeholder="001" /></Campo>
             <div className="sm:col-span-2"><Campo label="Correo de envío" hint="Copia opcional al emitir"><input className={inputCls} value={f.correoEnvio} onChange={(e) => set("correoEnvio", e.target.value)} placeholder="facturacion@empresa.com" /></Campo></div>
           </div>
         </Card>
