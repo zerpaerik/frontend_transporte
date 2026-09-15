@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, ReceiptText, Search, Send, FileDown, RefreshCw, Ban, Mail, X, ShieldCheck, TriangleAlert, Pencil } from "lucide-react";
+import { Plus, ReceiptText, Search, Send, FileDown, RefreshCw, Ban, Mail, X, ShieldCheck, TriangleAlert, Pencil, FileMinus } from "lucide-react";
 import { PageHeader, StatCard, Badge } from "@/components/ui";
 import { DataTable, type Column, type Filter } from "@/components/DataTable";
 import { useData } from "@/lib/store";
@@ -99,6 +99,9 @@ export default function FacturacionPage() {
                 placeholder="Código de viaje (OP-0001)" className="w-40 text-sm outline-none" />
               <button onClick={traer} className="rounded-md bg-steel-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-steel-700">Traer</button>
             </div>
+            <button onClick={() => router.push("/facturacion/nota-credito")} className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-600 hover:border-brand-300 hover:text-brand-600">
+              <FileMinus size={16} /> Nota de crédito
+            </button>
             <button onClick={irNuevo} className="flex items-center gap-2 rounded-lg bg-brand-500 px-3.5 py-2 text-sm font-semibold text-white hover:bg-brand-600">
               <Plus size={16} /> Nuevo comprobante
             </button>
