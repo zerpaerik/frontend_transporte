@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ScrollText, Search, RefreshCw, FileDown, Ban, X, ShieldCheck, TriangleAlert } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ScrollText, Search, RefreshCw, FileDown, Ban, Pencil, X, ShieldCheck, TriangleAlert } from "lucide-react";
 import { PageHeader, StatCard, Badge } from "@/components/ui";
 import { DataTable, type Column, type Filter } from "@/components/DataTable";
-import { GuiaModal } from "@/components/GuiaModal";
-import { apiGre, apiEmisor, apiViajePorCodigo, downloadBase64, type GuiaTransportista, type EmisorRespuesta } from "@/lib/api";
+import { apiGre, apiEmisor, downloadBase64, type GuiaTransportista, type EmisorRespuesta } from "@/lib/api";
 import { fecha } from "@/lib/format";
 
 type Tone = "gray" | "amber" | "green" | "blue" | "red";
@@ -25,11 +25,10 @@ const filters: Filter<GuiaTransportista>[] = [
 ];
 
 export default function GrePage() {
+  const router = useRouter();
   const [guias, setGuias] = useState<GuiaTransportista[]>([]);
   const [emisor, setEmisor] = useState<EmisorRespuesta | null>(null);
   const [codigo, setCodigo] = useState("");
-  const [msg, setMsg] = useState("");
-  const [viajeSel, setViajeSel] = useState<any | null>(null); // viaje para crear/emitir GRE
   const [sel, setSel] = useState<GuiaTransportista | null>(null); // guía para ver/gestionar
 
   function cargar() { apiGre.todas().then(setGuias).catch(() => setGuias([])); }
@@ -38,12 +37,9 @@ export default function GrePage() {
   const emitidas = guias.filter((g) => g.estadoDocumento === "102" || g.estadoDocumento === "103").length;
   const sinEmitir = guias.filter((g) => !g.estadoDocumento).length;
 
-  async function traer() {
+  function nueva() {
     const c = codigo.trim();
-    if (!c) return;
-    setMsg("");
-    try { const v = await apiViajePorCodigo(c); setViajeSel(v); setCodigo(""); }
-    catch { setMsg(`No se encontró un viaje con el código "${c}".`); }
+    router.push(c ? `/gre/nueva?codigo=${encodeURIComponent(c)}` : "/gre/nueva");
   }
 
   const columns: Column<GuiaTransportista>[] = [
@@ -89,16 +85,14 @@ export default function GrePage() {
         toolbar={
           <div className="flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-1.5 py-1">
             <Search size={14} className="text-slate-400" />
-            <input value={codigo} onChange={(e) => setCodigo(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") traer(); }}
+            <input value={codigo} onChange={(e) => setCodigo(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") nueva(); }}
               placeholder="Código de viaje (OP-0001)" className="w-44 text-sm outline-none" />
-            <button onClick={traer} className="rounded-md bg-brand-500 px-2.5 py-1 text-xs font-semibold text-white hover:bg-brand-600">Nueva GRE</button>
+            <button onClick={nueva} className="rounded-md bg-brand-500 px-2.5 py-1 text-xs font-semibold text-white hover:bg-brand-600">Nueva GRE</button>
           </div>
         }
       />
-      {msg ? <p className="mt-2 text-sm text-rose-600">{msg}</p> : null}
 
-      {viajeSel ? <GuiaModal viaje={viajeSel} onClose={() => { setViajeSel(null); cargar(); }} /> : null}
-      {sel ? <GreDetalleModal g={sel} onClose={() => setSel(null)} onChanged={cargar} /> : null}
+      {sel ? <GreDetalleModal g={sel} onClose={() => setSel(null)} onChanged={cargar} onEditar={() => router.push(`/gre/nueva?viajeId=${sel.viajeId}`)} /> : null}
     </div>
   );
 }
@@ -107,11 +101,12 @@ function Dato({ k, v }: { k: string; v: React.ReactNode }) {
   return <div className="flex justify-between gap-4 border-b border-slate-100 py-2 text-sm"><span className="text-slate-500">{k}</span><span className="break-words text-right font-medium text-slate-800">{v}</span></div>;
 }
 
-function GreDetalleModal({ g, onClose, onChanged }: { g: GuiaTransportista; onClose: () => void; onChanged: () => void }) {
+function GreDetalleModal({ g, onClose, onChanged, onEditar }: { g: GuiaTransportista; onClose: () => void; onChanged: () => void; onEditar: () => void }) {
   const [busy, setBusy] = useState("");
   const e = est(g);
   const emitido = !!g.estadoDocumento;
   const aceptado = g.estadoDocumento === "102" || g.estadoDocumento === "103";
+  const editable = !emitido || g.estadoDocumento === "104"; // sin emitir o rechazado
 
   async function correr(nombre: string, fn: () => Promise<unknown>, refrescar = true) {
     setBusy(nombre);
@@ -149,12 +144,17 @@ function GreDetalleModal({ g, onClose, onChanged }: { g: GuiaTransportista; onCl
           <Dato k="Traslado" v={g.fechaTraslado ? fecha(g.fechaTraslado) : "—"} />
           {g.hash ? <Dato k="Hash" v={<span className="tabular text-xs">{g.hash}</span>} /> : null}
           {g.sunatDescripcion ? <div className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">{g.sunatDescripcion}</div> : null}
-          {!emitido ? <div className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">Esta guía aún no se emite. Para emitirla, ábrela desde su viaje (botón "Nueva GRE" con el código del viaje) o desde Operaciones.</div> : null}
+          {editable ? <div className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">{emitido ? "Guía rechazada por SUNAT: corrige los datos y vuelve a emitir." : "Esta guía aún no se emite. Ábrela para completar los datos y emitirla."}</div> : null}
         </div>
 
         <div className="flex flex-wrap gap-2 border-t border-slate-200 px-6 py-4">
-          <button disabled={!!busy || !emitido} onClick={pdf} className={`${btn} flex-1 justify-center bg-brand-500 text-white hover:bg-brand-600`}><FileDown size={15} /> {busy === "pdf" ? "…" : "Descargar PDF"}</button>
+          {editable ? (
+            <button disabled={!!busy} onClick={onEditar} className={`${btn} flex-1 justify-center bg-brand-500 text-white hover:bg-brand-600`}><Pencil size={15} /> Editar / emitir</button>
+          ) : (
+            <button disabled={!!busy || !emitido} onClick={pdf} className={`${btn} flex-1 justify-center bg-brand-500 text-white hover:bg-brand-600`}><FileDown size={15} /> {busy === "pdf" ? "…" : "Descargar PDF"}</button>
+          )}
           {emitido ? <button disabled={!!busy} onClick={estado} className={`${btn} border border-slate-300 bg-white text-slate-600 hover:border-brand-300`}><RefreshCw size={15} /> Estado</button> : null}
+          {emitido && editable ? <button disabled={!!busy} onClick={pdf} className={`${btn} border border-slate-300 bg-white text-slate-600 hover:border-brand-300`}><FileDown size={15} /> PDF</button> : null}
           {aceptado ? <button disabled={!!busy} onClick={anular} className={`${btn} border border-slate-300 bg-white text-rose-600 hover:bg-rose-50`}><Ban size={15} /> Dar de baja</button> : null}
         </div>
       </div>

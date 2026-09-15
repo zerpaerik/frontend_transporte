@@ -331,17 +331,32 @@ export interface GuiaInput {
   fechaTraslado?: string;
   partidaDir?: string; partidaUbigeo?: string;
   llegadaDir?: string; llegadaUbigeo?: string;
+  remitenteRuc?: string; remitenteRazon?: string;
   destinatarioRuc?: string; destinatarioRazon?: string;
-  pesoBruto?: number;
+  conductorNombre?: string; conductorDni?: string; conductorLicencia?: string;
+  placaTracto?: string; tucTracto?: string; placaCarreta?: string; tucCarreta?: string;
+  pesoBruto?: number; unidad?: string;
   docRefTipo?: string; docRefNumero?: string;
   pagadorFlete?: "remitente" | "tercero" | "subcontratado";
   terceroRuc?: string; terceroRazon?: string;
   observaciones?: string;
   items?: { descripcion: string; cantidad?: number; peso?: number; unidad?: string }[];
 }
+// Datos precargados del viaje para el formulario de GRE.
+export interface GreDatos {
+  viajeId: string; codigo: string;
+  ambiente: "demo" | "prod"; esProd: boolean; greConfigurada: boolean;
+  serie: string; correlativo: string;
+  fechaTraslado: string; partidaDir: string; llegadaDir: string;
+  remitenteRuc: string; remitenteRazon: string;
+  conductorNombre: string; conductorDni: string; conductorLicencia: string;
+  placaTracto: string; tucTracto: string; placaCarreta: string; tucCarreta: string;
+  docRefNumero: string;
+}
 export const apiGre = {
   todas: () => api.get<GuiaTransportista[]>("/gre"),
   listar: (viajeId: string) => api.get<GuiaTransportista[]>(`/gre/viaje/${viajeId}`),
+  datos: (viajeId: string) => api.get<GreDatos>(`/gre/viaje/${viajeId}/datos`),
   preview: (viajeId: string, body: GuiaInput) => api.post<{ ambiente: string; greConfigurada: boolean; payload: Record<string, unknown> }>(`/gre/viaje/${viajeId}/preview`, body),
   emitir: (viajeId: string, body: GuiaInput) => api.post<{ guia: GuiaTransportista; respuesta: { estado_documento: string; errors: string; sunat_description: string } }>(`/gre/viaje/${viajeId}/emitir`, body),
   estado: (id: string) => api.post<GuiaTransportista>(`/gre/${id}/estado`, {}),
