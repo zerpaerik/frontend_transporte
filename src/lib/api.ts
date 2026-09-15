@@ -320,6 +320,12 @@ export interface GuiaTransportista {
   destinatarioRazon: string;
   pesoBruto: number;
   docRefNumero: string;
+  // Contexto del viaje (para la pantalla de gestión)
+  placaTracto?: string;
+  conductorNombre?: string;
+  partidaDir?: string;
+  llegadaDir?: string;
+  createdAt?: string;
 }
 export interface GuiaInput {
   fechaTraslado?: string;
@@ -334,6 +340,7 @@ export interface GuiaInput {
   items?: { descripcion: string; cantidad?: number; peso?: number; unidad?: string }[];
 }
 export const apiGre = {
+  todas: () => api.get<GuiaTransportista[]>("/gre"),
   listar: (viajeId: string) => api.get<GuiaTransportista[]>(`/gre/viaje/${viajeId}`),
   preview: (viajeId: string, body: GuiaInput) => api.post<{ ambiente: string; greConfigurada: boolean; payload: Record<string, unknown> }>(`/gre/viaje/${viajeId}/preview`, body),
   emitir: (viajeId: string, body: GuiaInput) => api.post<{ guia: GuiaTransportista; respuesta: { estado_documento: string; errors: string; sunat_description: string } }>(`/gre/viaje/${viajeId}/emitir`, body),

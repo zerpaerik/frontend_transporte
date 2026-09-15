@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Truck, IdCard, Wrench, Package, CircleDot,
-  Container, PackageCheck, ReceiptText, Wallet, UserCog, Coins, FolderCog, Fuel, FolderArchive, CalendarClock, Building2, type LucideIcon,
+  Container, PackageCheck, ReceiptText, Wallet, UserCog, Coins, FolderCog, Fuel, FolderArchive, CalendarClock, Building2, ScrollText, type LucideIcon,
 } from "lucide-react";
 import type { Rol } from "./types";
 
@@ -10,6 +10,7 @@ export interface NavItem {
   icon: LucideIcon;
   modulo: string;
   roles: Rol[]; // roles que pueden ver este módulo
+  grupo?: string; // agrupa el ítem bajo un submenú (p. ej. "SUNAT")
 }
 
 const TODOS: Rol[] = ["Administrador", "Operador", "Mecánico"];
@@ -26,8 +27,9 @@ export const NAV: NavItem[] = [
   { href: "/agenda", label: "Agenda", icon: CalendarClock, modulo: "14", roles: ["Administrador", "Operador"] },
   { href: "/operaciones", label: "Operaciones", icon: Container, modulo: "06", roles: ["Administrador", "Operador"] },
   { href: "/devoluciones", label: "Devoluciones", icon: PackageCheck, modulo: "07", roles: ["Administrador", "Operador"] },
-  { href: "/facturacion", label: "Facturación SUNAT", icon: ReceiptText, modulo: "09", roles: ["Administrador", "Operador"] },
-  { href: "/facturacion-emisor", label: "Datos del emisor", icon: Building2, modulo: "09", roles: ["Administrador"] },
+  { href: "/facturacion", label: "Facturación", icon: ReceiptText, modulo: "09", roles: ["Administrador", "Operador"], grupo: "SUNAT" },
+  { href: "/gre", label: "GRE Transportista", icon: ScrollText, modulo: "09", roles: ["Administrador", "Operador"], grupo: "SUNAT" },
+  { href: "/facturacion-emisor", label: "Datos del emisor", icon: Building2, modulo: "09", roles: ["Administrador"], grupo: "SUNAT" },
   { href: "/planilla", label: "Planilla", icon: Wallet, modulo: "10", roles: ["Administrador"] },
   { href: "/archivos", label: "Archivos", icon: FolderArchive, modulo: "13", roles: ["Administrador", "Contable"] },
   // Comisiones se maneja ahora dentro de la planilla. Se oculta del menú y se
@@ -39,6 +41,28 @@ export const NAV: NavItem[] = [
 
 export function navFor(rol: Rol): NavItem[] {
   return NAV.filter((n) => n.roles.includes(rol));
+}
+
+// Nodo de navegación: ítem suelto o grupo con submenú.
+export type NavNode =
+  | { kind: "item"; item: NavItem }
+  | { kind: "group"; nombre: string; icon: LucideIcon; items: NavItem[] };
+
+// Arma la navegación agrupando por `grupo` (el submenú aparece donde va su primer ítem).
+export function navGroupsFor(rol: Rol): NavNode[] {
+  const out: NavNode[] = [];
+  const idxByGrupo: Record<string, number> = {};
+  for (const item of navFor(rol)) {
+    if (!item.grupo) { out.push({ kind: "item", item }); continue; }
+    let idx = idxByGrupo[item.grupo];
+    if (idx === undefined) {
+      idx = out.length;
+      idxByGrupo[item.grupo] = idx;
+      out.push({ kind: "group", nombre: item.grupo, icon: item.icon, items: [] });
+    }
+    (out[idx] as { kind: "group"; items: NavItem[] }).items.push(item);
+  }
+  return out;
 }
 
 // Primera pantalla a la que puede entrar el rol (para redirigir tras login o acceso denegado).
