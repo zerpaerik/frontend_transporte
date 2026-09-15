@@ -173,6 +173,12 @@ export interface Factura {
   sunatDescripcion?: string;
   hash?: string;
   qr?: string;
+  // Referencia (notas de crédito / débito)
+  docRefTipo?: string;
+  docRefSerie?: string;
+  docRefCorrelativo?: string;
+  codTipNc?: string;
+  motivo?: string;
   items?: FacturaItem[];
 }
 
