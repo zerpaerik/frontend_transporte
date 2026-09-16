@@ -9,6 +9,7 @@ import { apiViajePorCodigo, apiTarifas, apiFacturasE, apiEmisor, apiCuentas, typ
 import { dinero, hoyPeru, fecha } from "@/lib/format";
 import type { Factura } from "@/lib/types";
 import { FacturaPreview, type PreviewData } from "@/components/FacturaPreview";
+import { UbigeoSelect } from "@/components/UbigeoSelect";
 
 // Traduce la forma de pago guardada (Contado/Credito + vencimiento) al selector y sus días.
 function plazoDesde(f: Partial<Factura>): { plazo: string; dias: number } {
@@ -345,8 +346,8 @@ export default function NuevoComprobantePage() {
             {vrDetalle ? <p className="sm:col-span-2 -mt-2 text-xs text-slate-500">{vrDetalle}</p> : null}
 
             <label className="sm:col-span-2"><span className={lbl}>Detalle del viaje</span><input className={inp} value={detalleViaje} onChange={(e) => setDetalleViaje(e.target.value)} placeholder="TRANSPORTE VENTANILLA → CALLAO" /></label>
-            <label><span className={lbl}>Ubigeo origen</span><input className={inp} value={ubigeoOrigen} onChange={(e) => setUbigeoOrigen(e.target.value)} placeholder="070101" /></label>
-            <label><span className={lbl}>Ubigeo destino</span><input className={inp} value={ubigeoDestino} onChange={(e) => setUbigeoDestino(e.target.value)} placeholder="150101" /></label>
+            <label><span className={lbl}>Ubigeo origen (partida)</span><UbigeoSelect value={ubigeoOrigen} onChange={setUbigeoOrigen} placeholder="Distrito de partida…" /></label>
+            <label><span className={lbl}>Ubigeo destino (llegada)</span><UbigeoSelect value={ubigeoDestino} onChange={setUbigeoDestino} placeholder="Distrito de llegada…" /></label>
           </div>
         </Card>
 

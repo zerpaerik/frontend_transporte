@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Building2, Save, ShieldCheck, TriangleAlert, CheckCircle2 } from "lucide-react";
 import { PageHeader, Card, Badge } from "@/components/ui";
 import { apiEmisor, type EmisorConfig, type EmisorRespuesta, type CorrelativoTipo } from "@/lib/api";
+import { UbigeoSelect } from "@/components/UbigeoSelect";
 
 type Form = Omit<EmisorConfig, "id" | "sedeId">;
 
@@ -101,7 +102,7 @@ export default function EmisorPage() {
             <div className="sm:col-span-2"><Campo label="Razón social"><input className={inputCls} value={f.razonSocial} onChange={(e) => set("razonSocial", e.target.value)} placeholder="MGR SERVICIOS INTEGRADOS S.A.C." /></Campo></div>
             <Campo label="Nombre comercial" hint="Opcional"><input className={inputCls} value={f.nombreComercial} onChange={(e) => set("nombreComercial", e.target.value)} /></Campo>
             <Campo label="RUC"><input className={inputCls} value={f.ruc} onChange={(e) => set("ruc", e.target.value)} placeholder="20616110340" /></Campo>
-            <Campo label="Ubigeo" hint="6 dígitos del distrito (ej. Lima 150101)"><input className={inputCls} value={f.ubigeo} onChange={(e) => set("ubigeo", e.target.value)} placeholder="150101" /></Campo>
+            <Campo label="Ubigeo" hint="Busca el distrito del domicilio fiscal (código INEI/SUNAT)"><UbigeoSelect value={f.ubigeo} onChange={(v) => set("ubigeo", v)} placeholder="Distrito del emisor…" /></Campo>
             <Campo label="Código de anexo" hint="Local anexo (0000 si es el principal)"><input className={inputCls} value={f.codAnexo} onChange={(e) => set("codAnexo", e.target.value)} placeholder="0000" /></Campo>
             <Campo label="Registro MTC" hint="N° de registro del transportista (para la GRE)"><input className={inputCls} value={f.registroMtc} onChange={(e) => set("registroMtc", e.target.value)} placeholder="15174917CNG" /></Campo>
             <div className="sm:col-span-2"><Campo label="Dirección fiscal"><input className={inputCls} value={f.direccionFiscal} onChange={(e) => set("direccionFiscal", e.target.value)} placeholder="Av. ... Lima" /></Campo></div>
