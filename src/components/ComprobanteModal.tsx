@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Send, FileDown, RefreshCw, Ban, Mail, X, Pencil } from "lucide-react";
+import { Plus, Send, FileDown, RefreshCw, Ban, Mail, X, Pencil, Eye } from "lucide-react";
 import { Badge } from "./ui";
-import { apiFacturasE, downloadBase64 } from "@/lib/api";
-import { soles, fecha } from "@/lib/format";
+import { apiFacturasE, downloadBase64, type EmisorConfig, type CuentaBancaria } from "@/lib/api";
+import { soles, dinero, fecha } from "@/lib/format";
 import type { Factura, FacturaItem } from "@/lib/types";
+import { FacturaPreview, type PreviewData } from "./FacturaPreview";
 
 type Tone = "gray" | "amber" | "green" | "blue" | "red";
 export const ESTADO_DOC: Record<string, { label: string; tone: Tone }> = {
@@ -25,11 +26,21 @@ function Dato({ k, v }: { k: string; v: React.ReactNode }) {
 
 const num = (v: string) => Number(String(v).replace(",", ".") || 0);
 
-export function ComprobanteModal({ f, listo, onClose, onChanged, onEdit }: { f: Factura; listo: boolean; onClose: () => void; onChanged: () => void; onEdit?: () => void }) {
+// Forma de pago legible (Contado, o Crédito N días con su vencimiento).
+function condPago(f: Factura): string {
+  if ((f.formaPago || "Contado") !== "Credito" || !f.fechaVencimiento) return "Contado";
+  const dias = Math.max(0, Math.round((new Date(f.fechaVencimiento).getTime() - new Date(String(f.fecha)).getTime()) / 86_400_000));
+  return `Crédito ${dias} días · vence ${fecha(f.fechaVencimiento)}`;
+}
+
+export function ComprobanteModal({ f, listo, emisor = null, cuentas = [], onClose, onChanged, onEdit }: { f: Factura; listo: boolean; emisor?: EmisorConfig | null; cuentas?: CuentaBancaria[]; onClose: () => void; onChanged: () => void; onEdit?: () => void }) {
   const [busy, setBusy] = useState("");
+  const [verPrevia, setVerPrevia] = useState(false);
   const est = estDoc(f);
   const emitido = !!f.estadoDocumento;
   const aceptado = f.estadoDocumento === "102" || f.estadoDocumento === "103";
+  const mon = f.moneda === "USD" ? "USD" : "PEN";
+  const tc = f.tipoCambio || 0;
   // Editable mientras no esté aceptado ni anulado (sin emitir o rechazado).
   const editable = !emitido || f.estadoDocumento === "104";
 
@@ -45,6 +56,25 @@ export function ComprobanteModal({ f, listo, onClose, onChanged, onEdit }: { f: 
   const gravadoL = Math.round(lineas.reduce((s, l) => s + (l.valorUnitario || 0) * (l.cantidad || 1), 0) * 100) / 100;
   const igvL = Math.round(gravadoL * 0.18 * 100) / 100;
   const totalL = Math.round((gravadoL + igvL) * 100) / 100;
+
+  // Total y neto a pagar (total − detracción). La detracción es en soles; si el comprobante
+  // es en dólares se descuenta su equivalente en la moneda del comprobante.
+  const totalMonto = emitido ? f.total || f.monto + f.igv : totalL;
+  const detr = f.montoDetraccion || 0;
+  const detrEnMoneda = mon === "USD" && tc > 0 ? Math.round((detr / tc) * 100) / 100 : detr;
+  const neto = Math.round((totalMonto - detrEnMoneda) * 100) / 100;
+
+  const previewData: PreviewData = {
+    tipo: f.tipo, serie: f.serie, correlativo: f.correlativo, fecha: String(f.fecha).slice(0, 10),
+    moneda: mon, tipoCambio: f.tipoCambio,
+    cliente: f.cliente, ruc: f.ruc, direccion: f.direccion,
+    lineas: (emitido ? f.items || [] : lineas).map((l) => ({ descripcion: l.descripcion, cantidad: l.cantidad || 1, valorUnitario: l.valorUnitario || 0 })),
+    formaPago: f.formaPago, fechaVencimiento: f.fechaVencimiento,
+    guia: f.guia, guiaTransportista: f.guiaTransportista, referencia: f.referenciaVR, detalleViaje: f.detalleViaje,
+    valorReferencial: f.valorReferencial, ubigeoOrigen: f.ubigeoOrigen, ubigeoDestino: f.ubigeoDestino,
+    docRef: f.docRefSerie ? `${f.docRefSerie}-${f.docRefCorrelativo}` : undefined,
+    montoDetraccion: f.montoDetraccion, sujetoDetraccion: f.sujetoDetraccion, ctaDetraccion: f.ctaDetraccion,
+  };
 
   async function correr(nombre: string, fn: () => Promise<unknown>, refrescar = true) {
     setBusy(nombre);
@@ -72,6 +102,7 @@ export function ComprobanteModal({ f, listo, onClose, onChanged, onEdit }: { f: 
 
   const btn = "inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium disabled:opacity-50";
   return (
+    <>
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 sm:p-6" onClick={onClose}>
       <div className="mt-8 w-full max-w-lg rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-4">
@@ -110,17 +141,29 @@ export function ComprobanteModal({ f, listo, onClose, onChanged, onEdit }: { f: 
             </div>
           ) : null}
 
-          <Dato k="Monto gravado" v={soles(emitido ? (f.gravado || f.monto) : gravadoL)} />
-          <Dato k="IGV (18%)" v={soles(emitido ? f.igv : igvL)} />
-          <Dato k="Total" v={<b>{soles(emitido ? (f.total || f.monto + f.igv) : totalL)}</b>} />
-          {f.sujetoDetraccion ? <Dato k="Detracción (4%)" v={<span className="text-rose-500">−{soles(f.montoDetraccion || 0)} · cta {f.ctaDetraccion || "—"}</span>} /> : null}
+          <Dato k="Monto gravado" v={dinero(emitido ? (f.gravado || f.monto) : gravadoL, mon)} />
+          <Dato k="IGV (18%)" v={dinero(emitido ? f.igv : igvL, mon)} />
+          <Dato k="Total" v={<b>{dinero(totalMonto, mon)}</b>} />
+          {f.sujetoDetraccion ? <Dato k="Detracción (4%)" v={<span className="text-rose-500">−{soles(detr)} · cta {f.ctaDetraccion || "—"}</span>} /> : null}
+          {f.sujetoDetraccion ? <Dato k="Neto a pagar" v={<b className="text-emerald-700">{dinero(neto, mon)}</b>} /> : null}
           {f.valorReferencial ? <Dato k="Valor referencial" v={soles(f.valorReferencial)} /> : null}
+
+          {/* Toda la información del comprobante */}
+          {f.moneda === "USD" ? <Dato k="Moneda" v={`Dólares (US$)${tc ? ` · T.C. ${tc.toFixed(3)}` : ""}`} /> : null}
+          <Dato k="Forma de pago" v={condPago(f)} />
+          {f.guia ? <Dato k="Guía remitente" v={f.guia} /> : null}
+          {f.guiaTransportista ? <Dato k="Guía transportista" v={f.guiaTransportista} /> : null}
+          {f.referenciaVR ? <Dato k="Orden / referencia" v={f.referenciaVR} /> : null}
+          {f.detalleViaje ? <Dato k="Detalle del viaje" v={f.detalleViaje} /> : null}
+          {f.ubigeoOrigen || f.ubigeoDestino ? <Dato k="Ubigeo origen → destino" v={`${f.ubigeoOrigen || "—"} → ${f.ubigeoDestino || "—"}`} /> : null}
+
           {f.hash ? <Dato k="Hash" v={<span className="tabular text-xs">{f.hash}</span>} /> : null}
           {f.qr ? <Dato k="Cadena QR" v={<span className="tabular break-all text-xs text-slate-500">{f.qr}</span>} /> : null}
           {f.sunatDescripcion ? <div className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">{f.sunatDescripcion}</div> : null}
         </div>
 
         <div className="flex flex-wrap gap-2 border-t border-slate-200 px-6 py-4">
+          <button disabled={!!busy} onClick={() => setVerPrevia(true)} className={`${btn} border border-slate-300 bg-white text-slate-600 hover:border-brand-300`}><Eye size={15} /> Previa</button>
           {editable && onEdit ? (
             <button disabled={!!busy} onClick={onEdit} title="Editar todos los datos (cliente, RUC, ubigeos de detracción, valor referencial, etc.)" className={`${btn} border border-slate-300 bg-white text-slate-700 hover:border-brand-300 hover:text-brand-600`}>
               <Pencil size={15} /> Editar
@@ -139,5 +182,7 @@ export function ComprobanteModal({ f, listo, onClose, onChanged, onEdit }: { f: 
         </div>
       </div>
     </div>
+    {verPrevia ? <FacturaPreview emisor={emisor} cuentas={cuentas.map((c) => ({ banco: c.banco, moneda: c.moneda, numero: c.numero, cci: c.cci }))} data={previewData} onClose={() => setVerPrevia(false)} /> : null}
+    </>
   );
 }

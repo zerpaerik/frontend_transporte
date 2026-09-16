@@ -8,6 +8,16 @@ export function soles(n: number): string {
   return "S/ " + n.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+// Símbolo de la moneda del comprobante (PEN o USD/dólares).
+export function simboloMoneda(moneda?: string): string {
+  return moneda === "USD" || moneda === "Dólares" || moneda === "$" ? "US$" : "S/";
+}
+
+// Monto con el símbolo de su moneda (S/ por defecto, US$ para dólares).
+export function dinero(n: number, moneda?: string): string {
+  return simboloMoneda(moneda) + " " + n.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 export function km(n: number): string {
   return n.toLocaleString("es-PE") + " km";
 }
