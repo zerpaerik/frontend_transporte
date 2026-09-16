@@ -135,7 +135,7 @@ export interface FacturaItem {
 export interface Factura {
   id: string;
   serie: string;
-  tipo: "Factura" | "Boleta" | "N. Crédito";
+  tipo: "Factura" | "Boleta" | "N. Crédito" | "N. Débito";
   cliente: string;
   ruc: string;
   direccion?: string;

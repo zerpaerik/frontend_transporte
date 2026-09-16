@@ -238,6 +238,7 @@ export interface EmisorConfig {
   serieFactura: string;
   serieBoleta: string;
   serieNotaCredito: string;
+  serieNotaDebito: string;
   serieGuiaTransportista: string;
   registroMtc: string;
   puntoVenta: string;

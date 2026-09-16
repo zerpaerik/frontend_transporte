@@ -103,7 +103,7 @@ export function FacturaPreview({
             </div>
             <div className="rounded-xl border-2 border-slate-300 px-4 py-3 text-center">
               <div className="text-[11px] font-semibold text-slate-500">RUC {emisor?.ruc || "—"}</div>
-              <div className="mt-0.5 text-sm font-extrabold uppercase text-brand-600">{data.tipo === "N. Crédito" ? "Nota de crédito" : data.tipo} electrónica</div>
+              <div className="mt-0.5 text-sm font-extrabold uppercase text-brand-600">{data.tipo === "N. Crédito" ? "Nota de crédito" : data.tipo === "N. Débito" ? "Nota de débito" : data.tipo} electrónica</div>
               <div className="mt-0.5 text-sm font-bold tabular text-slate-800">{doc || "Serie por asignar"}</div>
             </div>
           </div>

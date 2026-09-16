@@ -109,7 +109,7 @@ export function ComprobanteModal({ f, listo, emisor = null, cuentas = [], onClos
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-lg font-bold text-slate-900">{f.serie}{f.correlativo ? `-${f.correlativo}` : ""}</h2>
-              <Badge tone={f.tipo === "N. Crédito" ? "red" : "gray"}>{f.tipo}</Badge>
+              <Badge tone={f.tipo === "N. Crédito" ? "red" : f.tipo === "N. Débito" ? "amber" : "gray"}>{f.tipo}</Badge>
               <Badge tone={est.tone}>{est.label}</Badge>
             </div>
             <p className="mt-0.5 text-sm text-slate-500">{f.cliente} · {fecha(f.fecha)}</p>
