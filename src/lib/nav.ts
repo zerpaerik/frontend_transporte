@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Truck, IdCard, Wrench, Package, CircleDot,
-  Container, PackageCheck, ReceiptText, Wallet, UserCog, Coins, FolderCog, Fuel, FolderArchive, CalendarClock, Building2, ScrollText, FileMinus, type LucideIcon,
+  Container, PackageCheck, ReceiptText, Wallet, UserCog, Coins, FolderCog, Fuel, FolderArchive, CalendarClock, Building2, ScrollText, FileMinus, Landmark, type LucideIcon,
 } from "lucide-react";
 import type { Rol } from "./types";
 
@@ -31,6 +31,7 @@ export const NAV: NavItem[] = [
   { href: "/facturacion/nota-credito", label: "Notas de crédito", icon: FileMinus, modulo: "09", roles: ["Administrador", "Operador"], grupo: "SUNAT" },
   { href: "/gre", label: "GRE Transportista", icon: ScrollText, modulo: "09", roles: ["Administrador", "Operador"], grupo: "SUNAT" },
   { href: "/facturacion-emisor", label: "Datos del emisor", icon: Building2, modulo: "09", roles: ["Administrador"], grupo: "SUNAT" },
+  { href: "/cuentas-bancarias", label: "Cuentas bancarias", icon: Landmark, modulo: "09", roles: ["Administrador"], grupo: "SUNAT" },
   { href: "/planilla", label: "Planilla", icon: Wallet, modulo: "10", roles: ["Administrador"] },
   { href: "/archivos", label: "Archivos", icon: FolderArchive, modulo: "13", roles: ["Administrador", "Contable"] },
   // Comisiones se maneja ahora dentro de la planilla. Se oculta del menú y se

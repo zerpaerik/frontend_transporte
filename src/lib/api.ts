@@ -268,6 +268,24 @@ export const apiEmisor = {
   setCorrelativo: (tipoDoc: string, desde: number) => api.patch<EmisorRespuesta>("/emisor/correlativo", { tipoDoc, desde }),
 };
 
+// --- Cuentas bancarias de la sede (salen en los comprobantes para el pago del cliente) ---
+export interface CuentaBancaria {
+  id: string;
+  banco: string;
+  moneda: string; // Soles | Dólares
+  numero: string;
+  cci: string;
+  tipo: string; // Corriente | Ahorros
+  orden: number;
+  activo: boolean;
+}
+export const apiCuentas = {
+  list: () => api.get<CuentaBancaria[]>("/cuentas-bancarias"),
+  create: (b: Partial<Omit<CuentaBancaria, "id">>) => api.post<CuentaBancaria>("/cuentas-bancarias", b),
+  update: (id: string, b: Partial<Omit<CuentaBancaria, "id">>) => api.patch<CuentaBancaria>(`/cuentas-bancarias/${id}`, b),
+  remove: (id: string) => api.del<void>(`/cuentas-bancarias/${id}`),
+};
+
 // --- Valor referencial de la detracción (tablas del DS 022-2025-MTC) ---
 export interface TarifasMeta {
   vigencia: string;
