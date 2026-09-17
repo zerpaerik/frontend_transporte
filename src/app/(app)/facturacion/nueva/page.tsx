@@ -71,6 +71,7 @@ export default function NuevoComprobantePage() {
   const [lineas, setLineas] = useState<Linea[]>([{ descripcion: "SERVICIO DE TRANSPORTE", cantidad: 1, valorUnitario: 0 }]);
 
   const [codigo, setCodigo] = useState("");
+  const [viajes, setViajes] = useState<string[]>([]); // códigos de viaje incluidos en esta factura
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState(false);
@@ -88,30 +89,57 @@ export default function NuevoComprobantePage() {
   const agregar = () => setLineas((ls) => [...ls, { descripcion: "", cantidad: 1, valorUnitario: 0 }]);
   const quitar = (i: number) => setLineas((ls) => (ls.length > 1 ? ls.filter((_, j) => j !== i) : ls));
 
-  async function traer(cod: string) {
+  // Arma la línea de servicio con el detalle del viaje (como en la factura real).
+  function lineaDeViaje(v: any): Linea {
+    const ruta = [v.origen, v.destino].filter(Boolean).join(" → ");
+    const partes = [
+      v.fechaViaje ? `(${fecha(String(v.fechaViaje))})` : "",
+      v.greTransporte ? `G.R.: ${v.greTransporte}` : "",
+      v.placaTracto ? `PLACA: ${v.placaTracto}` : "",
+      v.contenedor ? `CONT.: ${v.contenedor}` : "",
+      ruta ? `ORIGEN: ${v.origen} → DESTINO: ${v.destino}` : "",
+    ].filter(Boolean).join(" | ");
+    return { descripcion: `SERVICIO DE TRANSPORTE${partes ? " " + partes : ""}`, cantidad: 1, valorUnitario: Number(v.tarifa || 0) };
+  }
+
+  // Trae un viaje de Operaciones. append=false carga (reemplaza) el primer viaje;
+  // append=true suma el viaje como una línea más (varios viajes en una sola factura).
+  async function traer(cod: string, append = false) {
     const c = cod.trim();
     if (!c) return;
     setMsg("");
     try {
       const v = await apiViajePorCodigo(c);
-      setCliente(String(v.clienteFactura || v.cliente || "")); // el cliente A FACTURAR de Operaciones
+      const cli = String(v.clienteFactura || v.cliente || "");
+      const linea = lineaDeViaje(v);
+      const ruta = [v.origen, v.destino].filter(Boolean).join(" → ");
+
+      if (append && cliente.trim()) {
+        // Agrega el viaje como una línea adicional; conserva el cliente ya cargado.
+        setLineas((ls) => [...ls.filter((l) => l.descripcion.trim() || l.valorUnitario), linea]);
+        if (v.nOrden) setReferenciaOrden((r) => {
+          const partes = r.split(/[,/]/).map((s) => s.trim()).filter(Boolean);
+          return partes.includes(String(v.nOrden)) ? r : (r ? `${r}, ${v.nOrden}` : String(v.nOrden));
+        });
+        if (v.greRemitente && !guia.trim()) setGuia(String(v.greRemitente));
+        if (v.greTransporte && !guiaTransportista.trim()) setGuiaTransportista(String(v.greTransporte));
+        setViajes((vs) => (vs.includes(c.toUpperCase()) ? vs : [...vs, c.toUpperCase()]));
+        if (cli && cliente.trim() && cli !== cliente.trim()) setMsg(`Ojo: el viaje ${c} es de otro cliente (${cli}). Se agregó igual.`);
+        setCodigo("");
+        return;
+      }
+
+      // Carga inicial (reemplaza): datos del cliente + primera línea.
+      setCliente(cli);
       setRuc(String(v.clienteRuc || ""));
       setDireccion(String(v.clienteDireccion || ""));
       setViaje(String(v.contenedor || "-"));
       setReferenciaOrden(String(v.nOrden || ""));
       setGuia(String(v.greRemitente || ""));
       setGuiaTransportista(String(v.greTransporte || ""));
-      const ruta = [v.origen, v.destino].filter(Boolean).join(" → ");
       setDetalleViaje(ruta ? `TRANSPORTE ${ruta}` : "");
-      // Línea de servicio con el detalle del viaje (como en la factura real).
-      const partes = [
-        v.fechaViaje ? `(${fecha(v.fechaViaje)})` : "",
-        v.greTransporte ? `G.R.: ${v.greTransporte}` : "",
-        v.placaTracto ? `PLACA: ${v.placaTracto}` : "",
-        v.contenedor ? `CONT.: ${v.contenedor}` : "",
-        ruta ? `ORIGEN: ${v.origen} → DESTINO: ${v.destino}` : "",
-      ].filter(Boolean).join(" | ");
-      setLineas([{ descripcion: `SERVICIO DE TRANSPORTE${partes ? " " + partes : ""}`, cantidad: 1, valorUnitario: Number(v.tarifa || 0) }]);
+      setLineas([linea]);
+      setViajes([c.toUpperCase()]);
       setCodigo("");
     } catch {
       setMsg(`No se encontró un viaje con el código "${c}".`);
@@ -231,12 +259,21 @@ export default function NuevoComprobantePage() {
       <p className="mt-1 text-sm text-slate-500">{editId ? "Corrige los datos del comprobante antes de emitirlo a SUNAT (por ejemplo, los ubigeos de la detracción)." : "Trae los datos desde el código del viaje (Operaciones): cliente, tarifa, ruta y detalle. El IGV (18%) y la detracción (4%) se calculan al emitir."}</p>
 
       {/* Traer desde Operaciones */}
-      <div className="mt-5 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/60 px-4 py-3">
-        <Search size={16} className="text-slate-400" />
-        <input value={codigo} onChange={(e) => setCodigo(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") traer(codigo); }}
-          placeholder="Código de viaje (OP-0001)" className="w-52 rounded-lg border border-slate-300 px-3 py-1.5 text-sm outline-none focus:border-brand-500" />
-        <button onClick={() => traer(codigo)} className="rounded-lg bg-steel-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-steel-700">Traer del viaje</button>
-        {msg ? <span className="text-sm text-rose-600">{msg}</span> : null}
+      <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50/60 px-4 py-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <Search size={16} className="text-slate-400" />
+          <input value={codigo} onChange={(e) => setCodigo(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") traer(codigo, !!cliente.trim()); }}
+            placeholder="Código de viaje (OP-0001)" className="w-52 rounded-lg border border-slate-300 px-3 py-1.5 text-sm outline-none focus:border-brand-500" />
+          <button onClick={() => traer(codigo, false)} className="rounded-lg bg-steel-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-steel-700">Traer del viaje</button>
+          <button onClick={() => traer(codigo, true)} disabled={!cliente.trim()} title={cliente.trim() ? "Suma este viaje como otra línea" : "Primero trae un viaje"} className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-600 hover:border-brand-300 hover:text-brand-600 disabled:opacity-50"><Plus size={14} /> Agregar viaje</button>
+          {msg ? <span className="text-sm text-rose-600">{msg}</span> : null}
+        </div>
+        {viajes.length ? (
+          <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
+            <span>Viajes en esta factura:</span>
+            {viajes.map((v) => <span key={v} className="rounded-md border border-slate-200 bg-white px-2 py-0.5 font-semibold tabular text-slate-600">{v}</span>)}
+          </div>
+        ) : null}
       </div>
 
       {/* Datos del comprobante */}
