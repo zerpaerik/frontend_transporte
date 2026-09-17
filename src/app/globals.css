@@ -41,3 +41,15 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .cita-blink, .cita-ring { animation: none; }
 }
+
+/* Impresión de la factura: solo se imprime el documento (#doc-imprimible). */
+@media print {
+  body * { visibility: hidden !important; }
+  #doc-imprimible, #doc-imprimible * { visibility: visible !important; }
+  #doc-imprimible {
+    position: absolute; left: 0; top: 0; width: 100%;
+    padding: 16px 24px; box-shadow: none;
+  }
+  .no-print { display: none !important; }
+  @page { margin: 12mm; }
+}

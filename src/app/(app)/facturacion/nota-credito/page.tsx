@@ -6,7 +6,7 @@ import { Plus, FileMinus } from "lucide-react";
 import { PageHeader, StatCard, Badge } from "@/components/ui";
 import { DataTable, type Column, type Filter } from "@/components/DataTable";
 import { useData } from "@/lib/store";
-import { apiEmisor, type EmisorRespuesta } from "@/lib/api";
+import { apiEmisor, apiCuentas, type EmisorRespuesta, type CuentaBancaria } from "@/lib/api";
 import { soles, fecha } from "@/lib/format";
 import type { Factura } from "@/lib/types";
 import { ComprobanteModal, estDoc } from "@/components/ComprobanteModal";
@@ -20,10 +20,14 @@ export default function NotasCreditoPage() {
   const router = useRouter();
   const { facturas, reload } = useData();
   const [emisor, setEmisor] = useState<EmisorRespuesta | null>(null);
+  const [cuentas, setCuentas] = useState<CuentaBancaria[]>([]);
   const [selId, setSelId] = useState<string | null>(null);
   const sel = facturas.find((f) => f.id === selId) || null;
 
-  useEffect(() => { apiEmisor.get().then(setEmisor).catch(() => setEmisor(null)); }, []);
+  useEffect(() => {
+    apiEmisor.get().then(setEmisor).catch(() => setEmisor(null));
+    apiCuentas.list().then((cs) => setCuentas(cs.filter((c) => c.activo))).catch(() => {});
+  }, []);
 
   const notas = facturas.filter((f) => f.tipo === "N. Crédito");
   const aceptadas = notas.filter((f) => f.estadoDocumento === "102" || f.estadoDocumento === "103").length;
@@ -65,7 +69,7 @@ export default function NotasCreditoPage() {
         }
       />
 
-      {sel ? <ComprobanteModal f={sel} listo={!!emisor?.integracionConfigurada && !!emisor?.config.activo} onClose={() => setSelId(null)} onChanged={reload} /> : null}
+      {sel ? <ComprobanteModal f={sel} listo={!!emisor?.integracionConfigurada && !!emisor?.config.activo} emisor={emisor?.config ?? null} cuentas={cuentas} onClose={() => setSelId(null)} onChanged={reload} /> : null}
     </div>
   );
 }

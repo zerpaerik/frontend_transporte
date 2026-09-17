@@ -1,6 +1,6 @@
 "use client";
 
-import { X } from "lucide-react";
+import { X, Printer } from "lucide-react";
 import { dinero, simboloMoneda, soles, fecha } from "@/lib/format";
 import type { EmisorConfig } from "@/lib/api";
 
@@ -85,16 +85,19 @@ export function FacturaPreview({
     <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-slate-900/60 p-4 sm:p-6" onClick={onClose}>
       <div className="my-6 w-full max-w-3xl rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
         {/* Barra */}
-        <div className="flex items-center justify-between gap-4 border-b border-slate-200 px-5 py-3">
+        <div className="no-print flex items-center justify-between gap-4 border-b border-slate-200 px-5 py-3">
           <div className="flex items-center gap-2 text-sm font-semibold text-slate-500">
             <span className="rounded-md bg-amber-100 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-amber-700">Vista previa</span>
             Así se verá el comprobante
           </div>
-          <button onClick={onClose} className="rounded-md p-1 text-slate-400 hover:bg-slate-100"><X size={20} /></button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => window.print()} className="inline-flex items-center gap-1.5 rounded-lg bg-brand-500 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-600"><Printer size={15} /> Imprimir / PDF</button>
+            <button onClick={onClose} className="rounded-md p-1 text-slate-400 hover:bg-slate-100"><X size={20} /></button>
+          </div>
         </div>
 
         {/* Documento */}
-        <div className="px-5 py-5 sm:px-8 sm:py-7">
+        <div id="doc-imprimible" className="px-5 py-5 sm:px-8 sm:py-7">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_auto]">
             <div>
               <div className="text-base font-extrabold uppercase tracking-tight text-slate-900">{emisor?.razonSocial || "Emisor no configurado"}</div>
@@ -129,22 +132,25 @@ export function FacturaPreview({
                 <tr className="border-y border-slate-200 bg-slate-50 text-xs">
                   <th className={`${th} w-10`}>Cant.</th>
                   <th className={th}>Descripción</th>
-                  <th className={`${th} text-right`}>V. unitario</th>
+                  <th className={`${th} text-right`}>P. unitario</th>
                   <th className={`${th} text-right`}>IGV 18%</th>
-                  <th className={`${th} text-right`}>Importe</th>
+                  <th className={`${th} text-right`}>Total</th>
                 </tr>
               </thead>
               <tbody>
                 {data.lineas.filter((l) => l.descripcion.trim() || l.valorUnitario).map((l, i) => {
                   const cant = l.cantidad || 1;
                   const base = r2((l.valorUnitario || 0) * cant);
+                  const igvItem = r2(base * 0.18);
+                  const totalItem = r2(base + igvItem); // total con IGV por ítem (p. ej. 100 + 18 = 118)
+                  const money = (n: number) => n.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                   return (
                     <tr key={i} className="border-b border-slate-100 align-top">
                       <td className={`${td} tabular`}>{cant}</td>
                       <td className={`${td} whitespace-pre-wrap break-words text-slate-700`}>{l.descripcion || "—"}</td>
-                      <td className={`${td} whitespace-nowrap text-right tabular`}>{sim} {(l.valorUnitario || 0).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                      <td className={`${td} whitespace-nowrap text-right tabular text-slate-500`}>{sim} {r2(base * 0.18).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                      <td className={`${td} whitespace-nowrap text-right tabular font-medium`}>{sim} {base.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td className={`${td} whitespace-nowrap text-right tabular`}>{sim} {money(l.valorUnitario || 0)}</td>
+                      <td className={`${td} whitespace-nowrap text-right tabular text-slate-500`}>{sim} {money(igvItem)}</td>
+                      <td className={`${td} whitespace-nowrap text-right tabular font-semibold`}>{sim} {money(totalItem)}</td>
                     </tr>
                   );
                 })}
