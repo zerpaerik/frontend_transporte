@@ -2,18 +2,22 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Search, Plus, X, Save } from "lucide-react";
+import { ArrowLeft, Search, Plus, X, Save, Eye } from "lucide-react";
 import { Card } from "@/components/ui";
 import { useData } from "@/lib/store";
-import { apiViajePorCodigo, apiTarifas, apiFacturasE, type TarifasMeta } from "@/lib/api";
-import { soles, hoyPeru, fecha } from "@/lib/format";
+import { apiViajePorCodigo, apiTarifas, apiFacturasE, apiEmisor, apiCuentas, type TarifasMeta, type EmisorConfig, type CuentaBancaria } from "@/lib/api";
+import { dinero, hoyPeru, fecha } from "@/lib/format";
 import type { Factura } from "@/lib/types";
+import { FacturaPreview, type PreviewData } from "@/components/FacturaPreview";
+import { UbigeoSelect } from "@/components/UbigeoSelect";
 
-// Traduce la forma de pago guardada (Contado/Credito + vencimiento) a la etiqueta del selector.
-function plazoDesde(f: Partial<Factura>): string {
-  if ((f.formaPago || "Contado") !== "Credito" || !f.fechaVencimiento) return "Contado";
-  const dias = Math.round((new Date(f.fechaVencimiento).getTime() - new Date(String(f.fecha)).getTime()) / 86_400_000);
-  return dias <= 15 ? "Crédito 15 días" : "Crédito 30 días";
+// Traduce la forma de pago guardada (Contado/Credito + vencimiento) al selector y sus días.
+function plazoDesde(f: Partial<Factura>): { plazo: string; dias: number } {
+  if ((f.formaPago || "Contado") !== "Credito" || !f.fechaVencimiento) return { plazo: "Contado", dias: 0 };
+  const dias = Math.max(0, Math.round((new Date(f.fechaVencimiento).getTime() - new Date(String(f.fecha)).getTime()) / 86_400_000));
+  if (dias === 15) return { plazo: "Crédito 15 días", dias };
+  if (dias === 30) return { plazo: "Crédito 30 días", dias };
+  return { plazo: "Crédito (días)", dias };
 }
 
 type Linea = { descripcion: string; cantidad: number; valorUnitario: number };
@@ -59,45 +63,83 @@ export default function NuevoComprobantePage() {
   const [vrTipoCarga, setVrTipoCarga] = useState("");
   const [pesoTM, setPesoTM] = useState("");
   const [vrDetalle, setVrDetalle] = useState("");
-  const [plazo, setPlazo] = useState("Contado"); // Contado | Crédito 15 días | Crédito 30 días
+  const [plazo, setPlazo] = useState("Contado"); // Contado | Crédito 15 días | Crédito 30 días | Crédito (días)
+  const [diasManual, setDiasManual] = useState("15"); // días de crédito cuando se ponen a mano
+  const [moneda, setMoneda] = useState("PEN"); // PEN | USD
+  const [tipoCambio, setTipoCambio] = useState(""); // solo cuando la moneda es dólares
+  const [guiaTransportista, setGuiaTransportista] = useState("");
   const [lineas, setLineas] = useState<Linea[]>([{ descripcion: "SERVICIO DE TRANSPORTE", cantidad: 1, valorUnitario: 0 }]);
 
   const [codigo, setCodigo] = useState("");
+  const [viajes, setViajes] = useState<string[]>([]); // códigos de viaje incluidos en esta factura
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
+  const [preview, setPreview] = useState(false);
+  const [emisor, setEmisor] = useState<EmisorConfig | null>(null);
+  const [cuentas, setCuentas] = useState<CuentaBancaria[]>([]);
 
   const gravado = Math.round(lineas.reduce((s, l) => s + (l.valorUnitario || 0) * (l.cantidad || 1), 0) * 100) / 100;
   const igv = Math.round(gravado * 0.18 * 100) / 100;
   const total = Math.round((gravado + igv) * 100) / 100;
-  const vencimiento = PLAZOS[plazo] ? masDias(fechaEmision, PLAZOS[plazo]) : "";
+  const esCredito = plazo !== "Contado";
+  const diasCredito = plazo === "Crédito (días)" ? Math.max(0, Math.round(Number(diasManual) || 0)) : PLAZOS[plazo] || 0;
+  const vencimiento = esCredito && diasCredito > 0 ? masDias(fechaEmision, diasCredito) : "";
 
   const setLinea = (i: number, patch: Partial<Linea>) => setLineas((ls) => ls.map((l, j) => (j === i ? { ...l, ...patch } : l)));
   const agregar = () => setLineas((ls) => [...ls, { descripcion: "", cantidad: 1, valorUnitario: 0 }]);
   const quitar = (i: number) => setLineas((ls) => (ls.length > 1 ? ls.filter((_, j) => j !== i) : ls));
 
-  async function traer(cod: string) {
+  // Arma la línea de servicio con el detalle del viaje (como en la factura real).
+  function lineaDeViaje(v: any): Linea {
+    const ruta = [v.origen, v.destino].filter(Boolean).join(" → ");
+    const partes = [
+      v.fechaViaje ? `(${fecha(String(v.fechaViaje))})` : "",
+      v.greTransporte ? `G.R.: ${v.greTransporte}` : "",
+      v.placaTracto ? `PLACA: ${v.placaTracto}` : "",
+      v.contenedor ? `CONT.: ${v.contenedor}` : "",
+      ruta ? `ORIGEN: ${v.origen} → DESTINO: ${v.destino}` : "",
+    ].filter(Boolean).join(" | ");
+    return { descripcion: `SERVICIO DE TRANSPORTE${partes ? " " + partes : ""}`, cantidad: 1, valorUnitario: Number(v.tarifa || 0) };
+  }
+
+  // Trae un viaje de Operaciones. append=false carga (reemplaza) el primer viaje;
+  // append=true suma el viaje como una línea más (varios viajes en una sola factura).
+  async function traer(cod: string, append = false) {
     const c = cod.trim();
     if (!c) return;
     setMsg("");
     try {
       const v = await apiViajePorCodigo(c);
-      setCliente(String(v.clienteFactura || v.cliente || "")); // el cliente A FACTURAR de Operaciones
+      const cli = String(v.clienteFactura || v.cliente || "");
+      const linea = lineaDeViaje(v);
+      const ruta = [v.origen, v.destino].filter(Boolean).join(" → ");
+
+      if (append && cliente.trim()) {
+        // Agrega el viaje como una línea adicional; conserva el cliente ya cargado.
+        setLineas((ls) => [...ls.filter((l) => l.descripcion.trim() || l.valorUnitario), linea]);
+        if (v.nOrden) setReferenciaOrden((r) => {
+          const partes = r.split(/[,/]/).map((s) => s.trim()).filter(Boolean);
+          return partes.includes(String(v.nOrden)) ? r : (r ? `${r}, ${v.nOrden}` : String(v.nOrden));
+        });
+        if (v.greRemitente && !guia.trim()) setGuia(String(v.greRemitente));
+        if (v.greTransporte && !guiaTransportista.trim()) setGuiaTransportista(String(v.greTransporte));
+        setViajes((vs) => (vs.includes(c.toUpperCase()) ? vs : [...vs, c.toUpperCase()]));
+        if (cli && cliente.trim() && cli !== cliente.trim()) setMsg(`Ojo: el viaje ${c} es de otro cliente (${cli}). Se agregó igual.`);
+        setCodigo("");
+        return;
+      }
+
+      // Carga inicial (reemplaza): datos del cliente + primera línea.
+      setCliente(cli);
       setRuc(String(v.clienteRuc || ""));
       setDireccion(String(v.clienteDireccion || ""));
       setViaje(String(v.contenedor || "-"));
       setReferenciaOrden(String(v.nOrden || ""));
-      setGuia(String(v.greRemitente || v.greTransporte || ""));
-      const ruta = [v.origen, v.destino].filter(Boolean).join(" → ");
+      setGuia(String(v.greRemitente || ""));
+      setGuiaTransportista(String(v.greTransporte || ""));
       setDetalleViaje(ruta ? `TRANSPORTE ${ruta}` : "");
-      // Línea de servicio con el detalle del viaje (como en la factura real).
-      const partes = [
-        v.fechaViaje ? `(${fecha(v.fechaViaje)})` : "",
-        v.greTransporte ? `G.R.: ${v.greTransporte}` : "",
-        v.placaTracto ? `PLACA: ${v.placaTracto}` : "",
-        v.contenedor ? `CONT.: ${v.contenedor}` : "",
-        ruta ? `ORIGEN: ${v.origen} → DESTINO: ${v.destino}` : "",
-      ].filter(Boolean).join(" | ");
-      setLineas([{ descripcion: `SERVICIO DE TRANSPORTE${partes ? " " + partes : ""}`, cantidad: 1, valorUnitario: Number(v.tarifa || 0) }]);
+      setLineas([linea]);
+      setViajes([c.toUpperCase()]);
       setCodigo("");
     } catch {
       setMsg(`No se encontró un viaje con el código "${c}".`);
@@ -131,7 +173,12 @@ export default function NuevoComprobantePage() {
     setUbigeoOrigen(f.ubigeoOrigen || "");
     setUbigeoDestino(f.ubigeoDestino || "");
     setDetalleViaje(f.detalleViaje || "");
-    setPlazo(plazoDesde(f));
+    setGuiaTransportista(f.guiaTransportista || "");
+    setMoneda(f.moneda === "USD" ? "USD" : "PEN");
+    setTipoCambio(f.tipoCambio ? String(f.tipoCambio) : "");
+    const pl = plazoDesde(f);
+    setPlazo(pl.plazo);
+    if (pl.plazo === "Crédito (días)") setDiasManual(String(pl.dias));
     setVrAmbito(f.vrAmbito || "");
     setVrRuta(f.vrRuta || "");
     setVrDestino(f.vrDestino || "");
@@ -145,6 +192,12 @@ export default function NuevoComprobantePage() {
 
   // Catálogo de tarifas referenciales (rutas/puertos) del DS 022-2025-MTC.
   useEffect(() => { apiTarifas.meta().then(setMeta).catch(() => {}); }, []);
+
+  // Emisor y cuentas de la sede para armar la vista previa del comprobante.
+  useEffect(() => {
+    apiEmisor.get().then((r) => setEmisor(r.config)).catch(() => {});
+    apiCuentas.list().then((cs) => setCuentas(cs.filter((c) => c.activo))).catch(() => {});
+  }, []);
 
   const tipoCargaPorViaje = meta?.tiposCarga.find((t) => t.key === vrTipoCarga)?.porViaje ?? false;
 
@@ -172,17 +225,17 @@ export default function NuevoComprobantePage() {
     setBusy(true);
     try {
       const items = lineas.filter((l) => l.descripcion.trim() || l.valorUnitario).map((l) => ({ descripcion: l.descripcion, cantidad: l.cantidad || 1, valorUnitario: l.valorUnitario || 0 }));
-      const esCredito = !!PLAZOS[plazo];
       const body: Omit<Factura, "id"> = {
         serie: "", tipo, cliente: cliente.trim(), ruc: ruc.trim() || "-", direccion: direccion.trim(),
         fecha: fechaEmision, viaje: viaje || "-", monto: gravado, igv, estadoSunat: "Emitida",
         items,
+        moneda, tipoCambio: moneda === "USD" && tipoCambio ? Number(tipoCambio) : 0,
         valorReferencial: valorReferencial ? Number(valorReferencial) : 0,
         vrAmbito, vrRuta, vrDestino, vrPuerto, vrZona, vrTipoCarga, pesoTM: pesoTM ? Number(pesoTM) : 0,
-        referenciaVR: referenciaOrden.trim(), guia: guia.trim(),
+        referenciaVR: referenciaOrden.trim(), guia: guia.trim(), guiaTransportista: guiaTransportista.trim(),
         ubigeoOrigen: ubigeoOrigen.trim(), ubigeoDestino: ubigeoDestino.trim(), detalleViaje: detalleViaje.trim(),
         formaPago: esCredito ? "Credito" : "Contado",
-        fechaVencimiento: esCredito ? vencimiento : null,
+        fechaVencimiento: esCredito && vencimiento ? vencimiento : null,
       };
       if (editId) {
         await apiFacturasE.actualizar(editId, body as Record<string, unknown>);
@@ -206,12 +259,21 @@ export default function NuevoComprobantePage() {
       <p className="mt-1 text-sm text-slate-500">{editId ? "Corrige los datos del comprobante antes de emitirlo a SUNAT (por ejemplo, los ubigeos de la detracción)." : "Trae los datos desde el código del viaje (Operaciones): cliente, tarifa, ruta y detalle. El IGV (18%) y la detracción (4%) se calculan al emitir."}</p>
 
       {/* Traer desde Operaciones */}
-      <div className="mt-5 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/60 px-4 py-3">
-        <Search size={16} className="text-slate-400" />
-        <input value={codigo} onChange={(e) => setCodigo(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") traer(codigo); }}
-          placeholder="Código de viaje (OP-0001)" className="w-52 rounded-lg border border-slate-300 px-3 py-1.5 text-sm outline-none focus:border-brand-500" />
-        <button onClick={() => traer(codigo)} className="rounded-lg bg-steel-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-steel-700">Traer del viaje</button>
-        {msg ? <span className="text-sm text-rose-600">{msg}</span> : null}
+      <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50/60 px-4 py-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <Search size={16} className="text-slate-400" />
+          <input value={codigo} onChange={(e) => setCodigo(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") traer(codigo, !!cliente.trim()); }}
+            placeholder="Código de viaje (OP-0001)" className="w-52 rounded-lg border border-slate-300 px-3 py-1.5 text-sm outline-none focus:border-brand-500" />
+          <button onClick={() => traer(codigo, false)} className="rounded-lg bg-steel-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-steel-700">Traer del viaje</button>
+          <button onClick={() => traer(codigo, true)} disabled={!cliente.trim()} title={cliente.trim() ? "Suma este viaje como otra línea" : "Primero trae un viaje"} className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-600 hover:border-brand-300 hover:text-brand-600 disabled:opacity-50"><Plus size={14} /> Agregar viaje</button>
+          {msg ? <span className="text-sm text-rose-600">{msg}</span> : null}
+        </div>
+        {viajes.length ? (
+          <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
+            <span>Viajes en esta factura:</span>
+            {viajes.map((v) => <span key={v} className="rounded-md border border-slate-200 bg-white px-2 py-0.5 font-semibold tabular text-slate-600">{v}</span>)}
+          </div>
+        ) : null}
       </div>
 
       {/* Datos del comprobante */}
@@ -226,8 +288,18 @@ export default function NuevoComprobantePage() {
           <label><span className={lbl}>Fecha de emisión</span><input type="date" className={inp} value={fechaEmision} onChange={(e) => setFechaEmision(e.target.value)} /></label>
           <label className="sm:col-span-2"><span className={lbl}>Cliente (razón social)</span><input className={inp} value={cliente} onChange={(e) => setCliente(e.target.value)} placeholder="Cliente a facturar (viene de Operaciones)" /></label>
           <label><span className={lbl}>RUC / DNI</span><input className={inp} value={ruc} onChange={(e) => setRuc(e.target.value)} placeholder="20601847834" /></label>
+          <label><span className={lbl}>Moneda</span>
+            <select className={inp} value={moneda} onChange={(e) => setMoneda(e.target.value)}>
+              <option value="PEN">Soles (S/)</option>
+              <option value="USD">Dólares (US$)</option>
+            </select>
+          </label>
+          {moneda === "USD" ? (
+            <label><span className={lbl}>Tipo de cambio (S/ por US$)</span><input type="number" step="any" min="0" className={inp} value={tipoCambio} onChange={(e) => setTipoCambio(e.target.value)} placeholder="3.750" /></label>
+          ) : null}
           <label><span className={lbl}>Referencia / N° de orden</span><input className={inp} value={referenciaOrden} onChange={(e) => setReferenciaOrden(e.target.value)} placeholder="ORDEN 2440" /></label>
-          <label><span className={lbl}>Guía de remisión</span><input className={inp} value={guia} onChange={(e) => setGuia(e.target.value)} placeholder="T002-1668" /></label>
+          <label><span className={lbl}>Guía remitente</span><input className={inp} value={guia} onChange={(e) => setGuia(e.target.value)} placeholder="T002-1668" /></label>
+          <label><span className={lbl}>Guía transportista</span><input className={inp} value={guiaTransportista} onChange={(e) => setGuiaTransportista(e.target.value)} placeholder="V001-00000123" /></label>
           <label className="sm:col-span-2"><span className={lbl}>Dirección del cliente</span><input className={inp} value={direccion} onChange={(e) => setDireccion(e.target.value)} /></label>
         </div>
       </Card>
@@ -239,7 +311,7 @@ export default function NuevoComprobantePage() {
         <div className="space-y-2">
           {lineas.map((l, i) => (
             <div key={i} className="flex items-start gap-2">
-              <input value={l.descripcion} onChange={(e) => setLinea(i, { descripcion: e.target.value })} placeholder="Descripción" className="min-w-0 flex-1 rounded-md border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-brand-500" />
+              <textarea value={l.descripcion} onChange={(e) => setLinea(i, { descripcion: e.target.value })} placeholder="Descripción (se ve completa, en varias líneas)" rows={2} className="min-w-0 flex-1 resize-y rounded-md border border-slate-200 px-2 py-1.5 text-sm leading-snug outline-none focus:border-brand-500" />
               <input type="number" step="any" min="0" value={l.cantidad} onChange={(e) => setLinea(i, { cantidad: num(e.target.value) })} title="Cantidad" className="w-16 rounded-md border border-slate-200 px-2 py-1.5 text-right text-sm tabular outline-none focus:border-brand-500" />
               <input type="number" step="any" min="0" value={l.valorUnitario || ""} onChange={(e) => setLinea(i, { valorUnitario: num(e.target.value) })} placeholder="0.00" title="Valor unitario (sin IGV)" className="w-28 rounded-md border border-slate-200 px-2 py-1.5 text-right text-sm tabular outline-none focus:border-brand-500" />
               <button onClick={() => quitar(i)} title="Quitar" className="mt-1 rounded p-1 text-slate-400 hover:text-rose-600"><X size={16} /></button>
@@ -311,8 +383,8 @@ export default function NuevoComprobantePage() {
             {vrDetalle ? <p className="sm:col-span-2 -mt-2 text-xs text-slate-500">{vrDetalle}</p> : null}
 
             <label className="sm:col-span-2"><span className={lbl}>Detalle del viaje</span><input className={inp} value={detalleViaje} onChange={(e) => setDetalleViaje(e.target.value)} placeholder="TRANSPORTE VENTANILLA → CALLAO" /></label>
-            <label><span className={lbl}>Ubigeo origen</span><input className={inp} value={ubigeoOrigen} onChange={(e) => setUbigeoOrigen(e.target.value)} placeholder="070101" /></label>
-            <label><span className={lbl}>Ubigeo destino</span><input className={inp} value={ubigeoDestino} onChange={(e) => setUbigeoDestino(e.target.value)} placeholder="150101" /></label>
+            <label><span className={lbl}>Ubigeo origen (partida)</span><UbigeoSelect value={ubigeoOrigen} onChange={setUbigeoOrigen} placeholder="Distrito de partida…" /></label>
+            <label><span className={lbl}>Ubigeo destino (llegada)</span><UbigeoSelect value={ubigeoDestino} onChange={setUbigeoDestino} placeholder="Distrito de llegada…" /></label>
           </div>
         </Card>
 
@@ -321,24 +393,48 @@ export default function NuevoComprobantePage() {
           <h2 className="mb-4 text-sm font-bold uppercase tracking-wide text-slate-500">Pago y totales</h2>
           <label className="block"><span className={lbl}>Forma de pago</span>
             <select className={inp} value={plazo} onChange={(e) => setPlazo(e.target.value)}>
-              <option>Contado</option><option>Crédito 15 días</option><option>Crédito 30 días</option>
+              <option>Contado</option><option>Crédito 15 días</option><option>Crédito 30 días</option><option>Crédito (días)</option>
             </select>
           </label>
-          {vencimiento ? <p className="mt-2 text-sm text-slate-500">Vence el <b className="text-slate-800">{fecha(vencimiento)}</b> (calculado automáticamente).</p> : null}
+          {plazo === "Crédito (días)" ? (
+            <label className="mt-3 block"><span className={lbl}>Días de crédito</span>
+              <input type="number" min="1" step="1" className={inp} value={diasManual} onChange={(e) => setDiasManual(e.target.value)} placeholder="Ej. 45" />
+            </label>
+          ) : null}
+          {vencimiento ? <p className="mt-2 text-sm text-slate-500">Vence el <b className="text-slate-800">{fecha(vencimiento)}</b> ({diasCredito} días).</p> : null}
           <div className="mt-4 space-y-1.5 border-t border-slate-100 pt-3 text-sm">
-            <div className="flex justify-between"><span className="text-slate-500">Monto gravado</span><span className="tabular font-medium">{soles(gravado)}</span></div>
-            <div className="flex justify-between"><span className="text-slate-500">IGV (18%)</span><span className="tabular font-medium">{soles(igv)}</span></div>
-            <div className="flex justify-between border-t border-slate-100 pt-1.5"><span className="font-semibold text-slate-700">Total</span><span className="tabular font-bold">{soles(total)}</span></div>
+            <div className="flex justify-between"><span className="text-slate-500">Monto gravado</span><span className="tabular font-medium">{dinero(gravado, moneda)}</span></div>
+            <div className="flex justify-between"><span className="text-slate-500">IGV (18%)</span><span className="tabular font-medium">{dinero(igv, moneda)}</span></div>
+            <div className="flex justify-between border-t border-slate-100 pt-1.5"><span className="font-semibold text-slate-700">Total</span><span className="tabular font-bold">{dinero(total, moneda)}</span></div>
           </div>
         </Card>
       </div>
 
-      <div className="mt-5 flex items-center gap-3">
+      <div className="mt-5 flex flex-wrap items-center gap-3">
         <button disabled={busy} onClick={guardar} className="inline-flex items-center gap-2 rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-50">
           <Save size={16} /> {busy ? "Guardando…" : editId ? "Guardar cambios" : "Guardar comprobante"}
         </button>
+        <button onClick={() => setPreview(true)} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 hover:border-brand-300 hover:text-brand-600">
+          <Eye size={16} /> Vista previa
+        </button>
         <button onClick={() => router.push("/facturacion")} className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">Cancelar</button>
       </div>
+
+      {preview ? (
+        <FacturaPreview
+          emisor={emisor}
+          cuentas={cuentas.map((c) => ({ banco: c.banco, moneda: c.moneda, numero: c.numero, cci: c.cci }))}
+          onClose={() => setPreview(false)}
+          data={{
+            tipo, fecha: fechaEmision, moneda, tipoCambio: tipoCambio ? Number(tipoCambio) : 0,
+            cliente, ruc, direccion,
+            lineas: lineas.map((l) => ({ descripcion: l.descripcion, cantidad: l.cantidad || 1, valorUnitario: l.valorUnitario || 0 })),
+            formaPago: esCredito ? "Credito" : "Contado", fechaVencimiento: esCredito && vencimiento ? vencimiento : null,
+            guia, guiaTransportista, referencia: referenciaOrden, detalleViaje,
+            valorReferencial: valorReferencial ? Number(valorReferencial) : 0, ubigeoOrigen, ubigeoDestino,
+          } as PreviewData}
+        />
+      ) : null}
     </div>
   );
 }

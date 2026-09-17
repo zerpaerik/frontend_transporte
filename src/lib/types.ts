@@ -135,7 +135,7 @@ export interface FacturaItem {
 export interface Factura {
   id: string;
   serie: string;
-  tipo: "Factura" | "Boleta" | "N. Crédito";
+  tipo: "Factura" | "Boleta" | "N. Crédito" | "N. Débito";
   cliente: string;
   ruc: string;
   direccion?: string;
@@ -148,6 +148,7 @@ export interface Factura {
   tipoDocCodigo?: string;
   correlativo?: string;
   moneda?: string;
+  tipoCambio?: number;
   gravado?: number;
   total?: number;
   sujetoDetraccion?: boolean;
@@ -164,6 +165,7 @@ export interface Factura {
   pesoTM?: number;
   referenciaVR?: string;
   guia?: string;
+  guiaTransportista?: string;
   ubigeoOrigen?: string;
   ubigeoDestino?: string;
   detalleViaje?: string;

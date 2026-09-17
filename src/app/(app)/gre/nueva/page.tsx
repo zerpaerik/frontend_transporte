@@ -6,6 +6,7 @@ import { ArrowLeft, Search, Send, FileJson, RefreshCw, FileDown, Ban, ShieldChec
 import { Card, Badge } from "@/components/ui";
 import { apiGre, apiViajePorCodigo, apiClientes, downloadBase64, type GuiaInput, type GuiaTransportista, type Cliente } from "@/lib/api";
 import { fecha } from "@/lib/format";
+import { UbigeoSelect } from "@/components/UbigeoSelect";
 
 const inp = "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100";
 const lbl = "mb-1 block text-sm font-medium text-slate-700";
@@ -168,8 +169,8 @@ export default function NuevaGrePage() {
                   <option value="remitente">Remitente</option><option value="tercero">Tercero</option><option value="subcontratado">Subcontratado</option>
                 </select>
               </label>
-              <label><span className={lbl}>Ubigeo partida</span><input className={inp} value={f.partidaUbigeo} onChange={(e) => set("partidaUbigeo", e.target.value)} placeholder="070101" /></label>
-              <label><span className={lbl}>Ubigeo llegada</span><input className={inp} value={f.llegadaUbigeo} onChange={(e) => set("llegadaUbigeo", e.target.value)} placeholder="150112" /></label>
+              <label><span className={lbl}>Ubigeo partida</span><UbigeoSelect value={f.partidaUbigeo} onChange={(v) => set("partidaUbigeo", v)} placeholder="Distrito de partida…" /></label>
+              <label><span className={lbl}>Ubigeo llegada</span><UbigeoSelect value={f.llegadaUbigeo} onChange={(v) => set("llegadaUbigeo", v)} placeholder="Distrito de llegada…" /></label>
               <label className="sm:col-span-2"><span className={lbl}>Dirección de partida</span><input className={inp} value={f.partidaDir} onChange={(e) => set("partidaDir", e.target.value)} /></label>
               <label className="sm:col-span-2"><span className={lbl}>Dirección de llegada</span><input className={inp} value={f.llegadaDir} onChange={(e) => set("llegadaDir", e.target.value)} /></label>
               {f.pagadorFlete !== "remitente" ? (

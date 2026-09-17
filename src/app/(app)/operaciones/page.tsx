@@ -17,6 +17,8 @@ import type { EstadoViaje, Viaje } from "@/lib/types";
 
 // Opción del select de carreta para escribir una placa alquilada (fuera de la flota).
 const ALQ_CARRETA = "Alquilada (otra placa)";
+// Opción del select de tracto para una placa que no es de la flota (alquilado / de tercero).
+const ALQ_TRACTO = "Externo (otra placa)";
 
 const estadoTone: Record<EstadoViaje, "gray" | "blue" | "green" | "orange" | "red"> = {
   Programado: "gray", "En curso": "orange", Culminado: "blue", Devuelto: "green", Cancelado: "red",
@@ -159,10 +161,17 @@ export default function OperacionesPage() {
     const carretasFlota = vehiculos.filter((x) => x.tipo === "Carreta").map((x) => x.placa);
     const carretaGuardada = g("carreta");
     const alquiladaGuardada = !!carretaGuardada && !carretasFlota.includes(carretaGuardada);
+    // Tracto: el de flota o uno externo (placa libre para este viaje, p. ej. alquilado).
+    const tractosFlota = vehiculos.filter((x) => x.tipo === "Tracto").map((x) => x.placa);
+    const tractoGuardado = g("placaTracto");
+    const tractoExternoGuardado = !!tractoGuardado && !tractosFlota.includes(tractoGuardado);
     // Incluye el valor guardado en las opciones para que al EDITAR no se pierda (si no está en el catálogo).
     const opt = (arr: string[], cur: string) => (cur && !arr.includes(cur) ? [cur, ...arr] : arr);
     return [
-      { name: "placaTracto", label: "Placa tracto", type: "select", options: vehiculos.filter((x) => x.tipo === "Tracto").map((x) => x.placa), required: true, default: g("placaTracto") },
+      { name: "placaTracto", label: "Placa tracto", type: "select", options: [...tractosFlota, ALQ_TRACTO], required: true, default: tractoExternoGuardado ? ALQ_TRACTO : tractoGuardado },
+      ...(vals.placaTracto === ALQ_TRACTO
+        ? [{ name: "tractoPlaca", label: "Placa del tracto externo", type: "text" as const, required: true, placeholder: "Ej. A1B-234", full: true, default: tractoExternoGuardado ? tractoGuardado : "" }]
+        : []),
       { name: "carreta", label: "Carreta", type: "select", options: ["", ...carretasFlota, ALQ_CARRETA], default: alquiladaGuardada ? ALQ_CARRETA : carretaGuardada },
       ...(vals.carreta === ALQ_CARRETA
         ? [{ name: "carretaPlaca", label: "Placa de la carreta alquilada", type: "text" as const, required: true, placeholder: "Ej. B7A-845", full: true, default: alquiladaGuardada ? carretaGuardada : "" }]
@@ -205,7 +214,7 @@ export default function OperacionesPage() {
 
   function toBody(v: FormValues) {
     const body: any = {
-      placaTracto: String(v.placaTracto),
+      placaTracto: v.placaTracto === ALQ_TRACTO ? String(v.tractoPlaca || "").toUpperCase() : String(v.placaTracto),
       carreta: v.carreta === ALQ_CARRETA ? String(v.carretaPlaca || "").toUpperCase() : String(v.carreta || ""),
       conductor: String(v.conductor || ""), cliente: String(v.cliente), clienteFactura: String(v.clienteFactura || ""),
       operacion: String(v.operacion), contenedor: String(v.contenedor).toUpperCase(), tamanio: String(v.tamanio || ""),
@@ -255,7 +264,7 @@ export default function OperacionesPage() {
 
       {vehiculos.filter((x) => x.tipo === "Tracto").length === 0 ? (
         <div className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700 ring-1 ring-inset ring-amber-200">
-          No hay tractos en la flota de esta sede. Agrégalos en <Link href="/vehiculos" className="font-semibold underline">Flota</Link> para poder registrar viajes.
+          No hay tractos en la flota de esta sede. Agrégalos en <Link href="/vehiculos" className="font-semibold underline">Flota</Link>, o usa la opción “Externo (otra placa)” al registrar el viaje.
         </div>
       ) : null}
 

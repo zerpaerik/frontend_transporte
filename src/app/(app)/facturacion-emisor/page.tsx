@@ -4,12 +4,13 @@ import { useEffect, useState } from "react";
 import { Building2, Save, ShieldCheck, TriangleAlert, CheckCircle2 } from "lucide-react";
 import { PageHeader, Card, Badge } from "@/components/ui";
 import { apiEmisor, type EmisorConfig, type EmisorRespuesta, type CorrelativoTipo } from "@/lib/api";
+import { UbigeoSelect } from "@/components/UbigeoSelect";
 
 type Form = Omit<EmisorConfig, "id" | "sedeId">;
 
 const VACIO: Form = {
   ruc: "", razonSocial: "", nombreComercial: "", ubigeo: "", direccionFiscal: "", codAnexo: "0000",
-  serieFactura: "FN01", serieBoleta: "BN01", serieNotaCredito: "FN01", serieGuiaTransportista: "V001", registroMtc: "", puntoVenta: "",
+  serieFactura: "FN01", serieBoleta: "BN01", serieNotaCredito: "FN01", serieNotaDebito: "FD01", serieGuiaTransportista: "V001", registroMtc: "", puntoVenta: "",
   ctaDetraccion: "", porcDetraccion: 4, codDetraccion: "027", umbralDetraccion: 700,
   formatoImpresion: "001",
   correoEnvio: "", activo: false,
@@ -101,7 +102,7 @@ export default function EmisorPage() {
             <div className="sm:col-span-2"><Campo label="Razón social"><input className={inputCls} value={f.razonSocial} onChange={(e) => set("razonSocial", e.target.value)} placeholder="MGR SERVICIOS INTEGRADOS S.A.C." /></Campo></div>
             <Campo label="Nombre comercial" hint="Opcional"><input className={inputCls} value={f.nombreComercial} onChange={(e) => set("nombreComercial", e.target.value)} /></Campo>
             <Campo label="RUC"><input className={inputCls} value={f.ruc} onChange={(e) => set("ruc", e.target.value)} placeholder="20616110340" /></Campo>
-            <Campo label="Ubigeo" hint="6 dígitos del distrito (ej. Lima 150101)"><input className={inputCls} value={f.ubigeo} onChange={(e) => set("ubigeo", e.target.value)} placeholder="150101" /></Campo>
+            <Campo label="Ubigeo" hint="Busca el distrito del domicilio fiscal (código INEI/SUNAT)"><UbigeoSelect value={f.ubigeo} onChange={(v) => set("ubigeo", v)} placeholder="Distrito del emisor…" /></Campo>
             <Campo label="Código de anexo" hint="Local anexo (0000 si es el principal)"><input className={inputCls} value={f.codAnexo} onChange={(e) => set("codAnexo", e.target.value)} placeholder="0000" /></Campo>
             <Campo label="Registro MTC" hint="N° de registro del transportista (para la GRE)"><input className={inputCls} value={f.registroMtc} onChange={(e) => set("registroMtc", e.target.value)} placeholder="15174917CNG" /></Campo>
             <div className="sm:col-span-2"><Campo label="Dirección fiscal"><input className={inputCls} value={f.direccionFiscal} onChange={(e) => set("direccionFiscal", e.target.value)} placeholder="Av. ... Lima" /></Campo></div>
@@ -115,6 +116,7 @@ export default function EmisorPage() {
             <Campo label="Serie de factura" hint="Distinta a la del portal MiFact"><input className={inputCls} value={f.serieFactura} onChange={(e) => set("serieFactura", e.target.value)} placeholder="FN01" /></Campo>
             <Campo label="Serie de boleta"><input className={inputCls} value={f.serieBoleta} onChange={(e) => set("serieBoleta", e.target.value)} placeholder="BN01" /></Campo>
             <Campo label="Serie de nota de crédito"><input className={inputCls} value={f.serieNotaCredito} onChange={(e) => set("serieNotaCredito", e.target.value)} placeholder="FN01" /></Campo>
+            <Campo label="Serie de nota de débito"><input className={inputCls} value={f.serieNotaDebito} onChange={(e) => set("serieNotaDebito", e.target.value)} placeholder="FD01" /></Campo>
             <Campo label="Serie de GRE (transportista)" hint="Guía de remisión electrónica"><input className={inputCls} value={f.serieGuiaTransportista} onChange={(e) => set("serieGuiaTransportista", e.target.value)} placeholder="V001" /></Campo>
             <Campo label="Punto de venta" hint="COD_PTO_VENTA"><input className={inputCls} value={f.puntoVenta} onChange={(e) => set("puntoVenta", e.target.value)} /></Campo>
             <Campo label="Formato de impresión (PDF)" hint="Código del formato en MiFact: 001 = básico. Pide a MiFact el código de tu formato personalizado."><input className={inputCls} value={f.formatoImpresion} onChange={(e) => set("formatoImpresion", e.target.value)} placeholder="001" /></Campo>
