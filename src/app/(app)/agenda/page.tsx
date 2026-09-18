@@ -74,6 +74,7 @@ export default function AgendaPage() {
     { name: "destino", label: "Destino (distrito)", type: "select", options: ["", ...distritos], default: a?.destino },
     { name: "devolucion", label: "Punto de devolución", type: "select", options: ["", ...puertos], default: a?.devolucion },
     { name: "tipoCarga", label: "Tipo de carga", type: "select", options: ["GENERAL", "IMO", "REEFER"], default: a?.tipoCarga },
+    { name: "tipoCarreta", label: "Tipo de carreta", type: "select", options: ["", "Plataforma", "Portacontenedor", "Cama baja", "Cama cuna", "Baranda", "Furgón", "Tolva", "Cisterna"], default: a?.tipoCarreta },
     { name: "unidades", label: "Unidades comprometidas", type: "number", default: a?.unidades ?? 1 },
     { name: "estado", label: "Estado", type: "select", options: ["Programado", "Confirmado", "Realizado", "Cancelado"], default: a?.estado },
     { name: "observacion", label: "Observación", type: "text", full: true, placeholder: "Notas del servicio (opcional)", default: a?.observacion },
@@ -82,7 +83,7 @@ export default function AgendaPage() {
   function toBody(v: FormValues) {
     return {
       fecha: String(v.fecha), cliente: String(v.cliente || "").trim() || "POR ASIGNAR", origen: String(v.origen || ""), destino: String(v.destino || ""), devolucion: String(v.devolucion || ""),
-      tipoCarga: String(v.tipoCarga || "GENERAL"), unidades: Number(v.unidades), estado: String(v.estado || "Programado"), observacion: String(v.observacion || ""),
+      tipoCarga: String(v.tipoCarga || "GENERAL"), tipoCarreta: String(v.tipoCarreta || ""), unidades: Number(v.unidades), estado: String(v.estado || "Programado"), observacion: String(v.observacion || ""),
     };
   }
   async function guardar(v: FormValues) { await apiAgenda.create(toBody(v)); cargar(); }
@@ -99,6 +100,7 @@ export default function AgendaPage() {
     { key: "destino", header: "Destino", render: (a) => a.destino || <span className="text-slate-300">—</span> },
     { key: "devolucion", header: "Devolución", render: (a) => a.devolucion || <span className="text-slate-300">—</span> },
     { key: "tipoCarga", header: "Carga", render: (a) => <span className="text-xs font-semibold text-slate-500">{a.tipoCarga}</span> },
+    { key: "tipoCarreta", header: "Carreta", render: (a) => a.tipoCarreta ? <span className="text-xs text-slate-500">{a.tipoCarreta}</span> : <span className="text-slate-300">—</span> },
     { key: "unidades", header: "Unidades", align: "right", sortable: true, value: (a) => a.unidades, render: (a) => <span className="tabular font-semibold">{a.unidades}</span> },
     { key: "estado", header: "Estado", sortable: true, render: (a) => <Badge tone={estadoTone(a.estado)}>{a.estado}</Badge> },
   ];
@@ -106,6 +108,7 @@ export default function AgendaPage() {
     { key: "cliente", label: "Cliente", value: (a) => a.cliente },
     { key: "estado", label: "Estado", value: (a) => a.estado },
     { key: "tipoCarga", label: "Carga", value: (a) => a.tipoCarga },
+    { key: "tipoCarreta", label: "Carreta", value: (a) => a.tipoCarreta || "Sin definir" },
   ];
 
   const toggleBtn = (v: "calendario" | "lista", Icon: typeof List, txt: string) => (
@@ -227,6 +230,7 @@ export default function AgendaPage() {
           </div>
           <div className="mt-1.5 flex items-center gap-2">
             <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">{hover.s.tipoCarga}</span>
+            {hover.s.tipoCarreta ? <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">{hover.s.tipoCarreta}</span> : null}
             <span className="font-semibold text-slate-700">{hover.s.unidades} unidad{hover.s.unidades === 1 ? "" : "es"}</span>
           </div>
           {hover.s.observacion ? <div className="mt-1.5 border-t border-slate-100 pt-1.5 text-slate-500">{hover.s.observacion}</div> : null}

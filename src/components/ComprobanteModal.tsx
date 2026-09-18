@@ -147,6 +147,19 @@ export function ComprobanteModal({ f, listo, emisor = null, cuentas = [], onClos
           {f.sujetoDetraccion ? <Dato k="Detracción (4%)" v={<span className="text-rose-500">−{soles(detr)} · cta {f.ctaDetraccion || "—"}</span>} /> : null}
           {f.sujetoDetraccion ? <Dato k="Neto a pagar" v={<b className="text-emerald-700">{dinero(neto, mon)}</b>} /> : null}
           {f.valorReferencial ? <Dato k="Valor referencial" v={soles(f.valorReferencial)} /> : null}
+          {/* Desglose: de qué servicio (viaje) sale cada parte del valor referencial. */}
+          {(f.serviciosVR?.length ?? 0) > 1 ? (
+            <Dato k="Por servicio" v={
+              <>
+                {f.serviciosVR!.map((s, i) => (
+                  <span key={s.id || i} className="flex justify-between gap-3 font-normal">
+                    <span className="min-w-0 truncate text-slate-500">{s.detalle || `Servicio ${i + 1}`}</span>
+                    <span className="tabular shrink-0">{soles(s.valor)}</span>
+                  </span>
+                ))}
+              </>
+            } />
+          ) : null}
 
           {/* Toda la información del comprobante */}
           {f.moneda === "USD" ? <Dato k="Moneda" v={`Dólares (US$)${tc ? ` · T.C. ${tc.toFixed(3)}` : ""}`} /> : null}

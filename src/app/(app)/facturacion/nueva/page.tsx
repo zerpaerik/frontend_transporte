@@ -6,8 +6,8 @@ import { ArrowLeft, Search, Plus, X, Save, Eye } from "lucide-react";
 import { Card } from "@/components/ui";
 import { useData } from "@/lib/store";
 import { apiViajePorCodigo, apiTarifas, apiFacturasE, apiEmisor, apiCuentas, type TarifasMeta, type EmisorConfig, type CuentaBancaria } from "@/lib/api";
-import { dinero, hoyPeru, fecha } from "@/lib/format";
-import type { Factura } from "@/lib/types";
+import { dinero, soles, hoyPeru, fecha } from "@/lib/format";
+import type { Factura, ServicioVR } from "@/lib/types";
 import { FacturaPreview, type PreviewData } from "@/components/FacturaPreview";
 import { UbigeoSelect } from "@/components/UbigeoSelect";
 
@@ -25,6 +25,9 @@ type Linea = { descripcion: string; cantidad: number; valorUnitario: number };
 const inp = "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100";
 const lbl = "mb-1 block text-sm font-medium text-slate-700";
 const num = (v: string) => Number(String(v).replace(",", ".") || 0);
+const r2v = (n: number) => Math.round(n * 100) / 100;
+// Ruta "ORIGEN - DESTINO" para los textos que van al comprobante.
+const rutaDe = (origen?: string, destino?: string) => [origen, destino].filter(Boolean).join(" - ");
 
 // Suma N días a una fecha "YYYY-MM-DD".
 function masDias(iso: string, n: number): string {
@@ -63,6 +66,9 @@ export default function NuevoComprobantePage() {
   const [vrTipoCarga, setVrTipoCarga] = useState("");
   const [pesoTM, setPesoTM] = useState("");
   const [vrDetalle, setVrDetalle] = useState("");
+  // Valor referencial por servicio: cada viaje suma su VR al total de la factura.
+  // Se guardan también los insumos del cálculo para poder recalcularlo al emitir.
+  const [serviciosVR, setServiciosVR] = useState<ServicioVR[]>([]);
   const [plazo, setPlazo] = useState("Contado"); // Contado | Crédito 15 días | Crédito 30 días | Crédito (días)
   const [diasManual, setDiasManual] = useState("15"); // días de crédito cuando se ponen a mano
   const [moneda, setMoneda] = useState("PEN"); // PEN | USD
@@ -84,20 +90,57 @@ export default function NuevoComprobantePage() {
   const esCredito = plazo !== "Contado";
   const diasCredito = plazo === "Crédito (días)" ? Math.max(0, Math.round(Number(diasManual) || 0)) : PLAZOS[plazo] || 0;
   const vencimiento = esCredito && diasCredito > 0 ? masDias(fechaEmision, diasCredito) : "";
+  // El servicio que se está calculando ahora mismo (aún no agregado a la lista).
+  const vrEnCurso = r2v(Number(valorReferencial) || 0);
+  // Valor referencial del comprobante: los servicios ya agregados MÁS el que está en
+  // curso. Así nunca se pierde un cálculo por no haber pulsado "Agregar otro servicio".
+  const totalVR = r2v(serviciosVR.reduce((s, x) => s + x.valor, 0) + vrEnCurso);
+
+  // Cómo se llama el servicio en la lista: el detalle del cálculo si lo hay; si no, el
+  // del viaje (numerado desde el segundo, para no repetir el mismo nombre).
+  function detalleServicioVR(orden: number) {
+    if (vrDetalle.trim()) return vrDetalle.trim();
+    if (detalleViaje.trim()) return orden > 1 ? `${detalleViaje.trim()} (servicio ${orden})` : detalleViaje.trim();
+    return `Servicio ${orden}`;
+  }
+
+  // Foto del servicio en curso (valor + insumos del cálculo) para guardarla/agregarla.
+  function servicioEnCurso(orden: number): ServicioVR {
+    return {
+      detalle: detalleServicioVR(orden),
+      valor: vrEnCurso,
+      ambito: vrAmbito, ruta: vrRuta, destino: vrDestino,
+      puerto: vrPuerto, zona: vrZona, tipoCarga: vrTipoCarga,
+      pesoTM: pesoTM ? Number(pesoTM) : 0,
+    };
+  }
+  function limpiarCalculadorVR() {
+    setVrAmbito(""); setVrRuta(""); setVrDestino(""); setVrPuerto(""); setVrZona(""); setVrTipoCarga(""); setPesoTM(""); setValorReferencial(""); setVrDetalle("");
+  }
+  function sumarServicioVR() {
+    if (vrEnCurso <= 0) { setMsg("Calcula o ingresa el valor referencial del servicio antes de agregarlo."); return; }
+    setServiciosVR((s) => [...s, servicioEnCurso(s.length + 1)]);
+    limpiarCalculadorVR();
+    setMsg("");
+  }
+  const quitarServicioVR = (i: number) => setServiciosVR((s) => s.filter((_, j) => j !== i));
 
   const setLinea = (i: number, patch: Partial<Linea>) => setLineas((ls) => ls.map((l, j) => (j === i ? { ...l, ...patch } : l)));
   const agregar = () => setLineas((ls) => [...ls, { descripcion: "", cantidad: 1, valorUnitario: 0 }]);
   const quitar = (i: number) => setLineas((ls) => (ls.length > 1 ? ls.filter((_, j) => j !== i) : ls));
 
   // Arma la línea de servicio con el detalle del viaje (como en la factura real).
+  // Sin flechas ni símbolos fuera del latín: MiFact imprime el PDF en Latin-1 y "→"
+  // sale como basura en el comprobante que recibe el cliente.
   function lineaDeViaje(v: any): Linea {
-    const ruta = [v.origen, v.destino].filter(Boolean).join(" → ");
+    const ruta = rutaDe(v.origen, v.destino);
     const partes = [
       v.fechaViaje ? `(${fecha(String(v.fechaViaje))})` : "",
       v.greTransporte ? `G.R.: ${v.greTransporte}` : "",
       v.placaTracto ? `PLACA: ${v.placaTracto}` : "",
       v.contenedor ? `CONT.: ${v.contenedor}` : "",
-      ruta ? `ORIGEN: ${v.origen} → DESTINO: ${v.destino}` : "",
+      v.tipoCarga ? `CARGA: ${v.tipoCarga}` : "",
+      ruta ? `ORIGEN: ${v.origen} - DESTINO: ${v.destino}` : "",
     ].filter(Boolean).join(" | ");
     return { descripcion: `SERVICIO DE TRANSPORTE${partes ? " " + partes : ""}`, cantidad: 1, valorUnitario: Number(v.tarifa || 0) };
   }
@@ -112,7 +155,7 @@ export default function NuevoComprobantePage() {
       const v = await apiViajePorCodigo(c);
       const cli = String(v.clienteFactura || v.cliente || "");
       const linea = lineaDeViaje(v);
-      const ruta = [v.origen, v.destino].filter(Boolean).join(" → ");
+      const ruta = rutaDe(v.origen, v.destino);
 
       if (append && cliente.trim()) {
         // Agrega el viaje como una línea adicional; conserva el cliente ya cargado.
@@ -140,6 +183,9 @@ export default function NuevoComprobantePage() {
       setDetalleViaje(ruta ? `TRANSPORTE ${ruta}` : "");
       setLineas([linea]);
       setViajes([c.toUpperCase()]);
+      // El comprobante arranca de cero: también el valor referencial del anterior.
+      setServiciosVR([]);
+      limpiarCalculadorVR();
       setCodigo("");
     } catch {
       setMsg(`No se encontró un viaje con el código "${c}".`);
@@ -169,7 +215,6 @@ export default function NuevoComprobantePage() {
     setViaje(f.viaje || "-");
     setReferenciaOrden(f.referenciaVR || "");
     setGuia(f.guia || "");
-    setValorReferencial(f.valorReferencial ? String(f.valorReferencial) : "");
     setUbigeoOrigen(f.ubigeoOrigen || "");
     setUbigeoDestino(f.ubigeoDestino || "");
     setDetalleViaje(f.detalleViaje || "");
@@ -179,13 +224,21 @@ export default function NuevoComprobantePage() {
     const pl = plazoDesde(f);
     setPlazo(pl.plazo);
     if (pl.plazo === "Crédito (días)") setDiasManual(String(pl.dias));
-    setVrAmbito(f.vrAmbito || "");
-    setVrRuta(f.vrRuta || "");
-    setVrDestino(f.vrDestino || "");
-    setVrPuerto(f.vrPuerto || "");
-    setVrZona(f.vrZona || "");
-    setVrTipoCarga(f.vrTipoCarga || "");
-    setPesoTM(f.pesoTM ? String(f.pesoTM) : "");
+    // Valor referencial: si el comprobante trae el desglose por servicio se carga la
+    // lista y el calculador queda en blanco para el siguiente (si se precargaran los
+    // insumos, el cálculo automático volvería a sumar el último servicio dos veces).
+    if (f.serviciosVR?.length) {
+      setServiciosVR(f.serviciosVR.map((s) => ({ ...s, valor: s.valor || 0 })));
+    } else {
+      setValorReferencial(f.valorReferencial ? String(f.valorReferencial) : "");
+      setVrAmbito(f.vrAmbito || "");
+      setVrRuta(f.vrRuta || "");
+      setVrDestino(f.vrDestino || "");
+      setVrPuerto(f.vrPuerto || "");
+      setVrZona(f.vrZona || "");
+      setVrTipoCarga(f.vrTipoCarga || "");
+      setPesoTM(f.pesoTM ? String(f.pesoTM) : "");
+    }
     if (f.items?.length) setLineas(f.items.map((i) => ({ descripcion: i.descripcion, cantidad: i.cantidad ?? 1, valorUnitario: i.valorUnitario ?? 0 })));
     setPrefilled(true);
   }, [editId, prefilled, facturas]);
@@ -230,7 +283,9 @@ export default function NuevoComprobantePage() {
         fecha: fechaEmision, viaje: viaje || "-", monto: gravado, igv, estadoSunat: "Emitida",
         items,
         moneda, tipoCambio: moneda === "USD" && tipoCambio ? Number(tipoCambio) : 0,
-        valorReferencial: valorReferencial ? Number(valorReferencial) : 0,
+        valorReferencial: totalVR,
+        // Desglose por servicio: los agregados más el que quedó en el calculador.
+        serviciosVR: vrEnCurso > 0 ? [...serviciosVR, servicioEnCurso(serviciosVR.length + 1)] : serviciosVR,
         vrAmbito, vrRuta, vrDestino, vrPuerto, vrZona, vrTipoCarga, pesoTM: pesoTM ? Number(pesoTM) : 0,
         referenciaVR: referenciaOrden.trim(), guia: guia.trim(), guiaTransportista: guiaTransportista.trim(),
         ubigeoOrigen: ubigeoOrigen.trim(), ubigeoDestino: ubigeoDestino.trim(), detalleViaje: detalleViaje.trim(),
@@ -382,7 +437,34 @@ export default function NuevoComprobantePage() {
             </label>
             {vrDetalle ? <p className="sm:col-span-2 -mt-2 text-xs text-slate-500">{vrDetalle}</p> : null}
 
-            <label className="sm:col-span-2"><span className={lbl}>Detalle del viaje</span><input className={inp} value={detalleViaje} onChange={(e) => setDetalleViaje(e.target.value)} placeholder="TRANSPORTE VENTANILLA → CALLAO" /></label>
+            {vrEnCurso > 0 ? (
+              <div className="sm:col-span-2 -mt-1">
+                <button type="button" onClick={sumarServicioVR} className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 hover:border-brand-300 hover:text-brand-600"><Plus size={14} /> Agregar otro servicio</button>
+                <span className="ml-2 text-xs text-slate-400">Cuando la factura junta varios viajes: agrega uno y calcula el siguiente. El total es la suma.</span>
+              </div>
+            ) : null}
+            {serviciosVR.length || vrEnCurso > 0 ? (
+              <div className="sm:col-span-2 rounded-lg border border-slate-200 bg-slate-50/60 p-3">
+                <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Valor referencial por servicio</div>
+                <ul className="space-y-1">
+                  {serviciosVR.map((s, i) => (
+                    <li key={i} className="flex items-center justify-between gap-2 text-sm">
+                      <span className="min-w-0 truncate text-slate-600">{s.detalle || `Servicio ${i + 1}`}</span>
+                      <span className="flex items-center gap-2"><span className="tabular font-medium text-slate-800">{soles(s.valor)}</span><button type="button" onClick={() => quitarServicioVR(i)} title="Quitar" className="rounded p-0.5 text-slate-400 hover:text-rose-600"><X size={14} /></button></span>
+                    </li>
+                  ))}
+                  {vrEnCurso > 0 ? (
+                    <li className="flex items-center justify-between gap-2 text-sm">
+                      <span className="min-w-0 truncate text-slate-600">{detalleServicioVR(serviciosVR.length + 1)} <span className="text-xs text-slate-400">· en el calculador</span></span>
+                      <span className="tabular font-medium text-slate-800">{soles(vrEnCurso)}</span>
+                    </li>
+                  ) : null}
+                </ul>
+                <div className="mt-1.5 flex justify-between border-t border-slate-200 pt-1.5 text-sm"><span className="font-semibold text-slate-700">Total valor referencial</span><span className="tabular font-bold">{soles(totalVR)}</span></div>
+              </div>
+            ) : null}
+
+            <label className="sm:col-span-2"><span className={lbl}>Detalle del viaje</span><input className={inp} value={detalleViaje} onChange={(e) => setDetalleViaje(e.target.value)} placeholder="TRANSPORTE VENTANILLA - CALLAO" /></label>
             <label><span className={lbl}>Ubigeo origen (partida)</span><UbigeoSelect value={ubigeoOrigen} onChange={setUbigeoOrigen} placeholder="Distrito de partida…" /></label>
             <label><span className={lbl}>Ubigeo destino (llegada)</span><UbigeoSelect value={ubigeoDestino} onChange={setUbigeoDestino} placeholder="Distrito de llegada…" /></label>
           </div>
@@ -431,7 +513,7 @@ export default function NuevoComprobantePage() {
             lineas: lineas.map((l) => ({ descripcion: l.descripcion, cantidad: l.cantidad || 1, valorUnitario: l.valorUnitario || 0 })),
             formaPago: esCredito ? "Credito" : "Contado", fechaVencimiento: esCredito && vencimiento ? vencimiento : null,
             guia, guiaTransportista, referencia: referenciaOrden, detalleViaje,
-            valorReferencial: valorReferencial ? Number(valorReferencial) : 0, ubigeoOrigen, ubigeoDestino,
+            valorReferencial: totalVR, ubigeoOrigen, ubigeoDestino,
           } as PreviewData}
         />
       ) : null}
