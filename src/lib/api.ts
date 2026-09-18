@@ -403,14 +403,18 @@ export interface Devolucion {
   estadoDevolucion: string;
   devueltoEn: string | null;
   devueltoPor: string; // conductor que efectivamente devolvió
+  devueltoPorEn: string | null; // cuándo se registró la devolución cruzada
   compensacionEstado: string; // "" | Pendiente | Compensada | Pagada
   compensacionMonto: number;
   compensacionNota: string;
+  compensacionEn: string | null; // cuándo se saldó
   citaArchivos: { id: string; nombre: string; mime: string }[];
 }
 export interface CruceCompensacion {
   id: string; codigo: string; contenedor: string; conductor: string; devueltoPor: string;
-  devueltoEn: string | null; estadoDevolucion: string; compensacionEstado: string; compensacionMonto: number; compensacionNota: string; cliente: string;
+  devueltoEn: string | null; devueltoPorEn: string | null; citaFecha: string | null;
+  estadoDevolucion: string; compensacionEstado: string; compensacionMonto: number;
+  compensacionNota: string; compensacionEn: string | null; cliente: string;
 }
 export interface SaldoCompensacion { conductor: string; aFavor: number; enContra: number; saldo: number; }
 export interface CompensacionesResp { cruces: CruceCompensacion[]; saldos: SaldoCompensacion[]; }

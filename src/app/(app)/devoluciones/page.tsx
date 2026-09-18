@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { PackageCheck, Search, Paperclip, Download, Save, Settings2, X, Plus, Trash2, Container, Clock, TriangleAlert, Check, RotateCcw, ArrowLeftRight, Scale, HandCoins } from "lucide-react";
+import Link from "next/link";
+import { PackageCheck, Search, Paperclip, Download, Save, Settings2, X, Plus, Trash2, Container, Clock, TriangleAlert, Check, RotateCcw, ArrowLeftRight, ArrowRight, Scale, Undo2 } from "lucide-react";
 import { PageHeader, StatCard, Card } from "@/components/ui";
+import { AccionesCompensacion, saldada } from "@/components/CompensacionAcciones";
 import { useData } from "@/lib/store";
 import { apiDevoluciones, apiLugares, fileToBase64, downloadBase64, type Devolucion, type LugarGuardado, type CompensacionesResp } from "@/lib/api";
 import { fecha, diasRestantes, soles } from "@/lib/format";
@@ -34,7 +36,7 @@ function DevolucionCard({ d, lugares, conductores, onSaved }: { d: Devolucion; l
   const [devueltoPor, setDevueltoPor] = useState(d.devueltoPor || d.conductor || "");
   const cruce = devueltoPor.trim() !== "" && devueltoPor.trim() !== (d.conductor || "").trim();
   // Ya saldada (se devolvió el favor o se pagó): se avisa, pero no como deuda abierta.
-  const saldada = d.compensacionEstado === "Compensada" || d.compensacionEstado === "Pagada";
+  const compSaldada = saldada(d.compensacionEstado);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
@@ -154,18 +156,33 @@ function DevolucionCard({ d, lugares, conductores, onSaved }: { d: Devolucion; l
 
       {/* Quién devolvió el contenedor (compensación entre conductores) */}
       <div className="px-4 pb-2">
-        <label className="mb-1 block text-xs font-medium text-slate-500">Devuelto por (conductor)</label>
+        <div className="mb-1 flex flex-wrap items-center gap-2">
+          <label className="text-xs font-medium text-slate-500">Devuelto por (conductor)</label>
+          {cruce && !locked ? (
+            <button type="button" onClick={() => setDevueltoPor(d.conductor || "")} title="Se anotó por error: lo devolvió su propio conductor" className="inline-flex items-center gap-1 text-xs font-semibold text-slate-400 hover:text-rose-600">
+              <Undo2 size={12} /> Lo devolvió su conductor
+            </button>
+          ) : null}
+        </div>
         <input list={`cd-${d.id}`} disabled={locked} value={devueltoPor} onChange={(e) => setDevueltoPor(e.target.value)} placeholder="Conductor que devolvió el contenedor" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500 disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed" />
         <datalist id={`cd-${d.id}`}>{conductores.map((c) => <option key={c} value={c} />)}</datalist>
         {cruce ? (
-          saldada ? (
+          compSaldada ? (
             <p className="mt-1.5 inline-flex items-start gap-1.5 rounded-md bg-emerald-50 px-2 py-1 text-xs text-emerald-700 ring-1 ring-inset ring-emerald-200">
               <Check size={13} className="mt-0.5 shrink-0" />
-              <span>Devolución cruzada por <b>{devueltoPor.trim()}</b> · {d.compensacionEstado}{d.compensacionEstado === "Pagada" && d.compensacionMonto ? ` ${soles(d.compensacionMonto)}` : ""}.</span>
+              <span>
+                Devolución cruzada por <b>{devueltoPor.trim()}</b>{d.devueltoPorEn ? ` del ${fecha(d.devueltoPorEn)}` : ""} · {d.compensacionEstado}
+                {d.compensacionEstado === "Pagada" && d.compensacionMonto ? ` ${soles(d.compensacionMonto)}` : ""}
+                {d.compensacionEn ? ` el ${fecha(d.compensacionEn)}` : ""}.
+              </span>
             </p>
           ) : (
             <p className="mt-1.5 inline-flex items-start gap-1.5 rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-700 ring-1 ring-inset ring-amber-200">
-              <ArrowLeftRight size={13} className="mt-0.5 shrink-0" /> <span>Devolución cruzada: <b>{d.conductor || "—"}</b> le debe una devolución a <b>{devueltoPor.trim()}</b>.</span>
+              <ArrowLeftRight size={13} className="mt-0.5 shrink-0" />
+              <span>
+                Devolución cruzada{d.devueltoPorEn ? ` del ${fecha(d.devueltoPorEn)}` : ""}: <b>{d.conductor || "—"}</b> le debe una devolución a <b>{devueltoPor.trim()}</b>.
+                {" "}Sigue pendiente aunque reabras la devolución; se salda o se descarta en <Link href="/devoluciones/compensaciones" className="font-semibold underline">Compensaciones</Link>.
+              </span>
             </p>
           )
         ) : null}
@@ -249,35 +266,22 @@ function LugaresModal({ lugares, onClose, onChanged }: { lugares: LugarGuardado[
   );
 }
 
+const MAX_PANEL = 5; // el resto se ve en el índice de compensaciones
+
 function CompensacionesPanel({ comp, onChanged }: { comp: CompensacionesResp; onChanged: () => void }) {
-  const [busy, setBusy] = useState("");
-  async function marcar(id: string, estado: string, monto?: number, nota?: string) {
-    setBusy(id + estado);
-    try { await apiDevoluciones.compensar(id, { estado, monto, nota }); onChanged(); }
-    catch (e) { alert((e as Error).message || "No se pudo actualizar la compensación."); }
-    finally { setBusy(""); }
-  }
-  // Se devolvió el favor con otra devolución. Si cancela el diálogo, no se guarda nada.
-  function compensada(id: string) {
-    const nota = prompt("¿Con qué devolución se compensó? (opcional)");
-    if (nota === null) return;
-    marcar(id, "Compensada", undefined, nota.trim());
-  }
-  // Se le pagó al que hizo la devolución. Exige un monto válido mayor a 0.
-  function pagada(id: string) {
-    const m = prompt("Monto pagado (S/):");
-    if (m === null) return;
-    const monto = Number(String(m).replace(",", ".").trim());
-    if (!(monto > 0)) { alert("Ingresa un monto válido mayor a 0."); return; }
-    marcar(id, "Pagada", Math.round(monto * 100) / 100, "");
-  }
-  const resuelta = (e: string) => e === "Compensada" || e === "Pagada";
-  const pendientes = comp.cruces.filter((c) => !resuelta(c.compensacionEstado));
-  const resueltas = comp.cruces.filter((c) => resuelta(c.compensacionEstado));
+  // Vienen ordenados por el backend: la devolución registrada más reciente, arriba.
+  const pendientes = comp.cruces.filter((c) => !saldada(c.compensacionEstado));
+  const visibles = pendientes.slice(0, MAX_PANEL);
 
   return (
     <Card className="mb-6 p-4">
-      <div className="mb-3 flex items-center gap-2"><Scale size={16} className="text-brand-600" /><h2 className="text-sm font-bold uppercase tracking-wide text-slate-500">Compensaciones entre conductores</h2></div>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <Scale size={16} className="text-brand-600" />
+        <h2 className="text-sm font-bold uppercase tracking-wide text-slate-500">Compensaciones entre conductores</h2>
+        <Link href="/devoluciones/compensaciones" className="ml-auto inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:text-brand-700">
+          Ver todas ({comp.cruces.length}) <ArrowRight size={13} />
+        </Link>
+      </div>
 
       {comp.saldos.length ? (
         <div className="mb-3 flex flex-wrap gap-2">
@@ -291,36 +295,23 @@ function CompensacionesPanel({ comp, onChanged }: { comp: CompensacionesResp; on
 
       <div className="space-y-2">
         {pendientes.length === 0 ? <p className="text-sm text-slate-400">No hay compensaciones pendientes.</p> : null}
-        {pendientes.map((c) => (
+        {visibles.map((c) => (
           <div key={c.id} className="flex flex-wrap items-center gap-x-1.5 gap-y-1 rounded-lg border border-slate-200 px-3 py-2 text-sm">
+            <span className="tabular mr-1 whitespace-nowrap text-xs font-semibold text-slate-400">{c.devueltoPorEn ? fecha(c.devueltoPorEn) : "sin fecha"}</span>
             <span className="font-semibold text-slate-800">{c.devueltoPor}</span>
             <span className="text-slate-500">devolvió</span>
             <span className="tabular text-slate-600">{c.contenedor || c.codigo}</span>
             <span className="text-slate-500">de</span>
             <span className="font-semibold text-slate-800">{c.conductor}</span>
-            <span className="ml-auto flex items-center gap-1.5">
-              <button disabled={!!busy} onClick={() => compensada(c.id)} className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 hover:border-emerald-300 hover:text-emerald-700 disabled:opacity-50"><ArrowLeftRight size={13} /> Compensada</button>
-              <button disabled={!!busy} onClick={() => pagada(c.id)} className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 hover:border-brand-300 hover:text-brand-600 disabled:opacity-50"><HandCoins size={13} /> Pagada</button>
-            </span>
+            <span className="ml-auto"><AccionesCompensacion c={c} onChanged={onChanged} /></span>
           </div>
         ))}
+        {pendientes.length > MAX_PANEL ? (
+          <Link href="/devoluciones/compensaciones" className="block pt-1 text-xs font-semibold text-brand-600 hover:text-brand-700">
+            y {pendientes.length - MAX_PANEL} pendiente{pendientes.length - MAX_PANEL === 1 ? "" : "s"} más…
+          </Link>
+        ) : null}
       </div>
-
-      {resueltas.length ? (
-        <details className="mt-2">
-          <summary className="cursor-pointer text-xs text-slate-400">Resueltas ({resueltas.length})</summary>
-          <div className="mt-2 space-y-1">
-            {resueltas.map((c) => (
-              <div key={c.id} className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                <span>{c.devueltoPor} ↔ {c.conductor} ({c.contenedor || c.codigo})</span>
-                <span className={`rounded px-1.5 py-0.5 font-semibold ${c.compensacionEstado === "Pagada" ? "bg-brand-50 text-brand-700" : "bg-emerald-50 text-emerald-700"}`}>{c.compensacionEstado}{c.compensacionEstado === "Pagada" && c.compensacionMonto ? ` · ${soles(c.compensacionMonto)}` : ""}</span>
-                {c.compensacionNota ? <span className="text-slate-400">· {c.compensacionNota}</span> : null}
-                <button disabled={!!busy} onClick={() => marcar(c.id, "Pendiente")} className="ml-auto text-slate-400 hover:text-brand-600 disabled:opacity-50">Reabrir</button>
-              </div>
-            ))}
-          </div>
-        </details>
-      ) : null}
     </Card>
   );
 }
