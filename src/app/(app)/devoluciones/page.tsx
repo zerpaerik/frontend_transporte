@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { PackageCheck, Search, Paperclip, Download, Save, Settings2, X, Plus, Trash2, Container, Clock, TriangleAlert, Check, RotateCcw } from "lucide-react";
+import { PackageCheck, Search, Paperclip, Download, Save, Settings2, X, Plus, Trash2, Container, Clock, TriangleAlert, Check, RotateCcw, ArrowLeftRight, Scale, HandCoins } from "lucide-react";
 import { PageHeader, StatCard, Card } from "@/components/ui";
-import { apiDevoluciones, apiLugares, fileToBase64, downloadBase64, type Devolucion, type LugarGuardado } from "@/lib/api";
-import { fecha, diasRestantes } from "@/lib/format";
+import { useData } from "@/lib/store";
+import { apiDevoluciones, apiLugares, fileToBase64, downloadBase64, type Devolucion, type LugarGuardado, type CompensacionesResp } from "@/lib/api";
+import { fecha, diasRestantes, soles } from "@/lib/format";
 
 const ESTADOS = ["Pendiente", "En proceso", "Devuelto"] as const;
 type Estado = (typeof ESTADOS)[number];
@@ -25,11 +26,15 @@ const btnEstadoCls: Record<string, string> = {
   Devuelto: "bg-emerald-600 text-white border-emerald-600",
 };
 
-function DevolucionCard({ d, lugares, onSaved }: { d: Devolucion; lugares: LugarGuardado[]; onSaved: (u: Devolucion) => void }) {
+function DevolucionCard({ d, lugares, conductores, onSaved }: { d: Devolucion; lugares: LugarGuardado[]; conductores: string[]; onSaved: (u: Devolucion) => void }) {
   const [citaFecha, setCitaFecha] = useState(d.citaFecha ?? "");
   const [citaHora, setCitaHora] = useState(d.citaHora ?? "");
   const [lugar, setLugar] = useState(d.lugarGuardado ?? "");
   const [estado, setEstado] = useState<string>(d.estadoDevolucion || "Pendiente");
+  const [devueltoPor, setDevueltoPor] = useState(d.devueltoPor || d.conductor || "");
+  const cruce = devueltoPor.trim() !== "" && devueltoPor.trim() !== (d.conductor || "").trim();
+  // Ya saldada (se devolvió el favor o se pagó): se avisa, pero no como deuda abierta.
+  const saldada = d.compensacionEstado === "Compensada" || d.compensacionEstado === "Pagada";
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
@@ -42,7 +47,7 @@ function DevolucionCard({ d, lugares, onSaved }: { d: Devolucion; lugares: Lugar
   async function guardar() {
     setBusy(true); setMsg("");
     try {
-      const upd = await apiDevoluciones.update(d.id, { citaFecha: citaFecha || null, citaHora, lugarGuardado: lugar, estadoDevolucion: estado });
+      const upd = await apiDevoluciones.update(d.id, { citaFecha: citaFecha || null, citaHora, lugarGuardado: lugar, estadoDevolucion: estado, devueltoPor: devueltoPor.trim() });
       onSaved(upd);
       setMsg("Guardado");
       setTimeout(() => setMsg(""), 1500);
@@ -53,7 +58,7 @@ function DevolucionCard({ d, lugares, onSaved }: { d: Devolucion; lugares: Lugar
   async function reabrir() {
     setBusy(true); setMsg("");
     try {
-      const upd = await apiDevoluciones.update(d.id, { citaFecha: citaFecha || null, citaHora, lugarGuardado: lugar, estadoDevolucion: "En proceso" });
+      const upd = await apiDevoluciones.update(d.id, { citaFecha: citaFecha || null, citaHora, lugarGuardado: lugar, estadoDevolucion: "En proceso", devueltoPor: devueltoPor.trim() });
       onSaved(upd);
       setEstado("En proceso");
     } catch (e) { setMsg((e as Error).message || "No se pudo reabrir."); }
@@ -147,6 +152,25 @@ function DevolucionCard({ d, lugares, onSaved }: { d: Devolucion; lugares: Lugar
         </div>
       </div>
 
+      {/* Quién devolvió el contenedor (compensación entre conductores) */}
+      <div className="px-4 pb-2">
+        <label className="mb-1 block text-xs font-medium text-slate-500">Devuelto por (conductor)</label>
+        <input list={`cd-${d.id}`} disabled={locked} value={devueltoPor} onChange={(e) => setDevueltoPor(e.target.value)} placeholder="Conductor que devolvió el contenedor" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500 disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed" />
+        <datalist id={`cd-${d.id}`}>{conductores.map((c) => <option key={c} value={c} />)}</datalist>
+        {cruce ? (
+          saldada ? (
+            <p className="mt-1.5 inline-flex items-start gap-1.5 rounded-md bg-emerald-50 px-2 py-1 text-xs text-emerald-700 ring-1 ring-inset ring-emerald-200">
+              <Check size={13} className="mt-0.5 shrink-0" />
+              <span>Devolución cruzada por <b>{devueltoPor.trim()}</b> · {d.compensacionEstado}{d.compensacionEstado === "Pagada" && d.compensacionMonto ? ` ${soles(d.compensacionMonto)}` : ""}.</span>
+            </p>
+          ) : (
+            <p className="mt-1.5 inline-flex items-start gap-1.5 rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-700 ring-1 ring-inset ring-amber-200">
+              <ArrowLeftRight size={13} className="mt-0.5 shrink-0" /> <span>Devolución cruzada: <b>{d.conductor || "—"}</b> le debe una devolución a <b>{devueltoPor.trim()}</b>.</span>
+            </p>
+          )
+        ) : null}
+      </div>
+
       {/* Adjuntos (varios) + guardar */}
       <div className="flex flex-wrap items-center gap-2 px-4 py-3">
         <label className="flex items-center gap-1.5 text-xs font-medium text-slate-500"><Paperclip size={13} /> Cita del puerto (PDF/JPG)</label>
@@ -225,16 +249,96 @@ function LugaresModal({ lugares, onClose, onChanged }: { lugares: LugarGuardado[
   );
 }
 
+function CompensacionesPanel({ comp, onChanged }: { comp: CompensacionesResp; onChanged: () => void }) {
+  const [busy, setBusy] = useState("");
+  async function marcar(id: string, estado: string, monto?: number, nota?: string) {
+    setBusy(id + estado);
+    try { await apiDevoluciones.compensar(id, { estado, monto, nota }); onChanged(); }
+    catch (e) { alert((e as Error).message || "No se pudo actualizar la compensación."); }
+    finally { setBusy(""); }
+  }
+  // Se devolvió el favor con otra devolución. Si cancela el diálogo, no se guarda nada.
+  function compensada(id: string) {
+    const nota = prompt("¿Con qué devolución se compensó? (opcional)");
+    if (nota === null) return;
+    marcar(id, "Compensada", undefined, nota.trim());
+  }
+  // Se le pagó al que hizo la devolución. Exige un monto válido mayor a 0.
+  function pagada(id: string) {
+    const m = prompt("Monto pagado (S/):");
+    if (m === null) return;
+    const monto = Number(String(m).replace(",", ".").trim());
+    if (!(monto > 0)) { alert("Ingresa un monto válido mayor a 0."); return; }
+    marcar(id, "Pagada", Math.round(monto * 100) / 100, "");
+  }
+  const resuelta = (e: string) => e === "Compensada" || e === "Pagada";
+  const pendientes = comp.cruces.filter((c) => !resuelta(c.compensacionEstado));
+  const resueltas = comp.cruces.filter((c) => resuelta(c.compensacionEstado));
+
+  return (
+    <Card className="mb-6 p-4">
+      <div className="mb-3 flex items-center gap-2"><Scale size={16} className="text-brand-600" /><h2 className="text-sm font-bold uppercase tracking-wide text-slate-500">Compensaciones entre conductores</h2></div>
+
+      {comp.saldos.length ? (
+        <div className="mb-3 flex flex-wrap gap-2">
+          {comp.saldos.map((s) => (
+            <span key={s.conductor} className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${s.saldo > 0 ? "bg-emerald-50 text-emerald-700 ring-emerald-200" : s.saldo < 0 ? "bg-rose-50 text-rose-600 ring-rose-200" : "bg-slate-50 text-slate-500 ring-slate-200"}`}>
+              {s.conductor}: {s.saldo > 0 ? `le deben ${s.saldo}` : s.saldo < 0 ? `debe ${-s.saldo}` : "a mano"}
+            </span>
+          ))}
+        </div>
+      ) : null}
+
+      <div className="space-y-2">
+        {pendientes.length === 0 ? <p className="text-sm text-slate-400">No hay compensaciones pendientes.</p> : null}
+        {pendientes.map((c) => (
+          <div key={c.id} className="flex flex-wrap items-center gap-x-1.5 gap-y-1 rounded-lg border border-slate-200 px-3 py-2 text-sm">
+            <span className="font-semibold text-slate-800">{c.devueltoPor}</span>
+            <span className="text-slate-500">devolvió</span>
+            <span className="tabular text-slate-600">{c.contenedor || c.codigo}</span>
+            <span className="text-slate-500">de</span>
+            <span className="font-semibold text-slate-800">{c.conductor}</span>
+            <span className="ml-auto flex items-center gap-1.5">
+              <button disabled={!!busy} onClick={() => compensada(c.id)} className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 hover:border-emerald-300 hover:text-emerald-700 disabled:opacity-50"><ArrowLeftRight size={13} /> Compensada</button>
+              <button disabled={!!busy} onClick={() => pagada(c.id)} className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 hover:border-brand-300 hover:text-brand-600 disabled:opacity-50"><HandCoins size={13} /> Pagada</button>
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {resueltas.length ? (
+        <details className="mt-2">
+          <summary className="cursor-pointer text-xs text-slate-400">Resueltas ({resueltas.length})</summary>
+          <div className="mt-2 space-y-1">
+            {resueltas.map((c) => (
+              <div key={c.id} className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                <span>{c.devueltoPor} ↔ {c.conductor} ({c.contenedor || c.codigo})</span>
+                <span className={`rounded px-1.5 py-0.5 font-semibold ${c.compensacionEstado === "Pagada" ? "bg-brand-50 text-brand-700" : "bg-emerald-50 text-emerald-700"}`}>{c.compensacionEstado}{c.compensacionEstado === "Pagada" && c.compensacionMonto ? ` · ${soles(c.compensacionMonto)}` : ""}</span>
+                {c.compensacionNota ? <span className="text-slate-400">· {c.compensacionNota}</span> : null}
+                <button disabled={!!busy} onClick={() => marcar(c.id, "Pendiente")} className="ml-auto text-slate-400 hover:text-brand-600 disabled:opacity-50">Reabrir</button>
+              </div>
+            ))}
+          </div>
+        </details>
+      ) : null}
+    </Card>
+  );
+}
+
 export default function DevolucionesPage() {
+  const { conductores } = useData();
+  const conductorNames = useMemo(() => conductores.map((c) => c.nombre).filter(Boolean), [conductores]);
   const [items, setItems] = useState<Devolucion[]>([]);
   const [lugares, setLugares] = useState<LugarGuardado[]>([]);
+  const [comp, setComp] = useState<CompensacionesResp | null>(null);
   const [query, setQuery] = useState("");
   const [filtro, setFiltro] = useState<"todos" | Estado>("todos");
   const [openLugares, setOpenLugares] = useState(false);
 
   function cargarItems() { apiDevoluciones.list().then(setItems).catch(() => setItems([])); }
   function cargarLugares() { apiLugares.list().then(setLugares).catch(() => setLugares([])); }
-  useEffect(() => { cargarItems(); cargarLugares(); }, []);
+  function cargarComp() { apiDevoluciones.compensaciones().then(setComp).catch(() => setComp(null)); }
+  useEffect(() => { cargarItems(); cargarLugares(); cargarComp(); }, []);
 
   const counts = useMemo(() => ({
     pendiente: items.filter((d) => d.estadoDevolucion === "Pendiente").length,
@@ -247,11 +351,11 @@ export default function DevolucionesPage() {
     return items.filter((d) => {
       if (filtro !== "todos" && d.estadoDevolucion !== filtro) return false;
       if (!q) return true;
-      return `${d.codigo} ${d.contenedor} ${d.cliente} ${d.conductor} ${d.placaTracto}`.toLowerCase().includes(q);
+      return `${d.codigo} ${d.contenedor} ${d.cliente} ${d.conductor} ${d.devueltoPor} ${d.placaTracto}`.toLowerCase().includes(q);
     });
   }, [items, query, filtro]);
 
-  function onSaved(u: Devolucion) { setItems((s) => s.map((x) => (x.id === u.id ? u : x))); }
+  function onSaved(u: Devolucion) { setItems((s) => s.map((x) => (x.id === u.id ? u : x))); cargarComp(); }
 
   const filtros: Array<"todos" | Estado> = ["todos", "Pendiente", "En proceso", "Devuelto"];
 
@@ -284,6 +388,8 @@ export default function DevolucionesPage() {
         <StatCard label="Devueltos" value={counts.devuelto} icon={PackageCheck} tone="green" />
       </div>
 
+      {comp && comp.cruces.length ? <CompensacionesPanel comp={comp} onChanged={() => { cargarComp(); cargarItems(); }} /> : null}
+
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <div className="relative min-w-[200px] flex-1">
           <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -307,7 +413,7 @@ export default function DevolucionesPage() {
             {items.length === 0 ? "No hay viajes de importación registrados." : "Sin resultados para el filtro actual."}
           </Card>
         ) : null}
-        {visibles.map((d) => <DevolucionCard key={d.id} d={d} lugares={lugares} onSaved={onSaved} />)}
+        {visibles.map((d) => <DevolucionCard key={d.id} d={d} lugares={lugares} conductores={conductorNames} onSaved={onSaved} />)}
       </div>
 
       {openLugares ? <LugaresModal lugares={lugares} onClose={() => setOpenLugares(false)} onChanged={cargarLugares} /> : null}

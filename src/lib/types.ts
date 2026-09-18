@@ -132,6 +132,19 @@ export interface FacturaItem {
   afectacion?: string;
   unidad?: string;
 }
+// Valor referencial de un servicio (viaje) del comprobante. El de la factura es la suma.
+export interface ServicioVR {
+  id?: string;
+  detalle?: string;
+  valor: number;
+  ambito?: string; // "" manual | local | nacional
+  ruta?: string;
+  destino?: string;
+  puerto?: string;
+  zona?: string;
+  tipoCarga?: string;
+  pesoTM?: number;
+}
 export interface Factura {
   id: string;
   serie: string;
@@ -155,6 +168,7 @@ export interface Factura {
   montoDetraccion?: number;
   ctaDetraccion?: string;
   valorReferencial?: number;
+  serviciosVR?: ServicioVR[]; // desglose del valor referencial por servicio
   // Insumos del valor referencial (tablas DS 022-2025-MTC)
   vrAmbito?: string;
   vrRuta?: string;

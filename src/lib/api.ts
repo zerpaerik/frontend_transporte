@@ -124,7 +124,7 @@ export const apiClientes = {
   remove: (id: string) => api.del<void>(`/clientes/${id}`),
 };
 
-export interface Agenda { id: string; fecha: string; cliente: string; origen: string; destino: string; devolucion: string; tipoCarga: string; unidades: number; observacion: string; estado: string; }
+export interface Agenda { id: string; fecha: string; cliente: string; origen: string; destino: string; devolucion: string; tipoCarga: string; tipoCarreta: string; unidades: number; observacion: string; estado: string; }
 export const apiAgenda = {
   list: () => api.get<Agenda[]>("/agenda"),
   create: (b: Partial<Omit<Agenda, "id">>) => api.post<Agenda>("/agenda", b),
@@ -402,12 +402,24 @@ export interface Devolucion {
   lugarGuardado: string;
   estadoDevolucion: string;
   devueltoEn: string | null;
+  devueltoPor: string; // conductor que efectivamente devolvió
+  compensacionEstado: string; // "" | Pendiente | Compensada | Pagada
+  compensacionMonto: number;
+  compensacionNota: string;
   citaArchivos: { id: string; nombre: string; mime: string }[];
 }
+export interface CruceCompensacion {
+  id: string; codigo: string; contenedor: string; conductor: string; devueltoPor: string;
+  devueltoEn: string | null; estadoDevolucion: string; compensacionEstado: string; compensacionMonto: number; compensacionNota: string; cliente: string;
+}
+export interface SaldoCompensacion { conductor: string; aFavor: number; enContra: number; saldo: number; }
+export interface CompensacionesResp { cruces: CruceCompensacion[]; saldos: SaldoCompensacion[]; }
 export interface LugarGuardado { id: string; nombre: string; }
 export const apiDevoluciones = {
   list: () => api.get<Devolucion[]>("/devoluciones"),
-  update: (viajeId: string, b: Partial<{ citaFecha: string | null; citaHora: string; lugarGuardado: string; estadoDevolucion: string }>) => api.patch<Devolucion>(`/devoluciones/${viajeId}`, b),
+  update: (viajeId: string, b: Partial<{ citaFecha: string | null; citaHora: string; lugarGuardado: string; estadoDevolucion: string; devueltoPor: string }>) => api.patch<Devolucion>(`/devoluciones/${viajeId}`, b),
+  compensar: (viajeId: string, b: { estado: string; monto?: number; nota?: string }) => api.patch<Devolucion>(`/devoluciones/${viajeId}/compensacion`, b),
+  compensaciones: () => api.get<CompensacionesResp>("/devoluciones/compensaciones"),
   agregarArchivo: (viajeId: string, archivoBase64: string, nombre: string, mime: string) => api.post<Devolucion>(`/devoluciones/${viajeId}/archivos`, { archivoBase64, nombre, mime }),
   quitarArchivo: (viajeId: string, archivoId: string) => api.del<Devolucion>(`/devoluciones/${viajeId}/archivos/${archivoId}`),
   archivo: (viajeId: string, archivoId: string) => api.get<{ nombre: string; mime: string; base64: string }>(`/devoluciones/${viajeId}/archivos/${archivoId}`),
