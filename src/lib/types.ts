@@ -182,6 +182,8 @@ export interface Factura {
   guiaTransportista?: string;
   ubigeoOrigen?: string;
   ubigeoDestino?: string;
+  origen?: string;
+  destino?: string;
   detalleViaje?: string;
   formaPago?: string;
   fechaVencimiento?: string | null;

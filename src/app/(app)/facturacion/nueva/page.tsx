@@ -55,6 +55,8 @@ export default function NuevoComprobantePage() {
   const [valorReferencial, setValorReferencial] = useState("");
   const [ubigeoOrigen, setUbigeoOrigen] = useState("");
   const [ubigeoDestino, setUbigeoDestino] = useState("");
+  const [origen, setOrigen] = useState("");
+  const [destino, setDestino] = useState("");
   const [detalleViaje, setDetalleViaje] = useState("");
   // Calculador del valor referencial (tablas DS 022-2025-MTC)
   const [meta, setMeta] = useState<TarifasMeta | null>(null);
@@ -181,6 +183,8 @@ export default function NuevoComprobantePage() {
       setGuia(String(v.greRemitente || ""));
       setGuiaTransportista(String(v.greTransporte || ""));
       setDetalleViaje(ruta ? `TRANSPORTE ${ruta}` : "");
+      setOrigen(String(v.origen || ""));
+      setDestino(String(v.destino || ""));
       setLineas([linea]);
       setViajes([c.toUpperCase()]);
       // El comprobante arranca de cero: también el valor referencial del anterior.
@@ -217,6 +221,8 @@ export default function NuevoComprobantePage() {
     setGuia(f.guia || "");
     setUbigeoOrigen(f.ubigeoOrigen || "");
     setUbigeoDestino(f.ubigeoDestino || "");
+    setOrigen(f.origen || "");
+    setDestino(f.destino || "");
     setDetalleViaje(f.detalleViaje || "");
     setGuiaTransportista(f.guiaTransportista || "");
     setMoneda(f.moneda === "USD" ? "USD" : "PEN");
@@ -288,7 +294,7 @@ export default function NuevoComprobantePage() {
         serviciosVR: vrEnCurso > 0 ? [...serviciosVR, servicioEnCurso(serviciosVR.length + 1)] : serviciosVR,
         vrAmbito, vrRuta, vrDestino, vrPuerto, vrZona, vrTipoCarga, pesoTM: pesoTM ? Number(pesoTM) : 0,
         referenciaVR: referenciaOrden.trim(), guia: guia.trim(), guiaTransportista: guiaTransportista.trim(),
-        ubigeoOrigen: ubigeoOrigen.trim(), ubigeoDestino: ubigeoDestino.trim(), detalleViaje: detalleViaje.trim(),
+        ubigeoOrigen: ubigeoOrigen.trim(), ubigeoDestino: ubigeoDestino.trim(), origen: origen.trim(), destino: destino.trim(), detalleViaje: detalleViaje.trim(),
         formaPago: esCredito ? "Credito" : "Contado",
         fechaVencimiento: esCredito && vencimiento ? vencimiento : null,
       };
@@ -467,6 +473,8 @@ export default function NuevoComprobantePage() {
             <label className="sm:col-span-2"><span className={lbl}>Detalle del viaje</span><input className={inp} value={detalleViaje} onChange={(e) => setDetalleViaje(e.target.value)} placeholder="TRANSPORTE VENTANILLA - CALLAO" /></label>
             <label><span className={lbl}>Ubigeo origen (partida)</span><UbigeoSelect value={ubigeoOrigen} onChange={setUbigeoOrigen} placeholder="Distrito de partida…" /></label>
             <label><span className={lbl}>Ubigeo destino (llegada)</span><UbigeoSelect value={ubigeoDestino} onChange={setUbigeoDestino} placeholder="Distrito de llegada…" /></label>
+            <label><span className={lbl}>Dirección de origen</span><input className={inp} value={origen} onChange={(e) => setOrigen(e.target.value)} placeholder="Ej. Ransa - Callao" /></label>
+            <label><span className={lbl}>Dirección de destino</span><input className={inp} value={destino} onChange={(e) => setDestino(e.target.value)} placeholder="Ej. Ventanilla" /></label>
           </div>
         </Card>
 
