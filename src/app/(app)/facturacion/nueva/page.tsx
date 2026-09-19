@@ -28,6 +28,14 @@ const num = (v: string) => Number(String(v).replace(",", ".") || 0);
 const r2v = (n: number) => Math.round(n * 100) / 100;
 // Ruta "ORIGEN - DESTINO" para los textos que van al comprobante.
 const rutaDe = (origen?: string, destino?: string) => [origen, destino].filter(Boolean).join(" - ");
+// Acumula un valor en una lista separada por comas, sin repetir (para juntar varias
+// órdenes / guías cuando una factura reúne varios viajes).
+const addCsv = (current: string, value?: string) => {
+  const val = String(value || "").trim();
+  if (!val) return current;
+  const partes = current.split(/[,/]/).map((s) => s.trim()).filter(Boolean);
+  return partes.includes(val) ? current : (current ? `${current}, ${val}` : val);
+};
 
 // Suma N días a una fecha "YYYY-MM-DD".
 function masDias(iso: string, n: number): string {
@@ -162,12 +170,10 @@ export default function NuevoComprobantePage() {
       if (append && cliente.trim()) {
         // Agrega el viaje como una línea adicional; conserva el cliente ya cargado.
         setLineas((ls) => [...ls.filter((l) => l.descripcion.trim() || l.valorUnitario), linea]);
-        if (v.nOrden) setReferenciaOrden((r) => {
-          const partes = r.split(/[,/]/).map((s) => s.trim()).filter(Boolean);
-          return partes.includes(String(v.nOrden)) ? r : (r ? `${r}, ${v.nOrden}` : String(v.nOrden));
-        });
-        if (v.greRemitente && !guia.trim()) setGuia(String(v.greRemitente));
-        if (v.greTransporte && !guiaTransportista.trim()) setGuiaTransportista(String(v.greTransporte));
+        if (v.nOrden) setReferenciaOrden((r) => addCsv(r, String(v.nOrden)));
+        // Al reunir varios viajes se acumulan las guías de cada uno (remitente y transportista).
+        if (v.greRemitente) setGuia((g) => addCsv(g, String(v.greRemitente)));
+        if (v.greTransporte) setGuiaTransportista((g) => addCsv(g, String(v.greTransporte)));
         setViajes((vs) => (vs.includes(c.toUpperCase()) ? vs : [...vs, c.toUpperCase()]));
         if (cli && cliente.trim() && cli !== cliente.trim()) setMsg(`Ojo: el viaje ${c} es de otro cliente (${cli}). Se agregó igual.`);
         setCodigo("");
@@ -290,8 +296,12 @@ export default function NuevoComprobantePage() {
         items,
         moneda, tipoCambio: moneda === "USD" && tipoCambio ? Number(tipoCambio) : 0,
         valorReferencial: totalVR,
-        // Desglose por servicio: los agregados más el que quedó en el calculador.
-        serviciosVR: vrEnCurso > 0 ? [...serviciosVR, servicioEnCurso(serviciosVR.length + 1)] : serviciosVR,
+        // Desglose por servicio: los agregados más el que quedó en el calculador. Se
+        // envían solo los campos del servicio (sin id/facturaId/orden que trae la BD al editar).
+        serviciosVR: (vrEnCurso > 0 ? [...serviciosVR, servicioEnCurso(serviciosVR.length + 1)] : serviciosVR).map((s) => ({
+          detalle: s.detalle, valor: s.valor, ambito: s.ambito, ruta: s.ruta, destino: s.destino,
+          puerto: s.puerto, zona: s.zona, tipoCarga: s.tipoCarga, pesoTM: s.pesoTM,
+        })),
         vrAmbito, vrRuta, vrDestino, vrPuerto, vrZona, vrTipoCarga, pesoTM: pesoTM ? Number(pesoTM) : 0,
         referenciaVR: referenciaOrden.trim(), guia: guia.trim(), guiaTransportista: guiaTransportista.trim(),
         ubigeoOrigen: ubigeoOrigen.trim(), ubigeoDestino: ubigeoDestino.trim(), origen: origen.trim(), destino: destino.trim(), detalleViaje: detalleViaje.trim(),
