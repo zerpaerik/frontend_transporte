@@ -6,7 +6,7 @@ import { ArrowLeft, Plus, X, Send } from "lucide-react";
 import { Card, Badge } from "@/components/ui";
 import { useData } from "@/lib/store";
 import { api, apiFacturasE } from "@/lib/api";
-import { soles, hoyPeru, fecha } from "@/lib/format";
+import { dinero, hoyPeru, fecha } from "@/lib/format";
 import type { Factura } from "@/lib/types";
 
 const inp = "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100";
@@ -44,6 +44,8 @@ export default function NotaCreditoPage() {
   const [codTipNc, setCodTipNc] = useState("01");
   const [motivo, setMotivo] = useState("");
   const [fechaEmision, setFechaEmision] = useState(hoyPeru());
+  const [moneda, setMoneda] = useState("PEN"); // PEN | USD (por defecto la de la factura de origen)
+  const [tipoCambio, setTipoCambio] = useState("");
   const [lineas, setLineas] = useState<Linea[]>([]);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
@@ -56,6 +58,9 @@ export default function NotaCreditoPage() {
       : [{ descripcion: `ANULACIÓN ${base.serie}-${base.correlativo}`, cantidad: 1, valorUnitario: base.monto || 0 }];
     setLineas(items);
     setMotivo((m) => m || "ANULACION DE LA OPERACION");
+    // La NC hereda la moneda y el tipo de cambio de la factura de origen (editable).
+    setMoneda(base.moneda === "USD" ? "USD" : "PEN");
+    setTipoCambio(base.tipoCambio ? String(base.tipoCambio) : "");
   }, [facturaId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const setLinea = (i: number, patch: Partial<Linea>) => setLineas((ls) => ls.map((l, j) => (j === i ? { ...l, ...patch } : l)));
@@ -77,6 +82,7 @@ export default function NotaCreditoPage() {
         cliente: base.cliente, ruc: base.ruc || "-", direccion: base.direccion || "",
         fecha: fechaEmision, viaje: base.viaje || "-",
         monto: gravado, igv, estadoSunat: "Emitida",
+        moneda, tipoCambio: moneda === "USD" && tipoCambio ? Number(tipoCambio) : 0,
         items,
         // Referencia al comprobante que se acredita
         docRefTipo: base.tipo === "Boleta" ? "03" : "01",
@@ -109,7 +115,7 @@ export default function NotaCreditoPage() {
           <select className={inp} value={facturaId} onChange={(e) => setFacturaId(e.target.value)}>
             <option value="">Elige el comprobante…</option>
             {acreditables.map((f) => (
-              <option key={f.id} value={f.id}>{f.serie}-{f.correlativo} · {f.cliente} · {soles(f.total || f.monto + f.igv)}</option>
+              <option key={f.id} value={f.id}>{f.serie}-{f.correlativo} · {f.cliente} · {dinero(f.total || f.monto + f.igv, f.moneda)}</option>
             ))}
           </select>
         </label>
@@ -119,7 +125,7 @@ export default function NotaCreditoPage() {
             <Badge tone="gray">{base.tipo}</Badge>
             <span className="font-semibold text-slate-800">{base.serie}-{base.correlativo}</span>
             <span className="text-slate-500">{base.cliente} · {base.ruc}</span>
-            <span className="ml-auto tabular font-semibold">{soles(base.total || base.monto + base.igv)}</span>
+            <span className="ml-auto tabular font-semibold">{dinero(base.total || base.monto + base.igv, base.moneda)}</span>
           </div>
         ) : null}
       </Card>
@@ -135,6 +141,15 @@ export default function NotaCreditoPage() {
                 </select>
               </label>
               <label><span className={lbl}>Fecha de emisión</span><input type="date" className={inp} value={fechaEmision} onChange={(e) => setFechaEmision(e.target.value)} /></label>
+              <label><span className={lbl}>Moneda</span>
+                <select className={inp} value={moneda} onChange={(e) => setMoneda(e.target.value)}>
+                  <option value="PEN">Soles (S/)</option>
+                  <option value="USD">Dólares (US$)</option>
+                </select>
+              </label>
+              {moneda === "USD" ? (
+                <label><span className={lbl}>Tipo de cambio (S/ por US$)</span><input type="number" step="any" min="0" className={inp} value={tipoCambio} onChange={(e) => setTipoCambio(e.target.value)} placeholder="3.750" /></label>
+              ) : null}
               <label className="sm:col-span-2"><span className={lbl}>Descripción / sustento</span><input className={inp} value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="ANULACION DE LA OPERACION" /></label>
             </div>
           </Card>
@@ -154,9 +169,9 @@ export default function NotaCreditoPage() {
             </div>
             <button onClick={agregar} className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-dashed border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 hover:border-brand-300 hover:text-brand-600"><Plus size={14} /> Agregar línea</button>
             <div className="mt-4 space-y-1.5 border-t border-slate-100 pt-3 text-sm">
-              <div className="flex justify-between"><span className="text-slate-500">Monto gravado</span><span className="tabular font-medium">{soles(gravado)}</span></div>
-              <div className="flex justify-between"><span className="text-slate-500">IGV (18%)</span><span className="tabular font-medium">{soles(igv)}</span></div>
-              <div className="flex justify-between border-t border-slate-100 pt-1.5"><span className="font-semibold text-slate-700">Total NC</span><span className="tabular font-bold">{soles(total)}</span></div>
+              <div className="flex justify-between"><span className="text-slate-500">Monto gravado</span><span className="tabular font-medium">{dinero(gravado, moneda)}</span></div>
+              <div className="flex justify-between"><span className="text-slate-500">IGV (18%)</span><span className="tabular font-medium">{dinero(igv, moneda)}</span></div>
+              <div className="flex justify-between border-t border-slate-100 pt-1.5"><span className="font-semibold text-slate-700">Total NC</span><span className="tabular font-bold">{dinero(total, moneda)}</span></div>
             </div>
           </Card>
 
