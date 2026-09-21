@@ -119,6 +119,7 @@ export function ComprobanteModal({ f, listo, emisor = null, cuentas = [], onClos
 
         <div className="px-6 py-3">
           <Dato k="RUC / DNI" v={f.ruc} />
+          {mon === "USD" ? <Dato k="Moneda" v={`Dólares (US$)${tc > 0 ? ` · T.C. ${tc.toFixed(3)}` : ""}`} /> : null}
           {f.docRefSerie ? <Dato k="Afecta a" v={`${f.docRefSerie}-${f.docRefCorrelativo}`} /> : null}
 
           {!emitido ? (

@@ -7,7 +7,7 @@ import { PageHeader, StatCard, Badge } from "@/components/ui";
 import { DataTable, type Column, type Filter } from "@/components/DataTable";
 import { useData } from "@/lib/store";
 import { apiEmisor, apiCuentas, type EmisorRespuesta, type CuentaBancaria } from "@/lib/api";
-import { soles, fecha } from "@/lib/format";
+import { soles, dinero, fecha } from "@/lib/format";
 import type { Factura } from "@/lib/types";
 import { ComprobanteModal, estDoc } from "@/components/ComprobanteModal";
 
@@ -42,7 +42,7 @@ export default function FacturacionPage() {
     { key: "cliente", header: "Cliente", sortable: true },
     { key: "ruc", header: "RUC", render: (f) => <span className="tabular text-slate-500">{f.ruc}</span> },
     { key: "fecha", header: "Fecha", sortable: true, value: (f) => f.fecha, render: (f) => <span className="tabular whitespace-nowrap">{fecha(f.fecha)}</span> },
-    { key: "total", header: "Total", align: "right", sortable: true, value: (f) => f.monto + f.igv, render: (f) => <span className="tabular font-semibold">{soles(f.total || f.monto + f.igv)}</span> },
+    { key: "total", header: "Total", align: "right", sortable: true, value: (f) => f.monto + f.igv, render: (f) => <span className="tabular font-semibold">{dinero(f.total || f.monto + f.igv, f.moneda)}</span> },
     { key: "detr", header: "Detracción", align: "right", render: (f) => (f.sujetoDetraccion && f.montoDetraccion ? <span className="tabular text-rose-500">−{soles(f.montoDetraccion)}</span> : <span className="text-slate-300">—</span>) },
     { key: "sunat", header: "Estado SUNAT", sortable: true, value: (f) => estDoc(f).label, render: (f) => <Badge tone={estDoc(f).tone}>{estDoc(f).label}</Badge> },
     { key: "acc", header: "", align: "right", render: (f) => <button onClick={() => setSelId(f.id)} className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:border-brand-300 hover:text-brand-600">Abrir</button> },
