@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Search, Plus, X, Save, Eye } from "lucide-react";
 import { Card } from "@/components/ui";
 import { useData } from "@/lib/store";
-import { apiViajePorCodigo, apiTarifas, apiFacturasE, apiEmisor, apiCuentas, type TarifasMeta, type EmisorConfig, type CuentaBancaria } from "@/lib/api";
+import { apiViajePorCodigo, apiTarifas, apiFacturasE, apiEmisor, apiCuentas, apiClientes, type TarifasMeta, type EmisorConfig, type CuentaBancaria, type Cliente } from "@/lib/api";
 import { dinero, soles, hoyPeru, fecha } from "@/lib/format";
 import type { Factura, ServicioVR } from "@/lib/types";
 import { FacturaPreview, type PreviewData } from "@/components/FacturaPreview";
@@ -56,6 +56,12 @@ export default function NuevoComprobantePage() {
   const [cliente, setCliente] = useState("");
   const [ruc, setRuc] = useState("");
   const [direccion, setDireccion] = useState("");
+  const [catClientes, setCatClientes] = useState<Cliente[]>([]);
+  // Busca un cliente del catálogo por nombre (para jalar su RUC y dirección).
+  const datosCliente = (nombre: string) => {
+    const n = String(nombre || "").trim().toLowerCase();
+    return catClientes.find((c) => c.nombre.trim().toLowerCase() === n) || null;
+  };
   const [fechaEmision, setFechaEmision] = useState(hoyPeru());
   const [viaje, setViaje] = useState("-");
   const [referenciaOrden, setReferenciaOrden] = useState("");
@@ -182,8 +188,11 @@ export default function NuevoComprobantePage() {
 
       // Carga inicial (reemplaza): datos del cliente + primera línea.
       setCliente(cli);
-      setRuc(String(v.clienteRuc || ""));
-      setDireccion(String(v.clienteDireccion || ""));
+      // El RUC/dirección salen del catálogo por el nombre del cliente a facturar; si no
+      // está en el catálogo, se usa lo que traiga el viaje.
+      const cat = datosCliente(cli);
+      setRuc(cat?.ruc || String(v.clienteRuc || ""));
+      setDireccion(cat?.direccion || String(v.clienteDireccion || ""));
       setViaje(String(v.contenedor || "-"));
       setReferenciaOrden(String(v.nOrden || ""));
       setGuia(String(v.greRemitente || ""));
@@ -257,6 +266,8 @@ export default function NuevoComprobantePage() {
 
   // Catálogo de tarifas referenciales (rutas/puertos) del DS 022-2025-MTC.
   useEffect(() => { apiTarifas.meta().then(setMeta).catch(() => {}); }, []);
+  // Catálogo de clientes (para jalar el RUC y la dirección por nombre).
+  useEffect(() => { apiClientes.list().then(setCatClientes).catch(() => {}); }, []);
 
   // Emisor y cuentas de la sede para armar la vista previa del comprobante.
   useEffect(() => {
@@ -357,7 +368,16 @@ export default function NuevoComprobantePage() {
             </select>
           </label>
           <label><span className={lbl}>Fecha de emisión</span><input type="date" className={inp} value={fechaEmision} onChange={(e) => setFechaEmision(e.target.value)} /></label>
-          <label className="sm:col-span-2"><span className={lbl}>Cliente (razón social)</span><input className={inp} value={cliente} onChange={(e) => setCliente(e.target.value)} placeholder="Cliente a facturar (viene de Operaciones)" /></label>
+          <label className="sm:col-span-2"><span className={lbl}>Cliente (razón social)</span>
+            <input className={inp} list="clientes-cat" value={cliente} placeholder="Cliente a facturar (viene de Operaciones)"
+              onChange={(e) => {
+                const nombre = e.target.value;
+                setCliente(nombre);
+                const cat = datosCliente(nombre); // si coincide con el catálogo, jala RUC y dirección
+                if (cat) { setRuc(cat.ruc || ""); setDireccion(cat.direccion || ""); }
+              }} />
+            <datalist id="clientes-cat">{catClientes.map((c) => <option key={c.id} value={c.nombre} />)}</datalist>
+          </label>
           <label><span className={lbl}>RUC / DNI</span><input className={inp} value={ruc} onChange={(e) => setRuc(e.target.value)} placeholder="20601847834" /></label>
           <label><span className={lbl}>Moneda</span>
             <select className={inp} value={moneda} onChange={(e) => setMoneda(e.target.value)}>
