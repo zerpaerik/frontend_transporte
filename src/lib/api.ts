@@ -320,6 +320,7 @@ export const apiFacturasE = {
   emitir: (id: string) => api.post<EmitirRespuesta>(`/facturas/${id}/emitir`, {}),
   estado: (id: string) => api.post<unknown>(`/facturas/${id}/estado`, {}),
   pdf: (id: string) => api.get<{ nombre: string; mime: string; base64: string }>(`/facturas/${id}/pdf`),
+  xml: (id: string) => api.get<{ nombre: string; mime: string; base64: string }>(`/facturas/${id}/xml`),
   anular: (id: string, motivo: string) => api.post<unknown>(`/facturas/${id}/anular`, { motivo }),
   correo: (id: string, correo: string) => api.post<{ ok: boolean; mensaje: string }>(`/facturas/${id}/correo`, { correo }),
 };

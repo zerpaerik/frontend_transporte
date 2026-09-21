@@ -99,6 +99,7 @@ export function ComprobanteModal({ f, listo, emisor = null, cuentas = [], onClos
   const anular = () => { const m = prompt("Motivo de la anulación:"); if (m) correr("anular", () => apiFacturasE.anular(f.id, m)); };
   const correo = () => { const c = prompt("Correo del cliente:"); if (c) correr("correo", async () => { const r = await apiFacturasE.correo(f.id, c); alert(r.mensaje); }, false); };
   const pdf = () => correr("pdf", async () => { const p = await apiFacturasE.pdf(f.id); downloadBase64(p.nombre, p.mime, p.base64); }, false);
+  const xml = () => correr("xml", async () => { const x = await apiFacturasE.xml(f.id); downloadBase64(x.nombre, x.mime, x.base64); }, false);
 
   const btn = "inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium disabled:opacity-50";
   return (
@@ -191,6 +192,7 @@ export function ComprobanteModal({ f, listo, emisor = null, cuentas = [], onClos
             <button disabled={!!busy} onClick={pdf} className={`${btn} flex-1 justify-center bg-brand-500 text-white hover:bg-brand-600`}><FileDown size={15} /> {busy === "pdf" ? "…" : "Descargar PDF"}</button>
           )}
           {emitido ? <button disabled={!!busy} onClick={estado} className={`${btn} border border-slate-300 bg-white text-slate-600 hover:border-brand-300`}><RefreshCw size={15} /> Estado</button> : null}
+          {aceptado ? <button disabled={!!busy} onClick={xml} className={`${btn} border border-slate-300 bg-white text-slate-600 hover:border-brand-300`}><FileDown size={15} /> {busy === "xml" ? "…" : "XML"}</button> : null}
           {aceptado ? <button disabled={!!busy} onClick={correo} className={`${btn} border border-slate-300 bg-white text-slate-600 hover:border-brand-300`}><Mail size={15} /> Correo</button> : null}
           {aceptado ? <button disabled={!!busy} onClick={anular} className={`${btn} border border-slate-300 bg-white text-rose-600 hover:bg-rose-50`}><Ban size={15} /> Anular</button> : null}
         </div>
