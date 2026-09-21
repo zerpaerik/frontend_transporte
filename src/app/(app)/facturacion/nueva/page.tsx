@@ -268,6 +268,15 @@ export default function NuevoComprobantePage() {
   useEffect(() => { apiTarifas.meta().then(setMeta).catch(() => {}); }, []);
   // Catálogo de clientes (para jalar el RUC y la dirección por nombre).
   useEffect(() => { apiClientes.list().then(setCatClientes).catch(() => {}); }, []);
+  // Si hay cliente pero el RUC quedó vacío (p. ej. el viaje se trajo antes de que
+  // cargara el catálogo), se completa el RUC/dirección desde el catálogo por nombre.
+  useEffect(() => {
+    if (!cliente || ruc) return;
+    const cat = datosCliente(cliente);
+    if (cat?.ruc) setRuc(cat.ruc);
+    if (cat?.direccion && !direccion) setDireccion(cat.direccion);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [catClientes, cliente]);
 
   // Emisor y cuentas de la sede para armar la vista previa del comprobante.
   useEffect(() => {
