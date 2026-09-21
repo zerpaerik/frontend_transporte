@@ -60,7 +60,7 @@ export function FacturaPreview({
   // Detracción del transporte de carga. Siempre en soles. Si el backend ya la calculó
   // se usa ese monto; si no, se estima con la config del emisor (se confirma al emitir).
   const porc = emisor?.porcDetraccion || 4;
-  const umbral = emisor?.umbralDetraccion ?? 700;
+  const umbral = emisor?.umbralDetraccion ?? 400;
   const totalSoles = mon === "USD" && tc > 0 ? r2(total * tc) : total;
   const baseDetr = Math.max(totalSoles, data.valorReferencial || 0);
   const aplicaEstimada = !!emisor?.ctaDetraccion && totalSoles >= umbral && data.tipo !== "N. Crédito";

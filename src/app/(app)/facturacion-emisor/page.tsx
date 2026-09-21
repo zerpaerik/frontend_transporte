@@ -11,7 +11,7 @@ type Form = Omit<EmisorConfig, "id" | "sedeId">;
 const VACIO: Form = {
   ruc: "", razonSocial: "", nombreComercial: "", ubigeo: "", direccionFiscal: "", codAnexo: "0000",
   serieFactura: "FN01", serieBoleta: "BN01", serieNotaCredito: "FN01", serieNotaDebito: "FD01", serieGuiaTransportista: "V001", registroMtc: "", puntoVenta: "",
-  ctaDetraccion: "", porcDetraccion: 4, codDetraccion: "027", umbralDetraccion: 700,
+  ctaDetraccion: "", porcDetraccion: 4, codDetraccion: "027", umbralDetraccion: 400,
   formatoImpresion: "001",
   correoEnvio: "", activo: false,
 };
