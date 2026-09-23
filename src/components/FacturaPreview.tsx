@@ -61,20 +61,22 @@ export function FacturaPreview({
   // se usa ese monto; si no, se estima con la config del emisor (se confirma al emitir).
   const porc = emisor?.porcDetraccion || 4;
   const umbral = emisor?.umbralDetraccion ?? 400;
+  // El umbral (S/) se compara en soles; la detracción se expresa en la MONEDA del comprobante
+  // (igual que el backend/MiFact): el valor referencial (soles) se lleva a la moneda con el T.C.
   const totalSoles = mon === "USD" && tc > 0 ? r2(total * tc) : total;
-  const baseDetr = Math.max(totalSoles, data.valorReferencial || 0);
-  const aplicaEstimada = !!emisor?.ctaDetraccion && totalSoles >= umbral && data.tipo !== "N. Crédito";
+  const vrEnMoneda = mon === "USD" && tc > 0 ? r2((data.valorReferencial || 0) / tc) : (data.valorReferencial || 0);
+  const baseDetr = Math.max(total, vrEnMoneda);
+  const aplicaEstimada = !!emisor?.ctaDetraccion && totalSoles > umbral && data.tipo !== "N. Crédito";
   const detraccion =
     data.montoDetraccion !== undefined && data.montoDetraccion > 0
       ? data.montoDetraccion
       : aplicaEstimada
-        ? Math.round(baseDetr * (porc / 100)) // redondeo a soles enteros (regla SUNAT)
+        ? (mon === "PEN" ? Math.round(baseDetr * (porc / 100)) : r2(baseDetr * (porc / 100))) // soles enteros (regla SUNAT)
         : 0;
   const hayDetr = (data.sujetoDetraccion ?? aplicaEstimada) && detraccion > 0;
   const estimada = data.montoDetraccion === undefined;
-  // Neto a pagar en la moneda del comprobante (la detracción es en soles).
-  const detrEnMoneda = mon === "USD" && tc > 0 ? r2(detraccion / tc) : detraccion;
-  const neto = r2(total - detrEnMoneda);
+  // Neto a pagar: total − detracción, ambos ya en la moneda del comprobante.
+  const neto = r2(total - detraccion);
   const cta = data.ctaDetraccion || emisor?.ctaDetraccion || "";
 
   const doc = `${data.serie || ""}${data.correlativo ? "-" + data.correlativo : ""}`.trim();
@@ -180,7 +182,7 @@ export function FacturaPreview({
               <div className="flex justify-between border-t border-slate-200 pt-1.5"><span className="font-bold text-slate-800">Importe total</span><span className="tabular font-extrabold text-slate-900">{dinero(total, mon)}</span></div>
               {hayDetr ? (
                 <>
-                  <Tot k={`Detracción (${porc}%)`} v={<span className="text-rose-500">− {soles(detraccion)}</span>} />
+                  <Tot k={`Detracción (${porc}%)`} v={<span className="text-rose-500">− {dinero(detraccion, mon)}</span>} />
                   <div className="flex justify-between rounded-lg bg-emerald-50 px-2 py-1.5"><span className="font-bold text-emerald-800">Neto a pagar</span><span className="tabular font-extrabold text-emerald-700">{dinero(neto, mon)}</span></div>
                 </>
               ) : null}

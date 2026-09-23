@@ -57,12 +57,11 @@ export function ComprobanteModal({ f, listo, emisor = null, cuentas = [], onClos
   const igvL = Math.round(gravadoL * 0.18 * 100) / 100;
   const totalL = Math.round((gravadoL + igvL) * 100) / 100;
 
-  // Total y neto a pagar (total − detracción). La detracción es en soles; si el comprobante
-  // es en dólares se descuenta su equivalente en la moneda del comprobante.
+  // Total y neto a pagar (total − detracción). La detracción ya viene calculada por el
+  // backend en la MONEDA del comprobante, así que se resta directo.
   const totalMonto = emitido ? f.total || f.monto + f.igv : totalL;
   const detr = f.montoDetraccion || 0;
-  const detrEnMoneda = mon === "USD" && tc > 0 ? Math.round((detr / tc) * 100) / 100 : detr;
-  const neto = Math.round((totalMonto - detrEnMoneda) * 100) / 100;
+  const neto = Math.round((totalMonto - detr) * 100) / 100;
 
   const previewData: PreviewData = {
     tipo: f.tipo, serie: f.serie, correlativo: f.correlativo, fecha: String(f.fecha).slice(0, 10),
@@ -146,7 +145,7 @@ export function ComprobanteModal({ f, listo, emisor = null, cuentas = [], onClos
           <Dato k="Monto gravado" v={dinero(emitido ? (f.gravado || f.monto) : gravadoL, mon)} />
           <Dato k="IGV (18%)" v={dinero(emitido ? f.igv : igvL, mon)} />
           <Dato k="Total" v={<b>{dinero(totalMonto, mon)}</b>} />
-          {f.sujetoDetraccion ? <Dato k="Detracción (4%)" v={<span className="text-rose-500">−{soles(detr)} · cta {f.ctaDetraccion || "—"}</span>} /> : null}
+          {f.sujetoDetraccion ? <Dato k="Detracción (4%)" v={<span className="text-rose-500">−{dinero(detr, mon)} · cta {f.ctaDetraccion || "—"}</span>} /> : null}
           {f.sujetoDetraccion ? <Dato k="Neto a pagar" v={<b className="text-emerald-700">{dinero(neto, mon)}</b>} /> : null}
           {f.valorReferencial ? <Dato k="Valor referencial" v={soles(f.valorReferencial)} /> : null}
           {/* Desglose: de qué servicio (viaje) sale cada parte del valor referencial. */}
