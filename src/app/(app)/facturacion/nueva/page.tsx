@@ -397,7 +397,10 @@ export default function NuevoComprobantePage() {
           {moneda === "USD" ? (
             <label><span className={lbl}>Tipo de cambio (S/ por US$)</span><input type="number" step="any" min="0" className={inp} value={tipoCambio} onChange={(e) => setTipoCambio(e.target.value)} placeholder="3.750" /></label>
           ) : null}
-          <label><span className={lbl}>Referencia / N° de orden</span><input className={inp} value={referenciaOrden} onChange={(e) => setReferenciaOrden(e.target.value)} placeholder="ORDEN 2440" /></label>
+          <label><span className={lbl}>Orden de compra (O/C) / referencia</span>
+            <input className={inp} value={referenciaOrden} onChange={(e) => setReferenciaOrden(e.target.value)} placeholder="Ej. 2440 o OC-2440" />
+            <span className="mt-1 block text-xs text-slate-400">Para que salga en la casilla O/C de SUNAT: solo letras y números, <b>sin espacios</b> (máx. 20). Si escribes otra cosa (DAM, ID, BK…), irá a Observaciones.</span>
+          </label>
           <label><span className={lbl}>Guía remitente</span><input className={inp} value={guia} onChange={(e) => setGuia(e.target.value)} placeholder="T002-1668" /></label>
           <label><span className={lbl}>Guía transportista</span><input className={inp} value={guiaTransportista} onChange={(e) => setGuiaTransportista(e.target.value)} placeholder="V001-00000123" /></label>
           <label className="sm:col-span-2"><span className={lbl}>Dirección del cliente</span><input className={inp} value={direccion} onChange={(e) => setDireccion(e.target.value)} /></label>
