@@ -23,6 +23,7 @@ export interface PreviewData {
   guiaTransportista?: string;
   referencia?: string;
   detalleViaje?: string;
+  observaciones?: string; // texto libre (p. ej. la DAM), una observación por línea
   valorReferencial?: number;
   ubigeoOrigen?: string;
   ubigeoDestino?: string;
@@ -164,6 +165,14 @@ export function FacturaPreview({
           <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:justify-between">
             <div className="flex-1 space-y-2 text-xs text-slate-500">
               {data.detalleViaje ? <p><span className="font-semibold text-slate-600">Detalle:</span> {data.detalleViaje}</p> : null}
+              {data.observaciones?.trim() ? (
+                <div>
+                  <span className="font-semibold text-slate-600">Observaciones:</span>
+                  <ul className="mt-0.5 space-y-0.5">
+                    {data.observaciones.split(/\r?\n/).map((l) => l.trim()).filter(Boolean).map((l, i) => <li key={i}>{l}</li>)}
+                  </ul>
+                </div>
+              ) : null}
               {hayDetr ? (
                 <p><span className="font-semibold text-slate-600">Detracción (transporte {emisor?.codDetraccion || "027"}):</span> {porc}% · cuenta {cta || "—"} (Banco de la Nación){estimada ? " · estimada, se confirma al emitir" : ""}</p>
               ) : null}

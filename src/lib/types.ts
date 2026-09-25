@@ -185,6 +185,7 @@ export interface Factura {
   origen?: string;
   destino?: string;
   detalleViaje?: string;
+  observaciones?: string; // texto libre que sale en "Observaciones" del comprobante (p. ej. la DAM)
   formaPago?: string;
   fechaVencimiento?: string | null;
   estadoDocumento?: string; // 101..108

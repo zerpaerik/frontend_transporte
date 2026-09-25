@@ -72,6 +72,7 @@ export default function NuevoComprobantePage() {
   const [origen, setOrigen] = useState("");
   const [destino, setDestino] = useState("");
   const [detalleViaje, setDetalleViaje] = useState("");
+  const [observaciones, setObservaciones] = useState(""); // sale en "Observaciones" del comprobante (p. ej. la DAM)
   // Calculador del valor referencial (tablas DS 022-2025-MTC)
   const [meta, setMeta] = useState<TarifasMeta | null>(null);
   const [vrAmbito, setVrAmbito] = useState(""); // "" manual | local | nacional
@@ -239,6 +240,7 @@ export default function NuevoComprobantePage() {
     setOrigen(f.origen || "");
     setDestino(f.destino || "");
     setDetalleViaje(f.detalleViaje || "");
+    setObservaciones(f.observaciones || "");
     setGuiaTransportista(f.guiaTransportista || "");
     setMoneda(f.moneda === "USD" ? "USD" : "PEN");
     setTipoCambio(f.tipoCambio ? String(f.tipoCambio) : "");
@@ -325,6 +327,7 @@ export default function NuevoComprobantePage() {
         vrAmbito, vrRuta, vrDestino, vrPuerto, vrZona, vrTipoCarga, pesoTM: pesoTM ? Number(pesoTM) : 0,
         referenciaVR: referenciaOrden.trim(), guia: guia.trim(), guiaTransportista: guiaTransportista.trim(),
         ubigeoOrigen: ubigeoOrigen.trim(), ubigeoDestino: ubigeoDestino.trim(), origen: origen.trim(), destino: destino.trim(), detalleViaje: detalleViaje.trim(),
+        observaciones: observaciones.trim(),
         formaPago: esCredito ? "Credito" : "Contado",
         fechaVencimiento: esCredito && vencimiento ? vencimiento : null,
       };
@@ -404,6 +407,10 @@ export default function NuevoComprobantePage() {
           <label><span className={lbl}>Guía remitente</span><input className={inp} value={guia} onChange={(e) => setGuia(e.target.value)} placeholder="T002-1668" /></label>
           <label><span className={lbl}>Guía transportista</span><input className={inp} value={guiaTransportista} onChange={(e) => setGuiaTransportista(e.target.value)} placeholder="V001-00000123" /></label>
           <label className="sm:col-span-2"><span className={lbl}>Dirección del cliente</span><input className={inp} value={direccion} onChange={(e) => setDireccion(e.target.value)} /></label>
+          <label className="sm:col-span-2"><span className={lbl}>Observaciones (salen en el comprobante)</span>
+            <textarea className={`${inp} min-h-[72px]`} value={observaciones} onChange={(e) => setObservaciones(e.target.value)} placeholder={"Ej. DAM N° 118-2026-10-451784\nUna observación por línea"} />
+            <span className="mt-1 block text-xs text-slate-400">Aquí va la DAM u otras referencias que el cliente pida ver en la factura. Cada línea sale como una observación en el PDF.</span>
+          </label>
         </div>
       </Card>
 
@@ -562,7 +569,7 @@ export default function NuevoComprobantePage() {
             cliente, ruc, direccion,
             lineas: lineas.map((l) => ({ descripcion: l.descripcion, cantidad: l.cantidad || 1, valorUnitario: l.valorUnitario || 0 })),
             formaPago: esCredito ? "Credito" : "Contado", fechaVencimiento: esCredito && vencimiento ? vencimiento : null,
-            guia, guiaTransportista, referencia: referenciaOrden, detalleViaje,
+            guia, guiaTransportista, referencia: referenciaOrden, detalleViaje, observaciones,
             valorReferencial: totalVR, ubigeoOrigen, ubigeoDestino,
           } as PreviewData}
         />

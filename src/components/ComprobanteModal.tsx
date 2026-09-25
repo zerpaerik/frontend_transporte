@@ -69,7 +69,7 @@ export function ComprobanteModal({ f, listo, emisor = null, cuentas = [], onClos
     cliente: f.cliente, ruc: f.ruc, direccion: f.direccion,
     lineas: (emitido ? f.items || [] : lineas).map((l) => ({ descripcion: l.descripcion, cantidad: l.cantidad || 1, valorUnitario: l.valorUnitario || 0 })),
     formaPago: f.formaPago, fechaVencimiento: f.fechaVencimiento,
-    guia: f.guia, guiaTransportista: f.guiaTransportista, referencia: f.referenciaVR, detalleViaje: f.detalleViaje,
+    guia: f.guia, guiaTransportista: f.guiaTransportista, referencia: f.referenciaVR, detalleViaje: f.detalleViaje, observaciones: f.observaciones,
     valorReferencial: f.valorReferencial, ubigeoOrigen: f.ubigeoOrigen, ubigeoDestino: f.ubigeoDestino,
     docRef: f.docRefSerie ? `${f.docRefSerie}-${f.docRefCorrelativo}` : undefined,
     montoDetraccion: f.montoDetraccion, sujetoDetraccion: f.sujetoDetraccion, ctaDetraccion: f.ctaDetraccion,
