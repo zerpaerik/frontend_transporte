@@ -313,6 +313,14 @@ export const apiTarifas = {
   calcular: (input: ValorRefInput) => api.post<ValorRefResultado>("/facturacion/tarifas/valor-referencial", input),
 };
 
+// --- Cobranzas: pago de facturas y comprobantes de pago (JPG/PNG/PDF) ---
+export const apiCobranzas = {
+  pago: (id: string, body: { pagada: boolean; fechaPago?: string; notaPago?: string }) => api.patch<unknown>(`/facturas/${id}/pago`, body),
+  subir: (id: string, body: { base64: string; nombre: string; mime: string }) => api.post<unknown>(`/facturas/${id}/comprobantes-pago`, body),
+  descargar: (id: string, cid: string) => api.get<{ nombre: string; mime: string; base64: string }>(`/facturas/${id}/comprobantes-pago/${cid}`),
+  quitar: (id: string, cid: string) => api.del<unknown>(`/facturas/${id}/comprobantes-pago/${cid}`),
+};
+
 // Acciones de facturación electrónica sobre un comprobante ya registrado.
 export interface EmitirRespuesta { respuesta: { estado_documento: string; errors: string; sunat_description: string } }
 export const apiFacturasE = {

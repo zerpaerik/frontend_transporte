@@ -186,6 +186,11 @@ export interface Factura {
   destino?: string;
   detalleViaje?: string;
   observaciones?: string; // texto libre que sale en "Observaciones" del comprobante (p. ej. la DAM)
+  // Cobranza (independiente del estado SUNAT)
+  pagada?: boolean;
+  fechaPago?: string | null;
+  notaPago?: string;
+  comprobantesPago?: { id: string; nombre: string; mime: string; createdAt: string }[];
   formaPago?: string;
   fechaVencimiento?: string | null;
   estadoDocumento?: string; // 101..108

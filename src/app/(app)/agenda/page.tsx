@@ -74,7 +74,13 @@ export default function AgendaPage() {
     { name: "destino", label: "Destino (distrito)", type: "select", options: ["", ...distritos], default: a?.destino },
     { name: "devolucion", label: "Punto de devolución", type: "select", options: ["", ...puertos], default: a?.devolucion },
     { name: "tipoCarga", label: "Tipo de carga", type: "select", options: ["GENERAL", "IMO", "REEFER"], default: a?.tipoCarga },
-    { name: "tipoCarreta", label: "Tipo de carreta", type: "select", options: ["", "Plataforma", "Portacontenedor", "Cama baja", "Cama cuna", "Baranda", "Furgón", "Tolva", "Cisterna"], default: a?.tipoCarreta },
+    // Plataforma se pide por tamaño (20' / 40'). Si un agendado anterior trae un valor que ya no
+    // está en la lista (p. ej. "Plataforma"), se conserva como opción para no perderlo al editar.
+    { name: "tipoCarreta", label: "Tipo de carreta", type: "select", options: (() => {
+        const base = ["", "Plataforma 20'", "Plataforma 40'", "Portacontenedor", "Cama baja", "Cama cuna", "Baranda", "Furgón", "Tolva", "Cisterna"];
+        const cur = String(a?.tipoCarreta || "");
+        return cur && !base.includes(cur) ? [cur, ...base] : base;
+      })(), default: a?.tipoCarreta },
     { name: "unidades", label: "Unidades comprometidas", type: "number", default: a?.unidades ?? 1 },
     { name: "estado", label: "Estado", type: "select", options: ["Programado", "Confirmado", "Realizado", "Cancelado"], default: a?.estado },
     { name: "observacion", label: "Observación", type: "text", full: true, placeholder: "Notas del servicio (opcional)", default: a?.observacion },

@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Truck, IdCard, Wrench, Package, CircleDot,
-  Container, PackageCheck, ReceiptText, Wallet, UserCog, Coins, FolderCog, Fuel, FolderArchive, CalendarClock, Building2, ScrollText, FileMinus, FilePlus, Landmark, Scale, type LucideIcon,
+  Container, PackageCheck, ReceiptText, Wallet, UserCog, Coins, FolderCog, Fuel, FolderArchive, CalendarClock, Building2, ScrollText, FileMinus, FilePlus, Landmark, Scale, HandCoins, type LucideIcon,
 } from "lucide-react";
 import type { Rol } from "./types";
 
@@ -31,6 +31,7 @@ export const NAV: NavItem[] = [
   { href: "/facturacion", label: "Facturación", icon: ReceiptText, modulo: "09", roles: ["Administrador", "Operador"], grupo: "SUNAT" },
   { href: "/facturacion/nota-credito", label: "Notas de crédito", icon: FileMinus, modulo: "09", roles: ["Administrador", "Operador"], grupo: "SUNAT" },
   { href: "/facturacion/nota-debito", label: "Notas de débito", icon: FilePlus, modulo: "09", roles: ["Administrador", "Operador"], grupo: "SUNAT" },
+  { href: "/cobranzas", label: "Cobranzas", icon: HandCoins, modulo: "09", roles: ["Administrador", "Operador", "Contable"], grupo: "SUNAT" },
   { href: "/gre", label: "GRE Transportista", icon: ScrollText, modulo: "09", roles: ["Administrador", "Operador"], grupo: "SUNAT" },
   { href: "/facturacion-emisor", label: "Datos del emisor", icon: Building2, modulo: "09", roles: ["Administrador"], grupo: "SUNAT" },
   { href: "/cuentas-bancarias", label: "Cuentas bancarias", icon: Landmark, modulo: "09", roles: ["Administrador"], grupo: "SUNAT" },
