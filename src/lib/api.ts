@@ -315,7 +315,9 @@ export const apiTarifas = {
 
 // --- Cobranzas: pago de facturas y comprobantes de pago (JPG/PNG/PDF) ---
 export const apiCobranzas = {
-  pago: (id: string, body: { pagada: boolean; fechaPago?: string; notaPago?: string }) => api.patch<unknown>(`/facturas/${id}/pago`, body),
+  pago: (id: string, body: { pagada: boolean; fechaPago?: string; notaPago?: string; montoCobrado?: number; detraccionResponsable?: "Cliente" | "Empresa" }) => api.patch<unknown>(`/facturas/${id}/pago`, body),
+  // Depósito de la detracción (numero vacío = quitarlo) y/o a quién le toca depositarla.
+  detraccion: (id: string, body: { responsable?: "Cliente" | "Empresa"; fecha?: string | null; numero?: string; monto?: number }) => api.patch<unknown>(`/facturas/${id}/detraccion`, body),
   subir: (id: string, body: { base64: string; nombre: string; mime: string }) => api.post<unknown>(`/facturas/${id}/comprobantes-pago`, body),
   descargar: (id: string, cid: string) => api.get<{ nombre: string; mime: string; base64: string }>(`/facturas/${id}/comprobantes-pago/${cid}`),
   quitar: (id: string, cid: string) => api.del<unknown>(`/facturas/${id}/comprobantes-pago/${cid}`),
@@ -463,6 +465,9 @@ export const apiArchivos = {
   descargar: (id: string) => api.get<{ nombre: string; mime: string; base64: string }>(`/archivos/${id}/descargar`),
   renombrarArchivo: (id: string, nombre: string) => api.patch<ArchivoMeta>(`/archivos/${id}`, { nombre }),
   borrarArchivo: (id: string) => api.del<void>(`/archivos/${id}`),
+  // Mueve archivos a otra carpeta; los que chocan de nombre con el destino no se mueven.
+  mover: (ids: string[], carpetaId: string) =>
+    api.post<{ movidos: number; conflictos: string[]; destino: { id: string; nombre: string } }>("/archivos/mover", { ids, carpetaId }),
 };
 
 // --- Documentos (conductores / vehículos) ---
