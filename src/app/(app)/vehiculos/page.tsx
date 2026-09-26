@@ -1,10 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Plus, Truck, Pencil, Trash2, Search, FileSpreadsheet, FileText, ChevronLeft, ChevronRight, FolderOpen, AlertTriangle } from "lucide-react";
+import { Plus, Truck, Pencil, Trash2, Search, FileSpreadsheet, FileText, ChevronLeft, ChevronRight, FolderOpen, AlertTriangle, CalendarDays, LayoutGrid } from "lucide-react";
 import { PageHeader, StatCard, Card, Badge } from "@/components/ui";
 import { FormModal, type Field, type FormValues } from "@/components/FormModal";
 import { DocumentosModal } from "@/components/DocumentosModal";
+import { CalendarioDocumentos } from "@/components/CalendarioDocumentos";
 import { PhotoAvatar } from "@/components/PhotoAvatar";
 import { useData } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
@@ -43,6 +44,7 @@ export default function VehiculosPage() {
   const [query, setQuery] = useState("");
   const [tipoFiltro, setTipoFiltro] = useState<"Todos" | "Tracto" | "Carreta">("Todos");
   const [page, setPage] = useState(1);
+  const [vista, setVista] = useState<"tarjetas" | "calendario">("tarjetas");
 
   const docsEstados = vehiculos.flatMap((v) => ((v as any).documentos ?? []).map((d: any) => estadoDocumento(d.vencimiento)));
   const porVencer = docsEstados.filter((e) => e === "Por vencer").length;
@@ -107,6 +109,10 @@ export default function VehiculosPage() {
             {t}
           </button>
         ))}
+        <div className="flex items-center gap-1 rounded-lg border border-slate-300 bg-white p-0.5">
+          <button onClick={() => setVista("tarjetas")} className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium ${vista === "tarjetas" ? "bg-brand-500 text-white" : "text-slate-600 hover:text-brand-600"}`}><LayoutGrid size={15} /> Tarjetas</button>
+          <button onClick={() => setVista("calendario")} className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium ${vista === "calendario" ? "bg-brand-500 text-white" : "text-slate-600 hover:text-brand-600"}`}><CalendarDays size={15} /> Calendario</button>
+        </div>
         <div className="ml-auto flex items-center gap-2">
           <button onClick={() => exportar("csv")} className="flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
             <FileSpreadsheet size={15} /> Excel
@@ -122,6 +128,17 @@ export default function VehiculosPage() {
         </div>
       </div>
 
+      {vista === "calendario" ? (
+        <CalendarioDocumentos
+          items={filtrados}
+          documentosDe={(v) => (v as any).documentos}
+          etiqueta={(v) => v.placa}
+          nombre={(v) => `${v.placa} (${v.tipo} ${v.marca})`}
+          onAbrir={(v) => setDocVeh(v)}
+          ayuda="clic para gestionar los documentos del vehículo"
+        />
+      ) : (
+      <>
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         {visibles.map((v) => {
           const docs: any[] = (v as any).documentos ?? [];
@@ -204,6 +221,8 @@ export default function VehiculosPage() {
             </button>
           </div>
         </div>
+      )}
+      </>
       )}
 
       <FormModal open={open} title="Nuevo vehículo" subtitle="Registra un tracto o carreta en la flota." fields={buildFields()} onSubmit={guardar} onClose={() => setOpen(false)} />
