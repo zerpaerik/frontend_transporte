@@ -165,6 +165,7 @@ export interface Factura {
   gravado?: number;
   total?: number;
   sujetoDetraccion?: boolean;
+  porcDetraccion?: number;
   montoDetraccion?: number;
   ctaDetraccion?: string;
   valorReferencial?: number;
@@ -190,7 +191,13 @@ export interface Factura {
   pagada?: boolean;
   fechaPago?: string | null;
   notaPago?: string;
+  montoCobrado?: number; // lo que entró a la cuenta (moneda del comprobante); 0 = sin dato
   comprobantesPago?: { id: string; nombre: string; mime: string; createdAt: string }[];
+  // Detracción: quién la deposita y la constancia del depósito (en soles)
+  detraccionResponsable?: "" | "Cliente" | "Empresa";
+  detraccionFecha?: string | null;
+  detraccionNumero?: string;
+  detraccionMonto?: number;
   formaPago?: string;
   fechaVencimiento?: string | null;
   estadoDocumento?: string; // 101..108

@@ -1,20 +1,17 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Wallet, AlertTriangle, Clock, CheckCircle2, X, Upload, FileDown, Trash2, Paperclip, FileText, Image as ImageIcon } from "lucide-react";
+import Link from "next/link";
+import { Wallet, AlertTriangle, Clock, CheckCircle2, X, Upload, FileDown, Trash2, Paperclip, FileText, Image as ImageIcon, Landmark, ArrowRight } from "lucide-react";
 import { PageHeader, StatCard, Badge } from "@/components/ui";
 import { DataTable, type Column, type Filter } from "@/components/DataTable";
 import { useData } from "@/lib/store";
 import { apiCobranzas, fileToBase64, downloadBase64 } from "@/lib/api";
 import { dinero, fecha, diasRestantes, hoyPeru } from "@/lib/format";
+import { r2, totalDe, netoDe, detraccionDe, aDepositarSoles, responsableSegunCobro, responsableDe, etiquetaResponsable, detraccionDepositada, type Responsable } from "@/lib/detraccion";
 import type { Factura } from "@/lib/types";
 
 type EstadoCobro = "Pagada" | "Vencida" | "Por vencer" | "Vigente";
-
-const r2 = (n: number) => Math.round(n * 100) / 100;
-const totalDe = (f: Factura) => f.total || f.monto + f.igv;
-// Lo que el cliente paga a la empresa: total menos la detracción (que va al Banco de la Nación).
-const netoDe = (f: Factura) => r2(totalDe(f) - (f.sujetoDetraccion ? f.montoDetraccion || 0 : 0));
 // Vence en la fecha de vencimiento (crédito) o, si es al contado, en la fecha de emisión.
 const venceDe = (f: Factura) => String(f.fechaVencimiento || f.fecha).slice(0, 10);
 
@@ -59,18 +56,35 @@ export default function CobranzasPage() {
     { key: "doc", header: "Comprobante", sortable: true, value: (f) => `${f.serie}-${f.correlativo}`, render: (f) => <span className="font-semibold text-slate-900">{f.serie}-{f.correlativo}</span> },
     { key: "cliente", header: "Cliente", sortable: true, render: (f) => <span className="block max-w-[240px] truncate" title={f.cliente}>{f.cliente}</span> },
     { key: "fecha", header: "Emisión", sortable: true, value: (f) => String(f.fecha), render: (f) => <span className="tabular whitespace-nowrap">{fecha(f.fecha)}</span> },
-    { key: "vence", header: "Vence", sortable: true, value: (f) => venceDe(f), render: (f) => <span className="tabular whitespace-nowrap">{fecha(venceDe(f))}</span> },
-    { key: "estado", header: "Estado", sortable: true, value: (f) => estadoCobro(f), render: (f) => <BadgeCobro f={f} /> },
+    // En "Pagadas" el estado siempre es Pagada y el vencimiento ya no importa: su lugar lo
+    // ocupan la fecha de pago y lo cobrado (así la tabla no se desborda).
+    ...(vista === "pendientes"
+      ? [
+          { key: "vence", header: "Vence", sortable: true, value: (f: Factura) => venceDe(f), render: (f: Factura) => <span className="tabular whitespace-nowrap">{fecha(venceDe(f))}</span> } as Column<Factura>,
+          { key: "estado", header: "Estado", sortable: true, value: (f: Factura) => estadoCobro(f), render: (f: Factura) => <BadgeCobro f={f} /> } as Column<Factura>,
+        ]
+      : []),
     { key: "total", header: "Total", align: "right", sortable: true, value: (f) => totalDe(f), render: (f) => <span className="tabular">{dinero(totalDe(f), f.moneda)}</span> },
     { key: "neto", header: "Neto a cobrar", align: "right", sortable: true, value: (f) => netoDe(f), render: (f) => <span className="tabular font-semibold">{dinero(netoDe(f), f.moneda)}</span> },
     ...(vista === "pagadas"
-      ? [{ key: "pago", header: "Pagada el", sortable: true, value: (f: Factura) => String(f.fechaPago || ""), render: (f: Factura) => <span className="tabular whitespace-nowrap">{f.fechaPago ? fecha(f.fechaPago) : "—"}</span> } as Column<Factura>]
+      ? [
+          // Lo cobrado y, debajo, cuándo se pagó (una sola columna para que la tabla no se desborde).
+          {
+            key: "pago", header: "Cobro", align: "right", sortable: true, value: (f: Factura) => String(f.fechaPago || ""),
+            render: (f: Factura) => (
+              <span className="block whitespace-nowrap">
+                {f.montoCobrado ? <span className="tabular font-semibold text-emerald-700">{dinero(f.montoCobrado, f.moneda)}</span> : <span className="text-slate-300">—</span>}
+                <span className="tabular block text-[11px] text-slate-400">{f.fechaPago ? fecha(f.fechaPago) : "sin fecha"}</span>
+              </span>
+            ),
+          } as Column<Factura>,
+        ]
       : []),
     { key: "comp", header: "Comprob.", align: "center", render: (f) => (f.comprobantesPago?.length ? <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600"><Paperclip size={13} /> {f.comprobantesPago.length}</span> : <span className="text-slate-300">—</span>) },
   ];
   const filters: Filter<Factura>[] = [
     { key: "cliente", label: "Cliente", value: (f) => f.cliente },
-    { key: "estado", label: "Estado", value: (f) => estadoCobro(f) },
+    ...(vista === "pendientes" ? [{ key: "estado", label: "Estado", value: (f: Factura) => estadoCobro(f) }] : []),
   ];
 
   const tab = (v: "pendientes" | "pagadas", txt: string, n: number) => (
@@ -93,7 +107,10 @@ export default function CobranzasPage() {
       <div className="mb-4 flex flex-wrap items-center gap-2">
         {tab("pendientes", "Por cobrar", pendientes.length)}
         {tab("pagadas", "Pagadas", pagadas.length)}
-        <span className="ml-auto text-xs text-slate-400">Neto a cobrar = total − detracción (la detracción la deposita el cliente en el Banco de la Nación).</span>
+        <span className="ml-auto text-xs text-slate-400">
+          Neto a cobrar = total − detracción (la detracción se deposita en el Banco de la Nación).{" "}
+          <Link href="/detracciones" className="font-semibold text-brand-600 hover:text-brand-700">Control de detracciones</Link>
+        </span>
       </div>
 
       <DataTable
@@ -124,7 +141,19 @@ const ACEPTA = "image/jpeg,image/png,image/webp,application/pdf";
 function CobroModal({ f, onClose, onChanged }: { f: Factura; onClose: () => void; onChanged: () => Promise<void> | void }) {
   const [fechaPago, setFechaPago] = useState(hoyPeru());
   const [nota, setNota] = useState("");
+  const [monto, setMonto] = useState(String(netoDe(f)));
+  // "" = automático: sigue al monto cobrado hasta que el usuario elija a mano.
+  const [respManual, setRespManual] = useState<Responsable | "">("");
   const [busy, setBusy] = useState("");
+
+  const neto = netoDe(f);
+  const total = totalDe(f);
+  const detraccion = detraccionDe(f);
+  const cobrado = r2(Number(String(monto).replace(",", ".")) || 0);
+  const responsable = respManual || responsableSegunCobro(cobrado, neto, detraccion);
+  // Ni el neto ni el total: pago parcial, comisión bancaria o un error de tipeo.
+  const montoRaro = cobrado > 0 && Math.abs(cobrado - neto) > 1 && Math.abs(cobrado - total) > 1;
+  const aDepositar = aDepositarSoles(f);
 
   async function correr(nombre: string, fn: () => Promise<unknown>) {
     setBusy(nombre);
@@ -132,7 +161,13 @@ function CobroModal({ f, onClose, onChanged }: { f: Factura; onClose: () => void
     catch (e) { alert((e as Error).message || "No se pudo completar la operación."); }
     finally { setBusy(""); }
   }
-  const marcarPagada = () => correr("pago", () => apiCobranzas.pago(f.id, { pagada: true, fechaPago, notaPago: nota.trim() }));
+  function marcarPagada() {
+    if (!(cobrado > 0)) { alert("Ingresa el monto cobrado (mayor a 0)."); return; }
+    correr("pago", () => apiCobranzas.pago(f.id, {
+      pagada: true, fechaPago, notaPago: nota.trim(), montoCobrado: cobrado,
+      detraccionResponsable: f.sujetoDetraccion ? responsable : undefined,
+    }));
+  }
   const marcarPendiente = () => { if (confirm("¿Volver a marcar esta factura como pendiente de pago?")) correr("pago", () => apiCobranzas.pago(f.id, { pagada: false })); };
 
   async function subir(files: FileList | null) {
@@ -178,17 +213,63 @@ function CobroModal({ f, onClose, onChanged }: { f: Factura; onClose: () => void
             {f.pagada ? (
               <div className="space-y-2 text-sm">
                 <div className="flex items-center gap-2 text-emerald-700"><CheckCircle2 size={16} /> Pagada el <b>{f.fechaPago ? fecha(f.fechaPago) : "—"}</b></div>
+                {f.montoCobrado ? <div className="text-slate-600">Cobrado: <b className="tabular">{dinero(f.montoCobrado, f.moneda)}</b></div> : null}
                 {f.notaPago ? <div className="text-slate-500">{f.notaPago}</div> : null}
                 <button disabled={!!busy} onClick={marcarPendiente} className={`${btn} border border-slate-300 bg-white text-slate-600 hover:border-rose-300 hover:text-rose-600`}>Marcar como pendiente</button>
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <label className="text-sm"><span className="mb-1 block font-medium text-slate-700">Fecha de pago</span><input type="date" className={inp} value={fechaPago} onChange={(e) => setFechaPago(e.target.value)} /></label>
-                <label className="text-sm"><span className="mb-1 block font-medium text-slate-700">Nota (banco / N° operación)</span><input className={inp} value={nota} onChange={(e) => setNota(e.target.value)} placeholder="BCP op. 123456" /></label>
+                <label className="text-sm">
+                  <span className="mb-1 block font-medium text-slate-700">Monto cobrado ({f.moneda === "USD" ? "US$" : "S/"})</span>
+                  <input type="number" step="0.01" min="0" className={`${inp} tabular`} value={monto} onChange={(e) => setMonto(e.target.value)} />
+                </label>
+                {f.sujetoDetraccion ? (
+                  <div className="flex flex-wrap gap-1.5 sm:col-span-2 -mt-1">
+                    <button type="button" onClick={() => setMonto(String(neto))} className="rounded-md border border-slate-200 px-2 py-0.5 text-xs text-slate-500 hover:border-brand-300 hover:text-brand-600">Neto {dinero(neto, f.moneda)}</button>
+                    <button type="button" onClick={() => setMonto(String(total))} className="rounded-md border border-slate-200 px-2 py-0.5 text-xs text-slate-500 hover:border-brand-300 hover:text-brand-600">Total {dinero(total, f.moneda)}</button>
+                  </div>
+                ) : null}
+                {montoRaro ? (
+                  <p className="rounded-md bg-amber-50 px-2.5 py-1.5 text-xs text-amber-700 ring-1 ring-inset ring-amber-200 sm:col-span-2">
+                    El monto no coincide con el neto ({dinero(neto, f.moneda)}) ni con el total ({dinero(total, f.moneda)}). Revisa si es un pago parcial o si hubo comisión bancaria.
+                  </p>
+                ) : null}
+
+                {/* Quién deposita la detracción: se deduce del monto y se puede corregir. */}
+                {f.sujetoDetraccion ? (
+                  <label className="text-sm sm:col-span-2">
+                    <span className="mb-1 block font-medium text-slate-700">
+                      ¿Quién deposita la detracción{aDepositar ? ` (S/ ${aDepositar.toLocaleString("es-PE")})` : ""}?
+                      {!respManual ? <span className="ml-1 font-normal text-slate-400">— sugerido según el monto</span> : null}
+                    </span>
+                    <select className={inp} value={responsable} onChange={(e) => setRespManual(e.target.value as Responsable)}>
+                      <option value="Cliente">El cliente (pagó el neto: descontó la detracción)</option>
+                      <option value="Empresa">Nosotros (el cliente pagó el total)</option>
+                    </select>
+                    {responsable === "Empresa" ? (
+                      <span className="mt-1 block text-xs text-rose-600">La empresa recibió el dinero de la detracción: hay que depositarla en el Banco de la Nación.</span>
+                    ) : null}
+                  </label>
+                ) : null}
+
+                <label className="text-sm sm:col-span-2"><span className="mb-1 block font-medium text-slate-700">Nota (banco / N° operación)</span><input className={inp} value={nota} onChange={(e) => setNota(e.target.value)} placeholder="BCP op. 123456" /></label>
                 <button disabled={!!busy} onClick={marcarPagada} className={`${btn} justify-center bg-emerald-600 text-white hover:bg-emerald-700 sm:col-span-2`}><CheckCircle2 size={15} /> {busy === "pago" ? "Guardando…" : "Marcar como pagada"}</button>
               </div>
             )}
           </div>
+
+          {/* Detracción: estado del depósito (se registra en Detracciones) */}
+          {f.sujetoDetraccion && f.pagada ? (
+            <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 px-4 py-3 text-sm">
+              <Landmark size={15} className="shrink-0 text-slate-400" />
+              <span className="text-slate-600">Detracción: la deposita <b>{etiquetaResponsable(responsableDe(f)).toLowerCase()}</b></span>
+              {detraccionDepositada(f)
+                ? <Badge tone="green">Depositada · N° {f.detraccionNumero}</Badge>
+                : <Badge tone={responsableDe(f) === "Empresa" ? "red" : "amber"}>Sin depositar</Badge>}
+              <Link href="/detracciones" className="ml-auto inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:text-brand-700">Ir a detracciones <ArrowRight size={13} /></Link>
+            </div>
+          ) : null}
 
           {/* Comprobantes de pago */}
           <div className="mt-4 mb-2">
