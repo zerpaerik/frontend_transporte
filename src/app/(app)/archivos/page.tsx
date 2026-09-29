@@ -3,14 +3,24 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   FolderArchive, Folder, FolderPlus, Upload, Download, Trash2, Pencil, ChevronRight, Home,
-  CalendarPlus, FileText, FileSpreadsheet, Image as ImageIcon, File as FileIcon, Eye, X,
+  CalendarPlus, FileText, FileSpreadsheet, Image as ImageIcon, File as FileIcon, Eye, X, GripVertical, FolderInput,
 } from "lucide-react";
 import { PageHeader, Card } from "@/components/ui";
 import { FormModal, type FormValues } from "@/components/FormModal";
-import { apiArchivos, fileToBase64, downloadBase64, type ListarArchivos, type ArchivoMeta } from "@/lib/api";
+import { apiArchivos, fileToBase64, downloadBase64, ApiError, type ListarArchivos, type ArchivoMeta } from "@/lib/api";
 import { fecha } from "@/lib/format";
 
 const fmtSize = (b: number) => (b < 1024 ? `${b} B` : b < 1024 * 1024 ? `${Math.round(b / 1024)} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`);
+const MAX_BYTES = 20 * 1024 * 1024;
+
+// Misma regla que el backend: dos archivos se llaman igual sin importar mayúsculas,
+// espacios de sobra ni cómo venga codificada la tilde ("Factura.pdf" = "factura.pdf").
+const claveNombre = (nombre: string) => nombre.normalize("NFC").trim().toLocaleLowerCase("es");
+
+// Tipo propio del arrastre: así las carpetas solo reaccionan a archivos arrastrados desde
+// esta misma pantalla (no a textos ni a archivos soltados desde el escritorio).
+const TIPO_DRAG = "application/x-ft-archivos";
+const esArrastreInterno = (e: React.DragEvent) => Array.from(e.dataTransfer.types).includes(TIPO_DRAG);
 
 function base64ToUrl(base64: string, mime: string) {
   const bin = atob(base64);
@@ -39,6 +49,12 @@ export default function ArchivosPage() {
   const [renOpen, setRenOpen] = useState<{ id: string; nombre: string } | null>(null);
   const [renArchivo, setRenArchivo] = useState<{ id: string; nombre: string } | null>(null);
   const [preview, setPreview] = useState<{ url: string; mime: string; nombre: string } | null>(null);
+  // Selección y arrastre de archivos para moverlos a otra carpeta.
+  const [sel, setSel] = useState<Set<string>>(new Set());
+  const [ultimo, setUltimo] = useState<number | null>(null); // para seleccionar un rango con Shift
+  const [arrastrando, setArrastrando] = useState<string[] | null>(null);
+  const [destinoHover, setDestinoHover] = useState<string | null>(null);
+  const [aviso, setAviso] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const seedTried = useRef(false);
 
@@ -56,6 +72,13 @@ export default function ArchivosPage() {
   }, []);
 
   useEffect(() => { cargar(carpetaId); }, [carpetaId, cargar]);
+  // Al cambiar de carpeta la selección anterior deja de tener sentido.
+  useEffect(() => { setSel(new Set()); setUltimo(null); }, [carpetaId]);
+  useEffect(() => {
+    if (!aviso) return;
+    const t = setTimeout(() => setAviso(""), 4000);
+    return () => clearTimeout(t);
+  }, [aviso]);
 
   const dentro = carpetaId !== null;
 
@@ -91,15 +114,38 @@ export default function ArchivosPage() {
     e.target.value = "";
     if (!files.length || !carpetaId) return;
     setBusy(true);
+    // Nombres ya presentes en la carpeta (y los que se van subiendo en este mismo lote).
+    const ocupados = new Set((data?.archivos ?? []).map((a) => claveNombre(a.nombre)));
+    const rechazados: { nombre: string; motivo: string }[] = [];
+    let subidos = 0;
     try {
       for (const f of files) {
-        if (f.size > 20 * 1024 * 1024) { alert(`"${f.name}" supera los 20 MB y no se subió.`); continue; }
-        const base64 = await fileToBase64(f);
-        await apiArchivos.subir({ carpetaId, nombre: f.name, mime: f.type, base64 });
+        const clave = claveNombre(f.name);
+        if (ocupados.has(clave)) { rechazados.push({ nombre: f.name, motivo: "ya existe un archivo con ese nombre" }); continue; }
+        if (f.size > MAX_BYTES) { rechazados.push({ nombre: f.name, motivo: "supera los 20 MB" }); continue; }
+        try {
+          const base64 = await fileToBase64(f);
+          await apiArchivos.subir({ carpetaId, nombre: f.name, mime: f.type, base64 });
+          ocupados.add(clave);
+          subidos++;
+        } catch (err) {
+          // El backend también lo valida (p. ej. si otra persona lo subió hace un momento).
+          const motivo = err instanceof ApiError && err.status === 409 ? "ya existe un archivo con ese nombre" : (err as Error).message || "no se pudo subir";
+          rechazados.push({ nombre: f.name, motivo });
+        }
       }
       await cargar(carpetaId);
-    } catch (err) { alert((err as Error).message || "No se pudo subir el archivo."); }
-    finally { setBusy(false); }
+    } finally { setBusy(false); }
+
+    if (rechazados.length === 1 && files.length === 1) {
+      const r = rechazados[0];
+      alert(r.motivo === "ya existe un archivo con ese nombre"
+        ? `No se puede subir "${r.nombre}" porque ya existe un archivo con ese nombre en esta carpeta.`
+        : `No se pudo subir "${r.nombre}": ${r.motivo}.`);
+    } else if (rechazados.length) {
+      const ok = subidos === 0 ? "" : subidos === 1 ? "Se subió 1 archivo. " : `Se subieron ${subidos} archivos. `;
+      alert(`${ok}No se subieron:\n\n${rechazados.map((r) => `• ${r.nombre} — ${r.motivo}`).join("\n")}`);
+    }
   }
   async function descargar(a: ArchivoMeta) {
     setBusy(true);
@@ -120,8 +166,105 @@ export default function ArchivosPage() {
   }
   async function renombrarArchivo(v: FormValues) {
     if (!renArchivo) return;
+    const nuevo = String(v.nombre).trim();
+    // Misma regla que al subir. El backend lo vuelve a validar.
+    if ((data?.archivos ?? []).some((a) => a.id !== renArchivo.id && claveNombre(a.nombre) === claveNombre(nuevo))) {
+      alert(`Ya existe un archivo llamado "${nuevo}" en esta carpeta.`);
+      return;
+    }
     setBusy(true);
-    try { await apiArchivos.renombrarArchivo(renArchivo.id, String(v.nombre).trim()); await cargar(carpetaId); }
+    try { await apiArchivos.renombrarArchivo(renArchivo.id, nuevo); await cargar(carpetaId); }
+    catch (err) { alert((err as Error).message || "No se pudo renombrar el archivo."); }
+    finally { setBusy(false); }
+  }
+
+  // ---- Selección ----
+  function alternar(idx: number, shift: boolean) {
+    const lista = data?.archivos ?? [];
+    const id = lista[idx]?.id;
+    if (!id) return;
+    setSel((s) => {
+      const n = new Set(s);
+      if (shift && ultimo !== null) {
+        // Shift: marca todo el rango entre el último tocado y este.
+        const [a, b] = ultimo < idx ? [ultimo, idx] : [idx, ultimo];
+        for (let i = a; i <= b; i++) n.add(lista[i].id);
+      } else if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+    setUltimo(idx);
+  }
+  function alternarTodos() {
+    const lista = data?.archivos ?? [];
+    setSel((s) => (s.size === lista.length ? new Set() : new Set(lista.map((a) => a.id))));
+  }
+
+  // ---- Arrastrar y soltar ----
+  function empezarArrastre(e: React.DragEvent, a: ArchivoMeta) {
+    // Si arrastra uno que está seleccionado, se lleva toda la selección; si no, solo ese.
+    const ids = sel.has(a.id) ? [...sel] : [a.id];
+    if (!sel.has(a.id)) setSel(new Set([a.id]));
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData(TIPO_DRAG, JSON.stringify(ids));
+    // Etiqueta que acompaña al cursor mientras se arrastra.
+    const ghost = document.createElement("div");
+    ghost.textContent = ids.length === 1 ? a.nombre : `${ids.length} archivos`;
+    ghost.style.cssText = "position:fixed;top:-100px;left:-100px;padding:6px 12px;border-radius:8px;background:#E5641C;color:#fff;font:600 13px system-ui,sans-serif;white-space:nowrap;max-width:280px;overflow:hidden;text-overflow:ellipsis;";
+    document.body.appendChild(ghost);
+    e.dataTransfer.setDragImage(ghost, 14, 14);
+    setTimeout(() => ghost.remove(), 0);
+    setArrastrando(ids);
+  }
+  function terminarArrastre() { setArrastrando(null); setDestinoHover(null); }
+
+  // Props para que una carpeta (tarjeta o miga de pan) reciba archivos soltados.
+  function destinoDrop(id: string, nombre: string) {
+    return {
+      onDragOver: (e: React.DragEvent) => {
+        if (!esArrastreInterno(e)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        if (destinoHover !== id) setDestinoHover(id);
+      },
+      onDragLeave: (e: React.DragEvent) => {
+        // Pasar por encima de un hijo (ícono, texto) no cuenta como salir.
+        if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+        setDestinoHover((h) => (h === id ? null : h));
+      },
+      onDrop: (e: React.DragEvent) => {
+        if (!esArrastreInterno(e)) return;
+        e.preventDefault();
+        let ids: string[] = [];
+        try { ids = JSON.parse(e.dataTransfer.getData(TIPO_DRAG) || "[]"); } catch { /* arrastre inválido */ }
+        terminarArrastre();
+        if (ids.length) moverA(ids, id, nombre);
+      },
+    };
+  }
+
+  async function moverA(ids: string[], destinoId: string, destinoNombre: string) {
+    setBusy(true);
+    try {
+      const r = await apiArchivos.mover(ids, destinoId);
+      setSel(new Set());
+      setUltimo(null);
+      await cargar(carpetaId);
+      if (r.movidos) setAviso(`${r.movidos === 1 ? "Se movió 1 archivo" : `Se movieron ${r.movidos} archivos`} a "${r.destino.nombre}".`);
+      if (r.conflictos.length) {
+        const destino = r.destino.nombre;
+        const lista = r.conflictos.map((n) => `• ${n}`).join("\n");
+        if (r.movidos === 0 && r.conflictos.length === 1) {
+          alert(`No se puede mover "${r.conflictos[0]}" porque en "${destino}" ya existe un archivo con ese nombre.`);
+        } else if (r.movidos === 0) {
+          alert(`No se movió ningún archivo porque en "${destino}" ya existen archivos con estos nombres:\n\n${lista}`);
+        } else {
+          const hechos = r.movidos === 1 ? `Se movió 1 archivo a "${destino}".` : `Se movieron ${r.movidos} archivos a "${destino}".`;
+          const cuales = r.conflictos.length === 1 ? "Este no se movió" : "Estos no se movieron";
+          alert(`${hechos} ${cuales} porque en "${destino}" ya existe un archivo con el mismo nombre:\n\n${lista}`);
+        }
+      }
+    } catch (err) { alert((err as Error).message || `No se pudieron mover los archivos a "${destinoNombre}".`); }
     finally { setBusy(false); }
   }
   async function borrarArchivo(a: ArchivoMeta) {
@@ -144,12 +287,28 @@ export default function ArchivosPage() {
         <button onClick={() => setCarpetaId(null)} className={`inline-flex items-center gap-1 rounded-md px-2 py-1 font-medium ${!dentro ? "text-brand-700" : "text-slate-500 hover:bg-slate-100 hover:text-brand-600"}`}>
           <Home size={15} /> Inicio
         </button>
-        {(data?.ruta ?? []).map((r, i, arr) => (
-          <span key={r.id} className="flex items-center gap-1">
-            <ChevronRight size={14} className="text-slate-300" />
-            <button onClick={() => setCarpetaId(r.id)} className={`rounded-md px-2 py-1 font-medium ${i === arr.length - 1 ? "text-brand-700" : "text-slate-500 hover:bg-slate-100 hover:text-brand-600"}`}>{r.nombre}</button>
-          </span>
-        ))}
+        {(data?.ruta ?? []).map((r, i, arr) => {
+          const actual = i === arr.length - 1;
+          // Las carpetas de arriba en la ruta aceptan archivos: así se puede "subir" un nivel.
+          const soltable = !actual && !!arrastrando;
+          return (
+            <span key={r.id} className="flex items-center gap-1">
+              <ChevronRight size={14} className="text-slate-300" />
+              <button
+                onClick={() => setCarpetaId(r.id)}
+                {...(actual ? {} : destinoDrop(r.id, r.nombre))}
+                className={`rounded-md px-2 py-1 font-medium transition ${
+                  actual ? "text-brand-700"
+                    : destinoHover === r.id ? "bg-brand-100 text-brand-700 ring-2 ring-brand-400"
+                    : soltable ? "text-slate-600 outline-dashed outline-1 outline-brand-300"
+                    : "text-slate-500 hover:bg-slate-100 hover:text-brand-600"
+                }`}
+              >
+                {r.nombre}
+              </button>
+            </span>
+          );
+        })}
       </div>
 
       {/* Barra de acciones */}
@@ -176,14 +335,25 @@ export default function ArchivosPage() {
       </div>
 
       {busy ? <div className="mb-3 text-xs text-slate-400">Procesando…</div> : null}
+      {aviso && !busy ? (
+        <div className="mb-3 inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200">
+          <FolderInput size={15} /> {aviso}
+        </div>
+      ) : null}
 
       {/* Carpetas */}
       {sub.length > 0 ? (
         <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {sub.map((c) => (
-            <Card key={c.id} className="group flex items-center gap-3 p-4 transition hover:shadow-md">
+            <div key={c.id} {...destinoDrop(c.id, c.nombre)} className="rounded-2xl">
+            <Card className={`group flex items-center gap-3 p-4 transition hover:shadow-md ${
+              destinoHover === c.id ? "bg-brand-50 ring-2 ring-brand-400"
+                : arrastrando ? "outline-dashed outline-2 outline-offset-2 outline-brand-300" : ""
+            }`}>
               <button onClick={() => setCarpetaId(c.id)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
-                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-brand-50 text-brand-600"><Folder size={20} /></span>
+                <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg ${destinoHover === c.id ? "bg-brand-500 text-white" : "bg-brand-50 text-brand-600"}`}>
+                  {destinoHover === c.id ? <FolderInput size={20} /> : <Folder size={20} />}
+                </span>
                 <span className="min-w-0">
                   <span className="block truncate font-semibold text-slate-800">{c.nombre}</span>
                   <span className="block text-xs text-slate-400">{c.items} elemento{c.items === 1 ? "" : "s"}</span>
@@ -194,6 +364,7 @@ export default function ArchivosPage() {
                 <button onClick={() => borrarCarpeta(c.id, c.nombre)} title="Eliminar" className="rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"><Trash2 size={15} /></button>
               </div>
             </Card>
+            </div>
           ))}
         </div>
       ) : null}
@@ -201,11 +372,50 @@ export default function ArchivosPage() {
       {/* Archivos */}
       {archivos.length > 0 ? (
         <Card className="overflow-hidden">
+          {/* Cabecera: seleccionar todo y ayuda para mover */}
+          <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 bg-slate-50/70 px-4 py-2 text-xs">
+            <input
+              type="checkbox"
+              aria-label="Seleccionar todos los archivos"
+              checked={sel.size > 0 && sel.size === archivos.length}
+              ref={(el) => { if (el) el.indeterminate = sel.size > 0 && sel.size < archivos.length; }}
+              onChange={alternarTodos}
+              className="h-4 w-4 cursor-pointer accent-brand-500"
+            />
+            {sel.size ? (
+              <>
+                <span className="font-semibold text-slate-700">{sel.size} seleccionado{sel.size === 1 ? "" : "s"}</span>
+                <span className="text-slate-500">· arrástralos a una carpeta para moverlos</span>
+                <button onClick={() => { setSel(new Set()); setUltimo(null); }} className="ml-auto font-semibold text-slate-400 hover:text-brand-600">Quitar selección</button>
+              </>
+            ) : (
+              <span className="text-slate-400">{archivos.length} archivo{archivos.length === 1 ? "" : "s"} · marca varios (Shift para un rango) y arrástralos a una carpeta</span>
+            )}
+          </div>
           <div className="divide-y divide-slate-100">
-            {archivos.map((a) => {
+            {archivos.map((a, idx) => {
               const { Icon, cls } = iconoArchivo(a.nombre, a.mime);
+              const marcado = sel.has(a.id);
+              const enArrastre = !!arrastrando?.includes(a.id);
               return (
-                <div key={a.id} className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50/60">
+                <div
+                  key={a.id}
+                  draggable={!busy}
+                  onDragStart={(e) => empezarArrastre(e, a)}
+                  onDragEnd={terminarArrastre}
+                  // Clic en la fila (fuera de los botones) marca o desmarca el archivo.
+                  onClick={(e) => { if ((e.target as HTMLElement).closest("button, input, a")) return; alternar(idx, e.shiftKey); }}
+                  className={`group flex cursor-pointer select-none items-center gap-3 px-4 py-3 transition ${enArrastre ? "opacity-40" : ""} ${marcado ? "bg-brand-50/70" : "hover:bg-slate-50/60"}`}
+                >
+                  <GripVertical size={15} className="-mx-1.5 shrink-0 cursor-grab text-slate-300 opacity-0 transition group-hover:opacity-100" />
+                  <input
+                    type="checkbox"
+                    aria-label={`Seleccionar ${a.nombre}`}
+                    checked={marcado}
+                    onChange={() => { /* lo maneja onClick para poder leer Shift */ }}
+                    onClick={(e) => alternar(idx, e.shiftKey)}
+                    className="h-4 w-4 shrink-0 cursor-pointer accent-brand-500"
+                  />
                   <Icon size={20} className={`shrink-0 ${cls}`} />
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium text-slate-800">{a.nombre}</div>
