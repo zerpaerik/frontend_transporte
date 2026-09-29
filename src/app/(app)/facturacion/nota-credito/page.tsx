@@ -7,7 +7,7 @@ import { PageHeader, StatCard, Badge } from "@/components/ui";
 import { DataTable, type Column, type Filter } from "@/components/DataTable";
 import { useData } from "@/lib/store";
 import { apiEmisor, apiCuentas, type EmisorRespuesta, type CuentaBancaria } from "@/lib/api";
-import { soles, fecha } from "@/lib/format";
+import { soles, fecha, ordenComprobantes } from "@/lib/format";
 import type { Factura } from "@/lib/types";
 import { ComprobanteModal, estDoc } from "@/components/ComprobanteModal";
 
@@ -29,7 +29,7 @@ export default function NotasCreditoPage() {
     apiCuentas.list().then((cs) => setCuentas(cs.filter((c) => c.activo))).catch(() => {});
   }, []);
 
-  const notas = facturas.filter((f) => f.tipo === "N. Crédito");
+  const notas = ordenComprobantes(facturas.filter((f) => f.tipo === "N. Crédito"));
   const aceptadas = notas.filter((f) => f.estadoDocumento === "102" || f.estadoDocumento === "103").length;
   const sinEmitir = notas.filter((f) => !f.estadoDocumento).length;
 

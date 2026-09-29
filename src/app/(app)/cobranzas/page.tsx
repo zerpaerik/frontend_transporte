@@ -6,7 +6,7 @@ import { PageHeader, StatCard, Badge } from "@/components/ui";
 import { DataTable, type Column, type Filter } from "@/components/DataTable";
 import { useData } from "@/lib/store";
 import { apiCobranzas, fileToBase64, downloadBase64 } from "@/lib/api";
-import { dinero, fecha, diasRestantes, hoyPeru } from "@/lib/format";
+import { dinero, fecha, diasRestantes, hoyPeru, ordenComprobantes } from "@/lib/format";
 import type { Factura } from "@/lib/types";
 
 type EstadoCobro = "Pagada" | "Vencida" | "Por vencer" | "Vigente";
@@ -42,7 +42,7 @@ export default function CobranzasPage() {
 
   // Facturas y boletas aceptadas por SUNAT (las notas de crédito/débito y lo anulado no se cobran).
   const cobrables = useMemo(
-    () => facturas.filter((f) => f.tipo !== "N. Crédito" && f.tipo !== "N. Débito" && (f.estadoDocumento === "102" || f.estadoDocumento === "103")),
+    () => ordenComprobantes(facturas.filter((f) => f.tipo !== "N. Crédito" && f.tipo !== "N. Débito" && (f.estadoDocumento === "102" || f.estadoDocumento === "103"))),
     [facturas],
   );
   const pendientes = cobrables.filter((f) => !f.pagada);

@@ -71,3 +71,12 @@ export function mapsHref(ubicacion: string): string {
   if (/^(www\.|maps\.app\.goo\.gl|goo\.gl\/|maps\.google\.)/i.test(s)) return "https://" + s; // enlace sin protocolo
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s)}`;
 }
+
+// Orden de listados de comprobantes: borradores (sin número) primero y luego por
+// numeración descendente. El correlativo va con ceros a la izquierda (00000007).
+export function ordenComprobantes<T extends { serie: string; correlativo?: string }>(xs: T[]): T[] {
+  return [...xs].sort((a, b) => {
+    if (!a.correlativo !== !b.correlativo) return a.correlativo ? 1 : -1;
+    return (b.correlativo || "").localeCompare(a.correlativo || "") || a.serie.localeCompare(b.serie);
+  });
+}
