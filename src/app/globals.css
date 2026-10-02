@@ -49,6 +49,7 @@ body {
   #doc-imprimible {
     position: absolute; left: 0; top: 0; width: 100%;
     padding: 16px 24px; box-shadow: none;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact; /* conserva fondos (p. ej. la cabecera de la cotización) */
   }
   .no-print { display: none !important; }
   @page { margin: 12mm; }

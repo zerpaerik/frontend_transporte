@@ -54,7 +54,7 @@ const columns: Column<Viaje>[] = [
   { key: "codigo", header: "Código", sortable: true, thClass: "sticky left-0 z-20", tdClass: "sticky left-0 z-10 bg-white", render: (v) => <span className="font-semibold text-brand-700">{(v as any).codigo || "—"}</span> },
   { key: "registro", header: "Registro", sortable: true, value: (v) => (v as any).createdAt || "", render: (v) => <span className="tabular whitespace-nowrap text-slate-500">{fecha((v as any).createdAt || "")}</span> },
   { key: "fechaViaje", header: "Fecha viaje", sortable: true, value: (v) => v.fechaViaje || "", render: (v) => v.fechaViaje ? <span className="tabular whitespace-nowrap">{fecha(v.fechaViaje)}</span> : dash },
-  { key: "placaTracto", header: "Tracto", sortable: true, render: (v) => <span className="font-semibold text-slate-900">{v.placaTracto}</span> },
+  { key: "placaTracto", header: "Tracto", sortable: true, render: (v) => v.placaTracto ? <span className="font-semibold text-slate-900">{v.placaTracto}</span> : <Badge tone="amber">Por asignar</Badge> },
   { key: "carreta", header: "Carreta", render: (v) => v.carreta ? <span className="tabular whitespace-nowrap">{v.carreta}</span> : dash },
   { key: "conductor", header: "Conductor", sortable: true, render: (v) => <span className="block max-w-[150px] truncate" title={v.conductor}>{v.conductor || "—"}</span> },
   { key: "cliente", header: "Cliente", sortable: true, render: (v) => <span className="block max-w-[190px] truncate font-medium text-slate-700" title={v.cliente}>{v.cliente || "—"}</span> },
@@ -174,7 +174,8 @@ export default function OperacionesPage() {
     // Incluye el valor guardado en las opciones para que al EDITAR no se pierda (si no está en el catálogo).
     const opt = (arr: string[], cur: string) => (cur && !arr.includes(cur) ? [cur, ...arr] : arr);
     return [
-      { name: "placaTracto", label: "Placa tracto", type: "select", options: [...tractosFlota, ALQ_TRACTO], required: true, default: tractoExternoGuardado ? ALQ_TRACTO : tractoGuardado },
+      // Un viaje creado desde una cotización llega sin placa: se ofrece la opción vacía para obligar a elegirla.
+      { name: "placaTracto", label: "Placa tracto", type: "select", options: [...(v && !tractoGuardado ? [""] : []), ...tractosFlota, ALQ_TRACTO], required: true, default: tractoExternoGuardado ? ALQ_TRACTO : tractoGuardado },
       ...(vals.placaTracto === ALQ_TRACTO
         ? [{ name: "tractoPlaca", label: "Placa del tracto externo", type: "text" as const, required: true, placeholder: "Ej. A1B-234", full: true, default: tractoExternoGuardado ? tractoGuardado : "" }]
         : []),

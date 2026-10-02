@@ -511,3 +511,62 @@ export function downloadBase64(nombre: string, mime: string, base64: string) {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+// ── Cotizaciones (documento interno, no va a SUNAT) ──
+export interface CotizacionItem {
+  id?: string;
+  descripcion: string;
+  cantidad: number;
+  precio: number; // unitario sin impuesto
+  descuento: number; // %
+  operacion?: string;
+  origen?: string;
+  destino?: string;
+  devolucion?: string;
+  tamanio?: string;
+  tipoCarga?: string;
+}
+export type EstadoCotizacion = "Borrador" | "Enviada" | "Aceptada" | "Rechazada" | "Convertida";
+export interface Cotizacion {
+  id: string;
+  numero: number;
+  codigo: string;
+  fecha: string;
+  validaHasta: string;
+  estado: EstadoCotizacion;
+  cliente: string;
+  clienteRuc: string;
+  clienteDireccion: string;
+  empresaRazon: string;
+  empresaRuc: string;
+  empresaDireccion: string;
+  contactoNombre: string;
+  contactoEmail: string;
+  contactoTelefono: string;
+  moneda: "PEN" | "USD";
+  tipoCambio: number;
+  descuentoGlobal: number;
+  igvPorc: number;
+  subtotal: number;
+  descuento: number;
+  igv: number;
+  total: number;
+  notas: string;
+  condiciones: string;
+  viajes: string[];
+  creadoPor: string;
+  items: CotizacionItem[];
+  createdAt: string;
+}
+export type CotizacionInput = Omit<Cotizacion, "id" | "numero" | "codigo" | "estado" | "empresaRazon" | "empresaRuc" | "empresaDireccion" | "subtotal" | "descuento" | "igv" | "total" | "viajes" | "creadoPor" | "createdAt">;
+export const apiCotizaciones = {
+  list: () => api.get<Cotizacion[]>("/cotizaciones"),
+  get: (id: string) => api.get<Cotizacion>(`/cotizaciones/${id}`),
+  siguiente: () => api.get<{ siguiente: number; codigo: string; empresaRazon: string; empresaRuc: string; empresaDireccion: string }>("/cotizaciones/siguiente"),
+  fijarSiguiente: (desde: number) => api.patch<{ siguiente: number; codigo: string }>("/cotizaciones/siguiente", { desde }),
+  create: (b: CotizacionInput) => api.post<Cotizacion>("/cotizaciones", b),
+  update: (id: string, b: CotizacionInput) => api.patch<Cotizacion>(`/cotizaciones/${id}`, b),
+  estado: (id: string, estado: Exclude<EstadoCotizacion, "Convertida">) => api.patch<Cotizacion>(`/cotizaciones/${id}/estado`, { estado }),
+  convertir: (id: string, fechaViaje?: string) => api.post<Cotizacion>(`/cotizaciones/${id}/convertir`, { fechaViaje }),
+  remove: (id: string) => api.del<{ ok: boolean }>(`/cotizaciones/${id}`),
+};
