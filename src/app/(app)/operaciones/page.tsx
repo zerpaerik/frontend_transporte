@@ -19,6 +19,8 @@ import type { EstadoViaje, Viaje } from "@/lib/types";
 const ALQ_CARRETA = "Alquilada (otra placa)";
 // Opción del select de tracto para una placa que no es de la flota (alquilado / de tercero).
 const ALQ_TRACTO = "Externo (otra placa)";
+// Opción del select de conductor para uno que no está registrado (de tercero / eventual).
+const EXT_CONDUCTOR = "Externo (otro conductor)";
 
 const estadoTone: Record<EstadoViaje, "gray" | "blue" | "green" | "orange" | "red"> = {
   Programado: "gray", "En curso": "orange", Culminado: "blue", Devuelto: "green", Cancelado: "red",
@@ -165,6 +167,10 @@ export default function OperacionesPage() {
     const tractosFlota = vehiculos.filter((x) => x.tipo === "Tracto").map((x) => x.placa);
     const tractoGuardado = g("placaTracto");
     const tractoExternoGuardado = !!tractoGuardado && !tractosFlota.includes(tractoGuardado);
+    // Conductor: el registrado o uno externo (nombre libre para este viaje).
+    const conductoresReg = conductores.map((c) => c.nombre);
+    const conductorGuardado = g("conductor");
+    const conductorExternoGuardado = !!conductorGuardado && !conductoresReg.includes(conductorGuardado);
     // Incluye el valor guardado en las opciones para que al EDITAR no se pierda (si no está en el catálogo).
     const opt = (arr: string[], cur: string) => (cur && !arr.includes(cur) ? [cur, ...arr] : arr);
     return [
@@ -176,7 +182,10 @@ export default function OperacionesPage() {
       ...(vals.carreta === ALQ_CARRETA
         ? [{ name: "carretaPlaca", label: "Placa de la carreta alquilada", type: "text" as const, required: true, placeholder: "Ej. B7A-845", full: true, default: alquiladaGuardada ? carretaGuardada : "" }]
         : []),
-      { name: "conductor", label: "Conductor", type: "select", options: ["", ...conductores.map((c) => c.nombre)], default: g("conductor") },
+      { name: "conductor", label: "Conductor", type: "select", options: ["", ...conductoresReg, EXT_CONDUCTOR], default: conductorExternoGuardado ? EXT_CONDUCTOR : conductorGuardado },
+      ...(vals.conductor === EXT_CONDUCTOR
+        ? [{ name: "conductorNombre", label: "Nombre del conductor externo", type: "text" as const, required: true, placeholder: "Nombres y apellidos", full: true, default: conductorExternoGuardado ? conductorGuardado : "" }]
+        : []),
       { name: "cliente", label: "Cliente (solicita el servicio)", type: "combo", options: ["POR ASIGNAR", ...clientes], required: true, placeholder: "Buscar cliente… o POR ASIGNAR", default: g("cliente") },
       { name: "clienteFactura", label: "Cliente a facturar (vacío = el solicitante)", type: "combo", options: ["", ...clientes], placeholder: "Buscar cliente a facturar…", default: g("clienteFactura") },
       { name: "fechaViaje", label: "Fecha del viaje", type: "date", default: g("fechaViaje", hoyISO) },
@@ -216,7 +225,7 @@ export default function OperacionesPage() {
     const body: any = {
       placaTracto: v.placaTracto === ALQ_TRACTO ? String(v.tractoPlaca || "").toUpperCase() : String(v.placaTracto),
       carreta: v.carreta === ALQ_CARRETA ? String(v.carretaPlaca || "").toUpperCase() : String(v.carreta || ""),
-      conductor: String(v.conductor || ""), cliente: String(v.cliente), clienteFactura: String(v.clienteFactura || ""),
+      conductor: v.conductor === EXT_CONDUCTOR ? String(v.conductorNombre || "").trim().toUpperCase() : String(v.conductor || ""), cliente: String(v.cliente), clienteFactura: String(v.clienteFactura || ""),
       operacion: String(v.operacion), contenedor: String(v.contenedor).toUpperCase(), tamanio: String(v.tamanio || ""),
       tipoCarga: String(v.tipoCarga || "GENERAL"), horaCita: String(v.horaCita || ""), horaCliente: String(v.horaCliente || ""), origen: String(v.origen || ""),
       destino: String(v.destino || ""), devolucion: String(v.devolucion || ""), ubicacion: String(v.ubicacion || ""),
