@@ -33,10 +33,9 @@ export const etiquetaResponsable = (r: Responsable) => (r === "Empresa" ? "Nosot
 export const detraccionDepositada = (f: Factura) => !!(f.detraccionNumero || "").trim();
 
 // ── Notas de crédito aplicadas a una factura ──
-// Una NC aceptada por SUNAT con motivo de anulación (01 anulación de la operación, 02 error en
-// el RUC, 06 devolución total) o que cubre todo el importe deja la factura sin nada que cobrar
-// ni detracción que depositar. Una NC parcial (descuentos, devolución por ítem) baja el saldo.
-const MOTIVOS_ANULAN = ["01", "02", "06"];
+// Se decide por el MONTO (no por el motivo, que a veces queda mal elegido): si las NC aceptadas
+// cubren todo el importe, la factura queda anulada (nada que cobrar ni detracción que depositar);
+// si no, es un descuento y se resta del saldo (factura 1,000 − NC 100 = se cobran 900).
 const aceptada = (f: Factura) => f.estadoDocumento === "102" || f.estadoDocumento === "103";
 const clave = (tipoDoc: string, serie: string, correlativo: string) =>
   `${tipoDoc}|${serie.trim().toUpperCase()}|${parseInt(correlativo, 10) || correlativo.trim()}`;
@@ -59,8 +58,7 @@ export function notasDe(f: Factura, notas: NotasPorFactura): Factura[] {
 }
 export const creditoDe = (f: Factura, notas: NotasPorFactura) => r2(notasDe(f, notas).reduce((s, n) => s + totalDe(n), 0));
 export function anuladaPorNc(f: Factura, notas: NotasPorFactura): boolean {
-  const ns = notasDe(f, notas);
-  return ns.some((n) => MOTIVOS_ANULAN.includes(n.codTipNc || "")) || (ns.length > 0 && creditoDe(f, notas) >= totalDe(f) - 0.01);
+  return notasDe(f, notas).length > 0 && creditoDe(f, notas) >= totalDe(f) - 0.01;
 }
 // Lo que queda por cobrar al cliente: neto (total − detracción) menos las NC parciales.
 export const saldoDe = (f: Factura, notas: NotasPorFactura) => (anuladaPorNc(f, notas) ? 0 : Math.max(0, r2(netoDe(f) - creditoDe(f, notas))));

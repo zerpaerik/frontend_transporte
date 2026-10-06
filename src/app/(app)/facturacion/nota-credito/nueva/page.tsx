@@ -8,6 +8,7 @@ import { useData } from "@/lib/store";
 import { api, apiFacturasE } from "@/lib/api";
 import { dinero, hoyPeru, fecha } from "@/lib/format";
 import type { Factura } from "@/lib/types";
+import { notasCreditoPorFactura, creditoDe, totalDe, r2 } from "@/lib/detraccion";
 
 const inp = "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100";
 const lbl = "mb-1 block text-sm font-medium text-slate-700";
@@ -16,6 +17,8 @@ const num = (v: string) => Number(String(v).replace(",", ".") || 0);
 type Linea = { descripcion: string; cantidad: number; valorUnitario: number };
 
 // Catálogo 09 SUNAT — motivos de nota de crédito.
+// Motivos que SUNAT reserva para acreditar el comprobante completo.
+const MOTIVOS_TOTALES = ["01", "02", "06"];
 const MOTIVOS_NC: { code: string; label: string }[] = [
   { code: "01", label: "01 — Anulación de la operación" },
   { code: "02", label: "02 — Anulación por error en el RUC" },
@@ -49,6 +52,13 @@ export default function NotaCreditoPage() {
   const [lineas, setLineas] = useState<Linea[]>([]);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
+  const [descuento, setDescuento] = useState("");
+
+  // Lo ya acreditado con otras NC aceptadas: la nueva no puede pasar del saldo de la factura.
+  const notas = useMemo(() => notasCreditoPorFactura(facturas), [facturas]);
+  const totalBase = base ? totalDe(base) : 0;
+  const yaAcreditado = base ? creditoDe(base, notas) : 0;
+  const disponible = r2(totalBase - yaAcreditado);
 
   // Al elegir la factura, precarga sus líneas (por defecto NC de devolución/anulación total).
   useEffect(() => {
@@ -69,12 +79,30 @@ export default function NotaCreditoPage() {
   const gravado = Math.round(lineas.reduce((s, l) => s + (l.valorUnitario || 0) * (l.cantidad || 1), 0) * 100) / 100;
   const igv = Math.round(gravado * 0.18 * 100) / 100;
   const total = Math.round((gravado + igv) * 100) / 100;
+  const excede = !!base && total > disponible + 0.01;
+  const motivoTotalParcial = !!base && MOTIVOS_TOTALES.includes(codTipNc) && total < disponible - 0.01;
+
+  // Descuento por un monto con IGV (p. ej. S/ 100 sobre una factura de 1,000): una sola línea con
+  // el valor sin IGV que más se acerca a ese total y motivo 04 (descuento global).
+  function aplicarDescuento() {
+    const d = num(descuento);
+    if (!(d > 0)) { setMsg("Indica el monto del descuento (con IGV)."); return; }
+    const tot = (v: number) => r2(v + r2(v * 0.18));
+    const base0 = Math.floor((d / 1.18) * 100) / 100;
+    const valor = [base0, r2(base0 + 0.01)].reduce((a, b) => (Math.abs(tot(b) - d) < Math.abs(tot(a) - d) ? b : a));
+    setLineas([{ descripcion: `DESCUENTO SOBRE ${base?.serie}-${base?.correlativo}`, cantidad: 1, valorUnitario: valor }]);
+    setCodTipNc("04");
+    setMotivo("DESCUENTO GLOBAL");
+    setMsg("");
+  }
 
   async function crearYEmitir() {
     if (!base) { setMsg("Elige la factura a la que se le hará la nota de crédito."); return; }
     if (!base.correlativo) { setMsg("La factura seleccionada no tiene número; no se puede referenciar."); return; }
     const items = lineas.filter((l) => l.descripcion.trim() || l.valorUnitario).map((l) => ({ descripcion: l.descripcion, cantidad: l.cantidad || 1, valorUnitario: l.valorUnitario || 0 }));
     if (!items.length || items.some((l) => l.valorUnitario <= 0)) { setMsg("Cada línea debe tener descripción y un valor mayor a 0."); return; }
+    if (excede) { setMsg(`La nota de crédito (${dinero(total, moneda)}) supera el saldo de la factura (${dinero(disponible, base.moneda)}).`); return; }
+    if (motivoTotalParcial && !confirm(`El motivo ${codTipNc} es para acreditar el comprobante completo, pero la nota es parcial (${dinero(total, moneda)} de ${dinero(disponible, base.moneda)}). Para un descuento usa 04 (descuento global) o 09 (disminución en el valor). ¿Emitir igual?`)) return;
     setBusy(true); setMsg("");
     try {
       const body = {
@@ -128,6 +156,19 @@ export default function NotaCreditoPage() {
             <span className="ml-auto tabular font-semibold">{dinero(base.total || base.monto + base.igv, base.moneda)}</span>
           </div>
         ) : null}
+        {base && yaAcreditado > 0 ? (
+          <p className="mt-2 text-xs text-amber-700">Ya tiene notas de crédito por {dinero(yaAcreditado, base.moneda)}. Saldo que se puede acreditar: <b>{dinero(disponible, base.moneda)}</b>.</p>
+        ) : null}
+        {base ? (
+          <div className="mt-4 flex flex-wrap items-end gap-2 rounded-lg border border-dashed border-slate-300 px-3 py-3">
+            <label className="min-w-[180px] flex-1">
+              <span className={lbl}>¿Es un descuento? Monto con IGV</span>
+              <input type="number" step="any" min="0" className={`${inp} tabular`} value={descuento} onChange={(e) => setDescuento(e.target.value)} placeholder="Ej. 100.00" />
+            </label>
+            <button type="button" onClick={aplicarDescuento} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-600 hover:border-brand-300 hover:text-brand-600">Aplicar descuento</button>
+            <p className="w-full text-xs text-slate-400">Arma la nota por ese monto (motivo 04 — descuento global). En Cobranzas la factura queda con el saldo rebajado: {dinero(totalBase, base.moneda)} − descuento.</p>
+          </div>
+        ) : null}
       </Card>
 
       {base ? (
@@ -172,7 +213,12 @@ export default function NotaCreditoPage() {
               <div className="flex justify-between"><span className="text-slate-500">Monto gravado</span><span className="tabular font-medium">{dinero(gravado, moneda)}</span></div>
               <div className="flex justify-between"><span className="text-slate-500">IGV (18%)</span><span className="tabular font-medium">{dinero(igv, moneda)}</span></div>
               <div className="flex justify-between border-t border-slate-100 pt-1.5"><span className="font-semibold text-slate-700">Total NC</span><span className="tabular font-bold">{dinero(total, moneda)}</span></div>
+              {total > 0 && !excede ? (
+                <div className="flex justify-between text-xs"><span className="text-slate-400">Saldo de la factura después de la nota</span><span className="tabular font-semibold text-slate-600">{dinero(r2(disponible - total), moneda)}{disponible - total <= 0.01 ? " · queda anulada" : ""}</span></div>
+              ) : null}
             </div>
+            {excede ? <p className="mt-2 rounded-md bg-rose-50 px-2.5 py-1.5 text-xs text-rose-700 ring-1 ring-inset ring-rose-200">Supera el saldo de la factura ({dinero(disponible, base.moneda)}). Ajusta las líneas.</p> : null}
+            {motivoTotalParcial ? <p className="mt-2 rounded-md bg-amber-50 px-2.5 py-1.5 text-xs text-amber-700 ring-1 ring-inset ring-amber-200">La nota es parcial, pero el motivo {codTipNc} es para acreditar todo el comprobante. Para un descuento usa 04 (descuento global) o 09 (disminución en el valor).</p> : null}
           </Card>
 
           <div className="mt-5 flex items-center gap-3">
