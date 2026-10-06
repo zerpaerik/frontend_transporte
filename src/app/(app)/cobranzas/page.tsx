@@ -2,16 +2,17 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Wallet, AlertTriangle, Clock, CheckCircle2, X, Upload, FileDown, Trash2, Paperclip, FileText, Image as ImageIcon, Landmark, ArrowRight } from "lucide-react";
+import { Wallet, AlertTriangle, Clock, CheckCircle2, X, Upload, FileDown, Trash2, Paperclip, FileText, Image as ImageIcon, Landmark, ArrowRight, FileMinus } from "lucide-react";
 import { PageHeader, StatCard, Badge } from "@/components/ui";
 import { DataTable, type Column, type Filter } from "@/components/DataTable";
 import { useData } from "@/lib/store";
 import { apiCobranzas, fileToBase64, downloadBase64 } from "@/lib/api";
 import { dinero, fecha, diasRestantes, hoyPeru, ordenComprobantes } from "@/lib/format";
-import { r2, totalDe, netoDe, detraccionDe, aDepositarSoles, responsableSegunCobro, responsableDe, etiquetaResponsable, detraccionDepositada, type Responsable } from "@/lib/detraccion";
+import { r2, totalDe, detraccionDe, aDepositarSoles, responsableSegunCobro, responsableDe, etiquetaResponsable, detraccionDepositada, notasCreditoPorFactura, notasDe, creditoDe, anuladaPorNc, saldoDe, docDe, type Responsable, type NotasPorFactura } from "@/lib/detraccion";
 import type { Factura } from "@/lib/types";
 
 type EstadoCobro = "Pagada" | "Vencida" | "Por vencer" | "Vigente";
+type Vista = "pendientes" | "pagadas" | "anuladas";
 // Vence en la fecha de vencimiento (crédito) o, si es al contado, en la fecha de emisión.
 const venceDe = (f: Factura) => String(f.fechaVencimiento || f.fecha).slice(0, 10);
 
@@ -34,7 +35,7 @@ function BadgeCobro({ f }: { f: Factura }) {
 
 export default function CobranzasPage() {
   const { facturas, reload } = useData();
-  const [vista, setVista] = useState<"pendientes" | "pagadas">("pendientes");
+  const [vista, setVista] = useState<Vista>("pendientes");
   const [selId, setSelId] = useState<string | null>(null);
 
   // Facturas y boletas aceptadas por SUNAT (las notas de crédito/débito y lo anulado no se cobran).
@@ -42,15 +43,20 @@ export default function CobranzasPage() {
     () => ordenComprobantes(facturas.filter((f) => f.tipo !== "N. Crédito" && f.tipo !== "N. Débito" && (f.estadoDocumento === "102" || f.estadoDocumento === "103"))),
     [facturas],
   );
-  const pendientes = cobrables.filter((f) => !f.pagada);
-  const pagadas = cobrables.filter((f) => f.pagada);
+  // Notas de crédito aceptadas, por factura: las que anulan la operación la sacan de la cobranza.
+  const notas = useMemo(() => notasCreditoPorFactura(facturas), [facturas]);
+  const anuladas = cobrables.filter((f) => anuladaPorNc(f, notas));
+  const vigentes = cobrables.filter((f) => !anuladaPorNc(f, notas));
+  const pendientes = vigentes.filter((f) => !f.pagada);
+  const pagadas = vigentes.filter((f) => f.pagada);
   const vencidas = pendientes.filter((f) => estadoCobro(f) === "Vencida");
   const porVencer = pendientes.filter((f) => estadoCobro(f) === "Por vencer");
-  const suma = (xs: Factura[], mon: "PEN" | "USD") => r2(xs.filter((f) => (f.moneda === "USD" ? "USD" : "PEN") === mon).reduce((s, f) => s + netoDe(f), 0));
+  const suma = (xs: Factura[], mon: "PEN" | "USD") => r2(xs.filter((f) => (f.moneda === "USD" ? "USD" : "PEN") === mon).reduce((s, f) => s + saldoDe(f, notas), 0));
   const montoHint = (xs: Factura[]) => { const usd = suma(xs, "USD"); return usd > 0 ? `+ ${dinero(usd, "USD")}` : undefined; };
 
   const sel = facturas.find((f) => f.id === selId) || null;
-  const filas = vista === "pendientes" ? pendientes : pagadas;
+  const filas = vista === "pendientes" ? pendientes : vista === "pagadas" ? pagadas : anuladas;
+  const ncTexto = (f: Factura) => notasDe(f, notas).map(docDe).join(", ");
 
   const columns: Column<Factura>[] = [
     { key: "doc", header: "Comprobante", sortable: true, value: (f) => `${f.serie}-${f.correlativo}`, render: (f) => <span className="font-semibold text-slate-900">{f.serie}-{f.correlativo}</span> },
@@ -65,7 +71,29 @@ export default function CobranzasPage() {
         ]
       : []),
     { key: "total", header: "Total", align: "right", sortable: true, value: (f) => totalDe(f), render: (f) => <span className="tabular">{dinero(totalDe(f), f.moneda)}</span> },
-    { key: "neto", header: "Neto a cobrar", align: "right", sortable: true, value: (f) => netoDe(f), render: (f) => <span className="tabular font-semibold">{dinero(netoDe(f), f.moneda)}</span> },
+    ...(vista === "anuladas"
+      ? [
+          {
+            key: "nc", header: "Nota de crédito", sortable: true, value: (f: Factura) => ncTexto(f),
+            render: (f: Factura) => (
+              <span className="block whitespace-nowrap">
+                <span className="tabular font-semibold text-rose-600">{ncTexto(f)}</span>
+                <span className="block text-[11px] text-slate-400">{notasDe(f, notas).map((n) => fecha(n.fecha)).join(", ")}</span>
+              </span>
+            ),
+          } as Column<Factura>,
+        ]
+      : [
+          {
+            key: "neto", header: "Neto a cobrar", align: "right", sortable: true, value: (f: Factura) => saldoDe(f, notas),
+            render: (f: Factura) => (
+              <span className="block whitespace-nowrap">
+                <span className="tabular font-semibold">{dinero(saldoDe(f, notas), f.moneda)}</span>
+                {creditoDe(f, notas) ? <span className="tabular block text-[11px] text-rose-500">NC {ncTexto(f)} −{dinero(creditoDe(f, notas), f.moneda)}</span> : null}
+              </span>
+            ),
+          } as Column<Factura>,
+        ]),
     ...(vista === "pagadas"
       ? [
           // Lo cobrado y, debajo, cuándo se pagó (una sola columna para que la tabla no se desborde).
@@ -87,7 +115,7 @@ export default function CobranzasPage() {
     ...(vista === "pendientes" ? [{ key: "estado", label: "Estado", value: (f: Factura) => estadoCobro(f) }] : []),
   ];
 
-  const tab = (v: "pendientes" | "pagadas", txt: string, n: number) => (
+  const tab = (v: Vista, txt: string, n: number) => (
     <button onClick={() => setVista(v)} className={`rounded-lg px-3.5 py-2 text-sm font-semibold transition ${vista === v ? "bg-brand-500 text-white" : "border border-slate-300 bg-white text-slate-600 hover:border-brand-300 hover:text-brand-600"}`}>
       {txt} <span className={`ml-1 rounded-full px-1.5 text-xs ${vista === v ? "bg-white/25" : "bg-slate-100"}`}>{n}</span>
     </button>
@@ -107,6 +135,7 @@ export default function CobranzasPage() {
       <div className="mb-4 flex flex-wrap items-center gap-2">
         {tab("pendientes", "Por cobrar", pendientes.length)}
         {tab("pagadas", "Pagadas", pagadas.length)}
+        {anuladas.length ? tab("anuladas", "Anuladas por NC", anuladas.length) : null}
         <span className="ml-auto text-xs text-slate-400">
           Neto a cobrar = total − detracción (la detracción se deposita en el Banco de la Nación).{" "}
           <Link href="/detracciones" className="font-semibold text-brand-600 hover:text-brand-700">Control de detracciones</Link>
@@ -114,8 +143,8 @@ export default function CobranzasPage() {
       </div>
 
       <DataTable
-        title={vista === "pendientes" ? "Facturas por cobrar" : "Facturas pagadas"}
-        exportName={vista === "pendientes" ? "facturas-por-cobrar" : "facturas-pagadas"}
+        title={vista === "pendientes" ? "Facturas por cobrar" : vista === "pagadas" ? "Facturas pagadas" : "Facturas anuladas con nota de crédito"}
+        exportName={vista === "pendientes" ? "facturas-por-cobrar" : vista === "pagadas" ? "facturas-pagadas" : "facturas-anuladas-nc"}
         columns={columns}
         rows={filas}
         filters={filters}
@@ -127,7 +156,7 @@ export default function CobranzasPage() {
         rowActions={(f) => <button onClick={() => setSelId(f.id)} className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:border-brand-300 hover:text-brand-600">Gestionar</button>}
       />
 
-      {sel ? <CobroModal f={sel} onClose={() => setSelId(null)} onChanged={reload} /> : null}
+      {sel ? <CobroModal f={sel} notas={notas} onClose={() => setSelId(null)} onChanged={reload} /> : null}
     </div>
   );
 }
@@ -138,16 +167,19 @@ function Dato({ k, v }: { k: string; v: React.ReactNode }) {
 
 const ACEPTA = "image/jpeg,image/png,image/webp,application/pdf";
 
-function CobroModal({ f, onClose, onChanged }: { f: Factura; onClose: () => void; onChanged: () => Promise<void> | void }) {
+function CobroModal({ f, notas, onClose, onChanged }: { f: Factura; notas: NotasPorFactura; onClose: () => void; onChanged: () => Promise<void> | void }) {
   const [fechaPago, setFechaPago] = useState(hoyPeru());
   const [nota, setNota] = useState("");
-  const [monto, setMonto] = useState(String(netoDe(f)));
+  const [monto, setMonto] = useState(String(saldoDe(f, notas)));
   // "" = automático: sigue al monto cobrado hasta que el usuario elija a mano.
   const [respManual, setRespManual] = useState<Responsable | "">("");
   const [busy, setBusy] = useState("");
 
-  const neto = netoDe(f);
+  // Neto ya rebajado por las notas de crédito parciales (si las hay).
+  const neto = saldoDe(f, notas);
   const total = totalDe(f);
+  const ncs = notasDe(f, notas);
+  const anulada = anuladaPorNc(f, notas);
   const detraccion = detraccionDe(f);
   const cobrado = r2(Number(String(monto).replace(",", ".")) || 0);
   const responsable = respManual || responsableSegunCobro(cobrado, neto, detraccion);
@@ -193,7 +225,7 @@ function CobroModal({ f, onClose, onChanged }: { f: Factura; onClose: () => void
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-lg font-bold text-slate-900">{f.serie}-{f.correlativo}</h2>
-              <BadgeCobro f={f} />
+              {anulada ? <Badge tone="red">Anulada por NC</Badge> : <BadgeCobro f={f} />}
             </div>
             <p className="mt-0.5 text-sm text-slate-500">{f.cliente} · RUC {f.ruc}</p>
           </div>
@@ -204,11 +236,24 @@ function CobroModal({ f, onClose, onChanged }: { f: Factura; onClose: () => void
           <Dato k="Emisión" v={fecha(f.fecha)} />
           <Dato k="Vence" v={fecha(venceDe(f))} />
           <Dato k="Total" v={dinero(totalDe(f), f.moneda)} />
-          {f.sujetoDetraccion ? <Dato k="Detracción (Banco de la Nación)" v={<span className="text-rose-500">− {dinero(f.montoDetraccion || 0, f.moneda)}</span>} /> : null}
-          <Dato k="Neto a cobrar" v={<b>{dinero(netoDe(f), f.moneda)}</b>} />
+          {f.sujetoDetraccion && !anulada ? <Dato k="Detracción (Banco de la Nación)" v={<span className="text-rose-500">− {dinero(f.montoDetraccion || 0, f.moneda)}</span>} /> : null}
+          {ncs.map((n) => (
+            <Dato key={n.id} k={`Nota de crédito ${docDe(n)}${n.motivo ? ` · ${n.motivo}` : ""}`} v={<span className="text-rose-500">− {dinero(totalDe(n), n.moneda)}</span>} />
+          ))}
+          <Dato k="Neto a cobrar" v={<b>{dinero(neto, f.moneda)}</b>} />
+
+          {anulada ? (
+            <div className="mt-4 flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              <FileMinus size={16} className="mt-0.5 shrink-0" />
+              <span>
+                Factura anulada con la nota de crédito <b>{ncs.map(docDe).join(", ")}</b>: no se cobra{f.sujetoDetraccion ? " ni se deposita su detracción" : ""}.
+                {f.pagada ? " Estaba marcada como pagada: si el cliente ya pagó, corresponde devolverle el importe." : ""}
+              </span>
+            </div>
+          ) : null}
 
           {/* Pago */}
-          <div className="mt-4 rounded-xl border border-slate-200 p-4">
+          <div className={`mt-4 rounded-xl border border-slate-200 p-4 ${anulada && !f.pagada ? "hidden" : ""}`}>
             <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Pago</div>
             {f.pagada ? (
               <div className="space-y-2 text-sm">

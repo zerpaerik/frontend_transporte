@@ -8,7 +8,7 @@ import { DataTable, type Column, type Filter } from "@/components/DataTable";
 import { useData } from "@/lib/store";
 import { apiCobranzas } from "@/lib/api";
 import { dinero, fecha, fechaISO, hoyPeru, soles } from "@/lib/format";
-import { totalDe, detraccionDe, aDepositarSoles, responsableDe, etiquetaResponsable, detraccionDepositada, type Responsable } from "@/lib/detraccion";
+import { totalDe, detraccionDe, aDepositarSoles, responsableDe, etiquetaResponsable, detraccionDepositada, notasCreditoPorFactura, notasDe, anuladaPorNc, docDe, type Responsable } from "@/lib/detraccion";
 import type { Factura } from "@/lib/types";
 
 const doc = (f: Factura) => `${f.serie}-${f.correlativo}`;
@@ -29,15 +29,28 @@ export default function DetraccionesPage() {
     () => facturas.filter((f) => f.sujetoDetraccion && f.tipo !== "N. Crédito" && f.tipo !== "N. Débito" && (f.estadoDocumento === "102" || f.estadoDocumento === "103")),
     [facturas],
   );
-  const pendientes = sujetas.filter((f) => !detraccionDepositada(f));
+  // Una factura anulada con nota de crédito ya no tiene detracción que depositar. Si ya se había
+  // depositado, sigue en "Depositadas" (marcada) para gestionar la devolución.
+  const notas = useMemo(() => notasCreditoPorFactura(facturas), [facturas]);
+  const anulada = (f: Factura) => anuladaPorNc(f, notas);
+  const pendientes = sujetas.filter((f) => !detraccionDepositada(f) && !anulada(f));
   const depositadas = sujetas.filter(detraccionDepositada);
+  const anuladasSinDepositar = sujetas.filter((f) => !detraccionDepositada(f) && anulada(f));
   const delCliente = pendientes.filter((f) => responsableDe(f) === "Cliente");
   const nuestras = pendientes.filter((f) => responsableDe(f) === "Empresa");
 
   const sel = facturas.find((f) => f.id === selId) || null;
   const filas = vista === "pendientes" ? pendientes : depositadas;
 
-  const colDoc: Column<Factura> = { key: "doc", header: "Comprobante", sortable: true, value: doc, render: (f) => <span className="font-semibold text-slate-900">{doc(f)}</span> };
+  const colDoc: Column<Factura> = {
+    key: "doc", header: "Comprobante", sortable: true, value: doc,
+    render: (f) => (
+      <span className="block whitespace-nowrap">
+        <span className="font-semibold text-slate-900">{doc(f)}</span>
+        {anulada(f) ? <span className="block text-[11px] font-semibold text-rose-600">Anulada · NC {notasDe(f, notas).map(docDe).join(", ")}</span> : null}
+      </span>
+    ),
+  };
   const colCliente: Column<Factura> = { key: "cliente", header: "Cliente", sortable: true, render: (f) => <span className="block max-w-[220px] truncate" title={f.cliente}>{f.cliente}</span> };
   const colEmision: Column<Factura> = { key: "fecha", header: "Emisión", sortable: true, value: (f) => fechaISO(String(f.fecha)), render: (f) => <span className="tabular whitespace-nowrap">{fecha(f.fecha)}</span> };
   const colResponsable: Column<Factura> = { key: "responsable", header: "Le corresponde", sortable: true, value: (f) => etiquetaResponsable(responsableDe(f)), render: (f) => <BadgeResponsable f={f} /> };
@@ -107,7 +120,7 @@ export default function DetraccionesPage() {
         <StatCard label="Por depositar · cliente" value={delCliente.length} icon={Users} tone="blue" hint={delCliente.length ? soles(sumaSoles(delCliente, aDepositarSoles)) : "al día"} />
         <StatCard label="Por depositar · nosotros" value={nuestras.length} icon={Building2} tone="red" hint={nuestras.length ? `${soles(sumaSoles(nuestras, aDepositarSoles))} · nos toca` : "al día"} />
         <StatCard label="Depositadas" value={depositadas.length} icon={CheckCircle2} tone="green" hint={depositadas.length ? soles(sumaSoles(depositadas, (f) => f.detraccionMonto || 0)) : undefined} />
-        <StatCard label="Total detracciones" value={soles(sumaSoles(sujetas, aDepositarSoles))} icon={Landmark} tone="gray" hint={`${sujetas.length} factura(s)`} />
+        <StatCard label="Total detracciones" value={soles(sumaSoles(sujetas.filter((f) => !anuladasSinDepositar.includes(f)), aDepositarSoles))} icon={Landmark} tone="gray" hint={`${sujetas.length - anuladasSinDepositar.length} factura(s)${anuladasSinDepositar.length ? ` · ${anuladasSinDepositar.length} anulada(s) con NC no se depositan` : ""}`} />
       </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -137,7 +150,7 @@ export default function DetraccionesPage() {
         )}
       />
 
-      {sel ? <DetraccionModal f={sel} todas={sujetas} onClose={() => setSelId(null)} onChanged={reload} /> : null}
+      {sel ? <DetraccionModal f={sel} todas={sujetas} notasCredito={notasDe(sel, notas).map(docDe)} anulada={anulada(sel)} onClose={() => setSelId(null)} onChanged={reload} /> : null}
     </div>
   );
 }
@@ -146,7 +159,7 @@ function Dato({ k, v }: { k: string; v: React.ReactNode }) {
   return <div className="flex justify-between gap-4 border-b border-slate-100 py-2 text-sm"><span className="text-slate-500">{k}</span><span className="text-right font-medium text-slate-800">{v}</span></div>;
 }
 
-function DetraccionModal({ f, todas, onClose, onChanged }: { f: Factura; todas: Factura[]; onClose: () => void; onChanged: () => Promise<void> | void }) {
+function DetraccionModal({ f, todas, notasCredito, anulada, onClose, onChanged }: { f: Factura; todas: Factura[]; notasCredito: string[]; anulada: boolean; onClose: () => void; onChanged: () => Promise<void> | void }) {
   const depositada = detraccionDepositada(f);
   const aDepositar = aDepositarSoles(f);
   const [responsable, setResponsable] = useState<Responsable>(responsableDe(f));
@@ -203,6 +216,12 @@ function DetraccionModal({ f, todas, onClose, onChanged }: { f: Factura; todas: 
         </div>
 
         <div className="px-6 py-3">
+          {anulada ? (
+            <div className="mb-2 mt-1 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              Factura anulada con la nota de crédito <b>{notasCredito.join(", ")}</b>.{" "}
+              {depositada ? "La detracción ya se había depositado: corresponde solicitar su devolución o aplicarla a otra factura." : "No se deposita su detracción."}
+            </div>
+          ) : null}
           <Dato k="Emisión" v={fecha(f.fecha)} />
           <Dato k="Total del comprobante" v={dinero(totalDe(f), f.moneda)} />
           <Dato k={`Detracción (${f.porcDetraccion || 4}%)`} v={dinero(detraccionDe(f), f.moneda)} />
