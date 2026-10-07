@@ -24,7 +24,17 @@ const columns: Column<Neumatico>[] = [
   { key: "estado", header: "Estado", sortable: true, render: (n) => <Badge tone={estadoTone[n.estado]}>{n.estado}</Badge> },
 ];
 
+// Posiciones por tipo de unidad. Tracto: dirección (P1) y tracción (P2/P3). Carreta
+// (semirremolque de 3 ejes, llantas dobles): eje, lado e interior/exterior.
+const POSICIONES: Record<"Tracto" | "Carreta", string[]> = {
+  Tracto: [
+    "Delantero izq. (P1)", "Delantero der. (P1)", "Tracción int. izq. (P2)", "Tracción int. der. (P2)", "Tracción ext. izq. (P3)", "Tracción ext. der. (P3)", "Repuesto",
+  ],
+  Carreta: [1, 2, 3].flatMap((e) => [`Eje ${e} izq. ext.`, `Eje ${e} izq. int.`, `Eje ${e} der. int.`, `Eje ${e} der. ext.`]).concat("Repuesto"),
+};
+
 const filters: Filter<Neumatico>[] = [
+  { key: "placa", label: "Placa", value: (n) => n.placa },
   { key: "marca", label: "Marca", value: (n) => n.marca },
   { key: "estado", label: "Estado", value: (n) => n.estado },
 ];
@@ -37,18 +47,24 @@ export default function NeumaticosPage() {
   const inversion = neumaticos.reduce((s, n) => s + n.costo, 0);
   const porRotar = neumaticos.filter((n) => n.estado === "Para rotar" || n.estado === "Reencauche").length;
 
-  const fieldsFor = (n?: Neumatico): Field[] => [
-    { name: "placa", label: "Vehículo", type: "select", options: vehiculos.filter((v) => v.tipo === "Tracto").map((v) => v.placa), default: n?.placa },
-    { name: "posicion", label: "Posición en la unidad", type: "select", options: [
-      "Delantero izq. (P1)", "Delantero der. (P1)", "Tracción int. izq. (P2)", "Tracción int. der. (P2)", "Tracción ext. izq. (P3)", "Tracción ext. der. (P3)",
-    ], default: n?.posicion },
+  // El neumático va en un tracto o en una carreta: el tipo define las placas y las posiciones.
+  // Al editar se conservan la placa y la posición guardadas aunque ya no estén en la lista.
+  const tipoDe = (placa?: string) => (vehiculos.find((v) => v.placa === placa)?.tipo === "Carreta" ? "Carreta" : "Tracto");
+  const fieldsFor = (n?: Neumatico) => (vals: Record<string, string>): Field[] => {
+    const tipo = vals.tipoUnidad === "Carreta" ? "Carreta" : "Tracto";
+    const conActual = (arr: string[], cur?: string) => (cur && !arr.includes(cur) && tipoDe(n?.placa) === tipo ? [cur, ...arr] : arr);
+    return [
+      { name: "tipoUnidad", label: "Tipo de unidad", type: "select", options: ["Tracto", "Carreta"], default: tipoDe(n?.placa) },
+      { name: "placa", label: tipo === "Carreta" ? "Carreta" : "Tracto", type: "select", required: true, options: conActual(vehiculos.filter((v) => v.tipo === tipo).map((v) => v.placa), n?.placa), default: n?.placa },
+      { name: "posicion", label: "Posición en la unidad", type: "select", required: true, options: conActual(POSICIONES[tipo], n?.posicion), default: n?.posicion },
     { name: "marca", label: "Marca", type: "text", required: true, placeholder: "Michelin", default: n?.marca },
     { name: "kmInstalacion", label: "Km al instalar", type: "number", default: n?.kmInstalacion ?? 0 },
     { name: "kmActual", label: "Km actual", type: "number", default: n?.kmActual ?? 0 },
     { name: "costo", label: "Costo (S/)", type: "number", default: n?.costo ?? 0 },
     { name: "tienda", label: "Tienda", type: "text", placeholder: "Neumáticos Perú", default: n?.tienda },
     { name: "estado", label: "Estado", type: "select", options: ["Nuevo", "En uso", "Para rotar", "Reencauche", "Descartado"], default: n?.estado },
-  ];
+    ];
+  };
 
   function toBody(v: FormValues) {
     return {
@@ -56,12 +72,15 @@ export default function NeumaticosPage() {
       kmActual: Number(v.kmActual), costo: Number(v.costo), tienda: String(v.tienda), estado: v.estado as Neumatico["estado"],
     };
   }
-  function guardar(v: FormValues) { addNeumatico(toBody(v)); }
+  function guardar(v: FormValues) {
+    if (!v.placa) { alert(`No hay ${v.tipoUnidad === "Carreta" ? "carretas" : "tractos"} registrados en Flota.`); return; }
+    addNeumatico(toBody(v));
+  }
   function guardarEdit(v: FormValues) { if (edit) updateNeumatico(edit.id, toBody(v)); }
 
   return (
     <div>
-      <PageHeader modulo="05" title="Neumáticos" subtitle="Cada llanta registrada por su posición exacta en la unidad, con kilometraje y costo." />
+      <PageHeader modulo="05" title="Neumáticos" subtitle="Cada llanta registrada por su posición exacta en el tracto o la carreta, con kilometraje y costo." />
 
       <div className="mb-6 grid grid-cols-3 gap-4">
         <StatCard label="Neumáticos" value={neumaticos.length} icon={CircleDot} tone="blue" />

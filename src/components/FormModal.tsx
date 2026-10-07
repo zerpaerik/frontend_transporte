@@ -104,8 +104,23 @@ export function FormModal({
 
   const flds = resolve(values);
 
+  // Al cambiar un campo pueden cambiar los demás (p. ej. Tracto/Carreta cambia las placas y las
+  // posiciones): los campos nuevos toman su valor por defecto y un select cuyo valor ya no está
+  // entre sus nuevas opciones se reinicia (un valor antiguo que nunca estuvo en la lista se respeta).
   function set(name: string, v: string) {
-    setValues((s) => ({ ...s, [name]: v }));
+    setValues((s) => {
+      const antes = resolve(s);
+      const next = { ...s, [name]: v };
+      for (const f of resolve(next)) {
+        if (!(f.name in next)) { next[f.name] = fieldDefault(f); continue; }
+        if (f.type !== "select" || f.name === name || f.options.includes(next[f.name])) continue;
+        const prev = antes.find((p) => p.name === f.name);
+        if (prev?.type === "select" && prev.options.includes(next[f.name])) {
+          next[f.name] = f.default && f.options.includes(f.default) ? f.default : f.options[0] ?? "";
+        }
+      }
+      return next;
+    });
   }
 
   function submit(e: React.FormEvent) {
