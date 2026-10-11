@@ -51,6 +51,9 @@ export default function NotaCreditoPage() {
   const [tipoCambio, setTipoCambio] = useState("");
   const [lineas, setLineas] = useState<Linea[]>([]);
   const [busy, setBusy] = useState(false);
+  // Nota ya registrada en un intento anterior: si la emisión falló (p. ej. se cortó la conexión),
+  // el reintento emite ESA misma nota (mismo número) en vez de crear otra y duplicarla en SUNAT.
+  const [creadaId, setCreadaId] = useState<string | null>(null);
   const [msg, setMsg] = useState("");
   const [descuento, setDescuento] = useState("");
 
@@ -97,6 +100,7 @@ export default function NotaCreditoPage() {
   }
 
   async function crearYEmitir() {
+    let idCreada = "";
     if (!base) { setMsg("Elige la factura a la que se le hará la nota de crédito."); return; }
     if (!base.correlativo) { setMsg("La factura seleccionada no tiene número; no se puede referenciar."); return; }
     const items = lineas.filter((l) => l.descripcion.trim() || l.valorUnitario).map((l) => ({ descripcion: l.descripcion, cantidad: l.cantidad || 1, valorUnitario: l.valorUnitario || 0 }));
@@ -119,14 +123,20 @@ export default function NotaCreditoPage() {
         codTipNc,
         motivo: motivo.trim() || "ANULACION DE LA OPERACION",
       };
-      const creada = await api.post<Factura>("/facturas", body);
-      const r = await apiFacturasE.emitir(creada.id);
+      let id = creadaId;
+      if (!id) {
+        id = (await api.post<Factura>("/facturas", body)).id;
+        idCreada = id;
+        setCreadaId(id);
+      }
+      const r = await apiFacturasE.emitir(id);
       const e = r.respuesta;
       await reload();
       alert(e.estado_documento === "102" ? `✅ Nota de crédito aceptada por SUNAT: ${e.sunat_description}` : `Estado ${e.estado_documento || "?"}: ${e.errors || e.sunat_description || "sin detalle"}`);
       router.push("/facturacion/nota-credito");
     } catch (e) {
-      setMsg((e as Error).message || "No se pudo emitir la nota de crédito.");
+      const registrada = creadaId || idCreada;
+      setMsg(`${(e as Error).message || "No se pudo emitir la nota de crédito."}${registrada ? ' La nota ya quedó registrada: al volver a apretar "Crear y emitir" se reintenta con la misma nota y el mismo número (no se duplica).' : ""}`);
       setBusy(false);
     }
   }

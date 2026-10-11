@@ -333,7 +333,18 @@ export const apiFacturasE = {
   xml: (id: string) => api.get<{ nombre: string; mime: string; base64: string }>(`/facturas/${id}/xml`),
   anular: (id: string, motivo: string) => api.post<unknown>(`/facturas/${id}/anular`, { motivo }),
   correo: (id: string, correo: string) => api.post<{ ok: boolean; mensaje: string }>(`/facturas/${id}/correo`, { correo }),
+  revisarNumeracion: () => api.get<RevisionNumeracion>("/facturas/revisar-numeracion"),
 };
+// Comprobantes que existen en MiFact/SUNAT pero no en el sistema (huecos de numeración).
+export interface RevisionNumeracion {
+  consultas: number;
+  truncado: boolean;
+  hallazgos: {
+    documento: string; tipoDoc: string; fecha: string; estado: string; descripcion: string;
+    probableDuplicadoDe: { documento: string; cliente: string; ruc: string; total: number; moneda: string; fecha: string };
+  }[];
+  libres: string[];
+}
 
 // --- Guía de Remisión electrónica del transportista (GRE) ---
 export interface GuiaTransportista {

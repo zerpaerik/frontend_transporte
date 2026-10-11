@@ -41,6 +41,9 @@ export default function NotaDebitoPage() {
   const [fechaEmision, setFechaEmision] = useState(hoyPeru());
   const [lineas, setLineas] = useState<Linea[]>([]);
   const [busy, setBusy] = useState(false);
+  // Nota ya registrada en un intento anterior: si la emisión falló (p. ej. se cortó la conexión),
+  // el reintento emite ESA misma nota (mismo número) en vez de crear otra y duplicarla en SUNAT.
+  const [creadaId, setCreadaId] = useState<string | null>(null);
   const [msg, setMsg] = useState("");
 
   // A diferencia de la NC, la nota de débito AGREGA un cargo (interés, penalidad,
@@ -66,6 +69,7 @@ export default function NotaDebitoPage() {
   const total = Math.round((gravado + igv) * 100) / 100;
 
   async function crearYEmitir() {
+    let idCreada = "";
     if (!base) { setMsg("Elige la factura a la que se le hará la nota de débito."); return; }
     if (!base.correlativo) { setMsg("La factura seleccionada no tiene número; no se puede referenciar."); return; }
     const items = lineas.filter((l) => l.descripcion.trim() || l.valorUnitario).map((l) => ({ descripcion: l.descripcion, cantidad: l.cantidad || 1, valorUnitario: l.valorUnitario || 0 }));
@@ -86,14 +90,20 @@ export default function NotaDebitoPage() {
         codTipNc: codTipNd,
         motivo: motivo.trim() || "INTERES POR MORA",
       };
-      const creada = await api.post<Factura>("/facturas", body);
-      const r = await apiFacturasE.emitir(creada.id);
+      let id = creadaId;
+      if (!id) {
+        id = (await api.post<Factura>("/facturas", body)).id;
+        idCreada = id;
+        setCreadaId(id);
+      }
+      const r = await apiFacturasE.emitir(id);
       const e = r.respuesta;
       await reload();
       alert(e.estado_documento === "102" ? `✅ Nota de débito aceptada por SUNAT: ${e.sunat_description}` : `Estado ${e.estado_documento || "?"}: ${e.errors || e.sunat_description || "sin detalle"}`);
       router.push("/facturacion/nota-debito");
     } catch (e) {
-      setMsg((e as Error).message || "No se pudo emitir la nota de débito.");
+      const registrada = creadaId || idCreada;
+      setMsg(`${(e as Error).message || "No se pudo emitir la nota de débito."}${registrada ? ' La nota ya quedó registrada: al volver a apretar "Crear y emitir" se reintenta con la misma nota y el mismo número (no se duplica).' : ""}`);
       setBusy(false);
     }
   }
