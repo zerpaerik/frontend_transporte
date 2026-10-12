@@ -174,6 +174,11 @@ export function ComprobanteModal({ f, listo, emisor = null, cuentas = [], onClos
           {f.hash ? <Dato k="Hash" v={<span className="tabular text-xs">{f.hash}</span>} /> : null}
           {f.qr ? <Dato k="Cadena QR" v={<span className="tabular break-all text-xs text-slate-500">{f.qr}</span>} /> : null}
           {f.sunatDescripcion ? <div className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">{f.sunatDescripcion}</div> : null}
+          {f.estadoDocumento === "101" ? (
+            <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              <b>En proceso:</b> MiFact ya recibió este comprobante (tiene número y hash) y lo está enviando a SUNAT. <b>No lo vuelvas a emitir ni crees otro por el mismo servicio</b>: cuando SUNAT responda quedará aceptado. Usa <b>Estado</b> más tarde para actualizarlo.
+            </div>
+          ) : null}
         </div>
 
         <div className="flex flex-wrap gap-2 border-t border-slate-200 px-6 py-4">
