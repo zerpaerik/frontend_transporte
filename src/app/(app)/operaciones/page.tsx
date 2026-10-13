@@ -12,7 +12,7 @@ import { GuiaModal } from "@/components/GuiaModal";
 import { useData } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { apiTipos, apiClientes, apiPuertos, apiComisiones } from "@/lib/api";
-import { fecha, diasRestantes, soles } from "@/lib/format";
+import { fecha, diasRestantes, soles, dinero } from "@/lib/format";
 import type { EstadoViaje, Viaje } from "@/lib/types";
 
 // Opción del select de carreta para escribir una placa alquilada (fuera de la flota).
@@ -85,7 +85,7 @@ const columns: Column<Viaje>[] = [
   } },
   { key: "semaforo", header: "Devolver", align: "center", render: (v) => <Semaforo iso={v.fechaLimite || undefined} estado={v.estado} /> },
   { key: "greRemitente", header: "N° Guía", value: (v) => v.greRemitente, render: (v) => v.greRemitente ? <span className="tabular whitespace-nowrap">{v.greRemitente}</span> : dash },
-  { key: "tarifa", header: "Tarifa", align: "right", sortable: true, value: (v) => v.tarifa || 0, render: (v) => v.tarifa ? <span className="tabular whitespace-nowrap font-medium">{soles(v.tarifa)}</span> : dash },
+  { key: "tarifa", header: "Tarifa", align: "right", sortable: true, value: (v) => v.tarifa || 0, render: (v) => v.tarifa ? <span className="tabular whitespace-nowrap font-medium">{dinero(v.tarifa, v.moneda)}</span> : dash },
   { key: "facturado", header: "Facturado", value: (v) => (v.factura ? "Sí" : "No"), render: (v) => v.factura ? <Badge tone="green">Facturado · {v.factura}</Badge> : <Badge tone="amber">No facturado</Badge> },
   { key: "estado", header: "Estado", sortable: true, render: (v) => <Badge tone={estadoTone[v.estado]}>{v.estado}</Badge> },
 ];
@@ -193,7 +193,8 @@ export default function OperacionesPage() {
       { name: "nOrden", label: "Orden", type: "text", placeholder: "26/03000251", default: g("nOrden") },
       { name: "greRemitente", label: "Guía de remisión (remitente)", type: "text", placeholder: "T001-26916", default: g("greRemitente") },
       { name: "greTransporte", label: "Guía de transportista", type: "text", placeholder: "V001-01028", default: g("greTransporte") },
-      { name: "tarifa", label: "Tarifa (S/) — se jala en la factura", type: "number", default: g("tarifa", "0") },
+      { name: "moneda", label: "Moneda de la tarifa", type: "select", options: ["Soles (S/)", "Dólares (US$)"], default: g("moneda") === "USD" ? "Dólares (US$)" : "Soles (S/)" },
+      { name: "tarifa", label: `Tarifa (${vals.moneda === "Dólares (US$)" ? "US$" : "S/"}) — se jala en la factura`, type: "number", default: g("tarifa", "0") },
       { name: "operacion", label: "Tipo de operación", type: "select", options: opt(tipos, g("operacion")), default: g("operacion") || tipos[0] || "" },
       { name: "contenedor", label: "Contenedor", type: "text", placeholder: "Opcional — se puede registrar luego al editar", default: g("contenedor") },
       { name: "tipoCarga", label: "Tipo de carga", type: "select", options: ["GENERAL", "IMO", "REEFER"], default: g("tipoCarga", "GENERAL") },
@@ -234,6 +235,7 @@ export default function OperacionesPage() {
       estado: String(v.estado || "Programado"), nOrden: String(v.nOrden || ""), greRemitente: String(v.greRemitente || ""),
       greTransporte: String(v.greTransporte || ""), factura: String(v.factura || ""),
       tarifa: Number(v.tarifa || 0),
+      moneda: v.moneda === "Dólares (US$)" ? "USD" : "PEN",
       fechaLimite: v.fechaLimite ? String(v.fechaLimite) : undefined,
       fechaCliente: v.fechaCliente ? String(v.fechaCliente) : undefined,
       fechaViaje: v.fechaViaje ? String(v.fechaViaje) : undefined,

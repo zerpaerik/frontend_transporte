@@ -8,7 +8,7 @@ import { DataTable, type Column, type Filter } from "@/components/DataTable";
 import { useData } from "@/lib/store";
 import { apiCobranzas, fileToBase64, downloadBase64 } from "@/lib/api";
 import { dinero, fecha, diasRestantes, hoyPeru, ordenComprobantes } from "@/lib/format";
-import { r2, totalDe, detraccionDe, aDepositarSoles, responsableSegunCobro, responsableDe, etiquetaResponsable, detraccionDepositada, notasCreditoPorFactura, notasDe, creditoDe, anuladaPorNc, saldoDe, docDe, type Responsable, type NotasPorFactura } from "@/lib/detraccion";
+import { r2, totalDe, detraccionDe, aDepositarSoles, responsableSegunCobro, responsableDe, etiquetaResponsable, detraccionDepositada, notasCreditoPorFactura, notasDe, creditoDe, anuladaPorNc, saldoDe, docDe, cobradoDe, pendienteDe, type Responsable, type NotasPorFactura } from "@/lib/detraccion";
 import type { Factura } from "@/lib/types";
 
 type EstadoCobro = "Pagada" | "Vencida" | "Por vencer" | "Vigente";
@@ -51,7 +51,9 @@ export default function CobranzasPage() {
   const pagadas = vigentes.filter((f) => f.pagada);
   const vencidas = pendientes.filter((f) => estadoCobro(f) === "Vencida");
   const porVencer = pendientes.filter((f) => estadoCobro(f) === "Por vencer");
-  const suma = (xs: Factura[], mon: "PEN" | "USD") => r2(xs.filter((f) => (f.moneda === "USD" ? "USD" : "PEN") === mon).reduce((s, f) => s + saldoDe(f, notas), 0));
+  // Por cobrar: lo que falta de cada factura (descontando pagos a cuenta); en Pagadas, lo cobrado.
+  const suma = (xs: Factura[], mon: "PEN" | "USD") => r2(xs.filter((f) => (f.moneda === "USD" ? "USD" : "PEN") === mon).reduce((s, f) => s + (f.pagada ? cobradoDe(f) : pendienteDe(f, notas)), 0));
+  const aCuenta = pendientes.filter((f) => cobradoDe(f) > 0);
   const montoHint = (xs: Factura[]) => { const usd = suma(xs, "USD"); return usd > 0 ? `+ ${dinero(usd, "USD")}` : undefined; };
 
   const sel = facturas.find((f) => f.id === selId) || null;
@@ -85,11 +87,13 @@ export default function CobranzasPage() {
         ]
       : [
           {
-            key: "neto", header: "Neto a cobrar", align: "right", sortable: true, value: (f: Factura) => saldoDe(f, notas),
+            key: "neto", header: vista === "pendientes" ? "Por cobrar" : "Neto a cobrar", align: "right", sortable: true,
+            value: (f: Factura) => (vista === "pendientes" ? pendienteDe(f, notas) : saldoDe(f, notas)),
             render: (f: Factura) => (
               <span className="block whitespace-nowrap">
-                <span className="tabular font-semibold">{dinero(saldoDe(f, notas), f.moneda)}</span>
+                <span className="tabular font-semibold">{dinero(vista === "pendientes" ? pendienteDe(f, notas) : saldoDe(f, notas), f.moneda)}</span>
                 {creditoDe(f, notas) ? <span className="tabular block text-[11px] text-rose-500">NC {ncTexto(f)} −{dinero(creditoDe(f, notas), f.moneda)}</span> : null}
+                {vista === "pendientes" && cobradoDe(f) > 0 ? <span className="tabular block text-[11px] text-emerald-700">a cuenta {dinero(cobradoDe(f), f.moneda)} de {dinero(saldoDe(f, notas), f.moneda)}</span> : null}
               </span>
             ),
           } as Column<Factura>,
@@ -101,8 +105,8 @@ export default function CobranzasPage() {
             key: "pago", header: "Cobro", align: "right", sortable: true, value: (f: Factura) => String(f.fechaPago || ""),
             render: (f: Factura) => (
               <span className="block whitespace-nowrap">
-                {f.montoCobrado ? <span className="tabular font-semibold text-emerald-700">{dinero(f.montoCobrado, f.moneda)}</span> : <span className="text-slate-300">—</span>}
-                <span className="tabular block text-[11px] text-slate-400">{f.fechaPago ? fecha(f.fechaPago) : "sin fecha"}</span>
+                {cobradoDe(f) ? <span className="tabular font-semibold text-emerald-700">{dinero(cobradoDe(f), f.moneda)}</span> : <span className="text-slate-300">—</span>}
+                <span className="tabular block text-[11px] text-slate-400">{f.fechaPago ? fecha(f.fechaPago) : "sin fecha"}{(f.abonos?.length || 0) > 1 ? ` · ${f.abonos!.length} pagos` : ""}</span>
               </span>
             ),
           } as Column<Factura>,
@@ -126,7 +130,7 @@ export default function CobranzasPage() {
       <PageHeader modulo="09" title="Cobranzas" subtitle="Control de las facturas emitidas: qué falta cobrar, qué está vencido y los comprobantes de pago recibidos." />
 
       <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard label="Por cobrar (neto)" value={dinero(suma(pendientes, "PEN"), "PEN")} icon={Wallet} tone="blue" hint={montoHint(pendientes) || `${pendientes.length} factura(s)`} />
+        <StatCard label="Por cobrar (neto)" value={dinero(suma(pendientes, "PEN"), "PEN")} icon={Wallet} tone="blue" hint={montoHint(pendientes) || `${pendientes.length} factura(s)${aCuenta.length ? ` · ${aCuenta.length} con pagos a cuenta` : ""}`} />
         <StatCard label="Vencidas" value={vencidas.length} icon={AlertTriangle} tone="red" hint={vencidas.length ? `${dinero(suma(vencidas, "PEN"), "PEN")}${montoHint(vencidas) ? " " + montoHint(vencidas) : ""}` : "al día"} />
         <StatCard label="Vencen en 7 días" value={porVencer.length} icon={Clock} tone="amber" hint={porVencer.length ? dinero(suma(porVencer, "PEN"), "PEN") : undefined} />
         <StatCard label="Pagadas" value={pagadas.length} icon={CheckCircle2} tone="green" hint={pagadas.length ? dinero(suma(pagadas, "PEN"), "PEN") : undefined} />
@@ -170,9 +174,11 @@ const ACEPTA = "image/jpeg,image/png,image/webp,application/pdf";
 function CobroModal({ f, notas, onClose, onChanged }: { f: Factura; notas: NotasPorFactura; onClose: () => void; onChanged: () => Promise<void> | void }) {
   const [fechaPago, setFechaPago] = useState(hoyPeru());
   const [nota, setNota] = useState("");
-  const [monto, setMonto] = useState(String(saldoDe(f, notas)));
+  const [monto, setMonto] = useState(String(pendienteDe(f, notas)));
   // "" = automático: sigue al monto cobrado hasta que el usuario elija a mano.
   const [respManual, setRespManual] = useState<Responsable | "">("");
+  // null = automático: el pago cierra la factura si cubre lo que falta; se puede forzar a mano.
+  const [cerrarManual, setCerrarManual] = useState<boolean | null>(null);
   const [busy, setBusy] = useState("");
 
   // Neto ya rebajado por las notas de crédito parciales (si las hay).
@@ -181,10 +187,15 @@ function CobroModal({ f, notas, onClose, onChanged }: { f: Factura; notas: Notas
   const ncs = notasDe(f, notas);
   const anulada = anuladaPorNc(f, notas);
   const detraccion = detraccionDe(f);
-  const cobrado = r2(Number(String(monto).replace(",", ".")) || 0);
-  const responsable = respManual || responsableSegunCobro(cobrado, neto, detraccion);
-  // Ni el neto ni el total: pago parcial, comisión bancaria o un error de tipeo.
-  const montoRaro = cobrado > 0 && Math.abs(cobrado - neto) > 1 && Math.abs(cobrado - total) > 1;
+  const abonos = f.abonos || [];
+  const previo = cobradoDe(f); // pagos a cuenta ya registrados
+  const restante = pendienteDe(f, notas);
+  const cobrado = r2(Number(String(monto).replace(",", ".")) || 0); // este pago
+  const totalCobrado = r2(previo + cobrado);
+  const cerrar = cerrarManual ?? cobrado >= restante - 0.01;
+  const responsable = respManual || responsableSegunCobro(totalCobrado, neto, detraccion);
+  // Al cerrar, lo cobrado no es ni el neto ni el total: comisión bancaria o un error de tipeo.
+  const montoRaro = cerrar && cobrado > 0 && Math.abs(totalCobrado - neto) > 1 && Math.abs(totalCobrado - total) > 1;
   const aDepositar = aDepositarSoles(f);
 
   async function correr(nombre: string, fn: () => Promise<unknown>) {
@@ -193,13 +204,17 @@ function CobroModal({ f, notas, onClose, onChanged }: { f: Factura; notas: Notas
     catch (e) { alert((e as Error).message || "No se pudo completar la operación."); }
     finally { setBusy(""); }
   }
-  function marcarPagada() {
+  function registrarPago() {
     if (!(cobrado > 0)) { alert("Ingresa el monto cobrado (mayor a 0)."); return; }
-    correr("pago", () => apiCobranzas.pago(f.id, {
-      pagada: true, fechaPago, notaPago: nota.trim(), montoCobrado: cobrado,
-      detraccionResponsable: f.sujetoDetraccion ? responsable : undefined,
-    }));
+    correr("pago", async () => {
+      await apiCobranzas.abono(f.id, {
+        fecha: fechaPago, monto: cobrado, nota: nota.trim(), cerrar,
+        detraccionResponsable: cerrar && f.sujetoDetraccion ? responsable : undefined,
+      });
+      setNota(""); setCerrarManual(null); setMonto(String(Math.max(0, r2(restante - cobrado))));
+    });
   }
+  const quitarAbono = (aid: string) => { if (confirm("¿Quitar este pago? La factura vuelve a quedar por cobrar con el saldo que corresponda.")) correr("abono" + aid, () => apiCobranzas.quitarAbono(f.id, aid)); };
   const marcarPendiente = () => { if (confirm("¿Volver a marcar esta factura como pendiente de pago?")) correr("pago", () => apiCobranzas.pago(f.id, { pagada: false })); };
 
   async function subir(files: FileList | null) {
@@ -241,6 +256,12 @@ function CobroModal({ f, notas, onClose, onChanged }: { f: Factura; notas: Notas
             <Dato key={n.id} k={`Nota de crédito ${docDe(n)}${n.motivo ? ` · ${n.motivo}` : ""}`} v={<span className="text-rose-500">− {dinero(totalDe(n), n.moneda)}</span>} />
           ))}
           <Dato k="Neto a cobrar" v={<b>{dinero(neto, f.moneda)}</b>} />
+          {!f.pagada && previo > 0 ? (
+            <>
+              <Dato k="Pagado a cuenta" v={<span className="text-emerald-700">− {dinero(previo, f.moneda)}</span>} />
+              <Dato k="Falta cobrar" v={<b>{dinero(restante, f.moneda)}</b>} />
+            </>
+          ) : null}
 
           {anulada ? (
             <div className="mt-4 flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
@@ -254,35 +275,55 @@ function CobroModal({ f, notas, onClose, onChanged }: { f: Factura; notas: Notas
 
           {/* Pago */}
           <div className={`mt-4 rounded-xl border border-slate-200 p-4 ${anulada && !f.pagada ? "hidden" : ""}`}>
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Pago</div>
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Pagos</div>
+            {abonos.length ? (
+              <div className="mb-3 space-y-1">
+                {abonos.map((a) => (
+                  <div key={a.id} className="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-1.5 text-sm">
+                    <span className="tabular text-slate-500">{fecha(a.fecha)}</span>
+                    <span className="min-w-0 flex-1 truncate text-xs text-slate-400" title={a.nota}>{a.nota}</span>
+                    <span className="tabular font-semibold text-emerald-700">{dinero(a.monto, f.moneda)}</span>
+                    <button disabled={!!busy} onClick={() => quitarAbono(a.id)} title="Quitar este pago" className="rounded p-1 text-slate-400 hover:text-rose-600"><Trash2 size={14} /></button>
+                  </div>
+                ))}
+              </div>
+            ) : null}
             {f.pagada ? (
               <div className="space-y-2 text-sm">
                 <div className="flex items-center gap-2 text-emerald-700"><CheckCircle2 size={16} /> Pagada el <b>{f.fechaPago ? fecha(f.fechaPago) : "—"}</b></div>
-                {f.montoCobrado ? <div className="text-slate-600">Cobrado: <b className="tabular">{dinero(f.montoCobrado, f.moneda)}</b></div> : null}
-                {f.notaPago ? <div className="text-slate-500">{f.notaPago}</div> : null}
+                {previo ? <div className="text-slate-600">Cobrado: <b className="tabular">{dinero(previo, f.moneda)}</b>{abonos.length > 1 ? ` en ${abonos.length} pagos` : ""}</div> : null}
                 <button disabled={!!busy} onClick={marcarPendiente} className={`${btn} border border-slate-300 bg-white text-slate-600 hover:border-rose-300 hover:text-rose-600`}>Marcar como pendiente</button>
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <label className="text-sm"><span className="mb-1 block font-medium text-slate-700">Fecha de pago</span><input type="date" className={inp} value={fechaPago} onChange={(e) => setFechaPago(e.target.value)} /></label>
                 <label className="text-sm">
-                  <span className="mb-1 block font-medium text-slate-700">Monto cobrado ({f.moneda === "USD" ? "US$" : "S/"})</span>
+                  <span className="mb-1 block font-medium text-slate-700">Monto de este pago ({f.moneda === "USD" ? "US$" : "S/"})</span>
                   <input type="number" step="0.01" min="0" className={`${inp} tabular`} value={monto} onChange={(e) => setMonto(e.target.value)} />
                 </label>
-                {f.sujetoDetraccion ? (
-                  <div className="flex flex-wrap gap-1.5 sm:col-span-2 -mt-1">
-                    <button type="button" onClick={() => setMonto(String(neto))} className="rounded-md border border-slate-200 px-2 py-0.5 text-xs text-slate-500 hover:border-brand-300 hover:text-brand-600">Neto {dinero(neto, f.moneda)}</button>
-                    <button type="button" onClick={() => setMonto(String(total))} className="rounded-md border border-slate-200 px-2 py-0.5 text-xs text-slate-500 hover:border-brand-300 hover:text-brand-600">Total {dinero(total, f.moneda)}</button>
-                  </div>
-                ) : null}
+                <div className="flex flex-wrap gap-1.5 sm:col-span-2 -mt-1">
+                  <button type="button" onClick={() => setMonto(String(restante))} className="rounded-md border border-slate-200 px-2 py-0.5 text-xs text-slate-500 hover:border-brand-300 hover:text-brand-600">{previo > 0 ? "Lo que falta" : "Neto"} {dinero(restante, f.moneda)}</button>
+                  {f.sujetoDetraccion ? <button type="button" onClick={() => setMonto(String(r2(total - previo)))} className="rounded-md border border-slate-200 px-2 py-0.5 text-xs text-slate-500 hover:border-brand-300 hover:text-brand-600">Total {dinero(r2(total - previo), f.moneda)}</button> : null}
+                </div>
+                <label className="flex items-start gap-2 text-sm sm:col-span-2">
+                  <input type="checkbox" className="mt-0.5" checked={cerrar} onChange={(e) => setCerrarManual(e.target.checked)} />
+                  <span>
+                    <span className="font-medium text-slate-700">Con este pago la factura queda cancelada</span>
+                    <span className="block text-xs text-slate-400">
+                      {cerrar
+                        ? cobrado < restante - 0.01 ? `Se cierra aunque falten ${dinero(r2(restante - cobrado), f.moneda)} (p. ej. comisión del banco).` : "Pasa a Pagadas."
+                        : `Pago a cuenta: quedará por cobrar ${dinero(Math.max(0, r2(restante - cobrado)), f.moneda)}.`}
+                    </span>
+                  </span>
+                </label>
                 {montoRaro ? (
                   <p className="rounded-md bg-amber-50 px-2.5 py-1.5 text-xs text-amber-700 ring-1 ring-inset ring-amber-200 sm:col-span-2">
                     El monto no coincide con el neto ({dinero(neto, f.moneda)}) ni con el total ({dinero(total, f.moneda)}). Revisa si es un pago parcial o si hubo comisión bancaria.
                   </p>
                 ) : null}
 
-                {/* Quién deposita la detracción: se deduce del monto y se puede corregir. */}
-                {f.sujetoDetraccion ? (
+                {/* Quién deposita la detracción: se deduce de lo cobrado al cerrar y se puede corregir. */}
+                {f.sujetoDetraccion && cerrar ? (
                   <label className="text-sm sm:col-span-2">
                     <span className="mb-1 block font-medium text-slate-700">
                       ¿Quién deposita la detracción{aDepositar ? ` (S/ ${aDepositar.toLocaleString("es-PE")})` : ""}?
@@ -299,7 +340,7 @@ function CobroModal({ f, notas, onClose, onChanged }: { f: Factura; notas: Notas
                 ) : null}
 
                 <label className="text-sm sm:col-span-2"><span className="mb-1 block font-medium text-slate-700">Nota (banco / N° operación)</span><input className={inp} value={nota} onChange={(e) => setNota(e.target.value)} placeholder="BCP op. 123456" /></label>
-                <button disabled={!!busy} onClick={marcarPagada} className={`${btn} justify-center bg-emerald-600 text-white hover:bg-emerald-700 sm:col-span-2`}><CheckCircle2 size={15} /> {busy === "pago" ? "Guardando…" : "Marcar como pagada"}</button>
+                <button disabled={!!busy} onClick={registrarPago} className={`${btn} justify-center bg-emerald-600 text-white hover:bg-emerald-700 sm:col-span-2`}><CheckCircle2 size={15} /> {busy === "pago" ? "Guardando…" : cerrar ? "Registrar pago y cerrar la factura" : "Registrar pago a cuenta"}</button>
               </div>
             )}
           </div>

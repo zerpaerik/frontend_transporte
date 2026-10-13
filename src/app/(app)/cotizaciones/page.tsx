@@ -196,8 +196,7 @@ function ConvertirModal({ c, onClose, onDone }: { c: Cotizacion; onClose: () => 
   const [fechaViaje, setFechaViaje] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const tc = c.moneda === "USD" ? c.tipoCambio : 1;
-  const tarifa = (precio: number, desc: number) => Math.round(precio * (1 - desc / 100) * (1 - c.descuentoGlobal / 100) * tc * 100) / 100;
+  const tarifa = (precio: number, desc: number) => Math.round(precio * (1 - desc / 100) * (1 - c.descuentoGlobal / 100) * 100) / 100;
 
   async function crear() {
     setBusy(true); setError("");
@@ -225,13 +224,13 @@ function ConvertirModal({ c, onClose, onDone }: { c: Cotizacion; onClose: () => 
                     <td className="px-3 py-2 tabular">{Math.max(1, Math.round(i.cantidad))}</td>
                     <td className="px-3 py-2">{[i.operacion, i.tamanio, i.tipoCarga].filter(Boolean).join(" · ") || <span className="text-amber-600">Sin operación</span>}</td>
                     <td className="px-3 py-2 text-slate-600">{[i.origen, i.destino, i.devolucion].filter(Boolean).join(" → ") || <span className="text-amber-600">Sin ruta</span>}</td>
-                    <td className="px-3 py-2 text-right font-semibold tabular">{soles(tarifa(i.precio, i.descuento))}</td>
+                    <td className="px-3 py-2 text-right font-semibold tabular">{dinero(tarifa(i.precio, i.descuento), c.moneda)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          {c.moneda === "USD" ? <p className="text-xs text-slate-500">La tarifa del viaje se registra en soles: precio en dólares × T.C. {c.tipoCambio.toFixed(3)}.</p> : null}
+          {c.moneda === "USD" ? <p className="text-xs text-slate-500">La tarifa del viaje se registra en dólares, igual que la cotización.</p> : null}
           <label className="block max-w-xs">
             <span className="mb-1 block text-sm font-medium text-slate-700">Fecha del viaje <span className="font-normal text-slate-400">(opcional)</span></span>
             <input type="date" value={fechaViaje} onChange={(e) => setFechaViaje(e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500" />

@@ -63,3 +63,8 @@ export function anuladaPorNc(f: Factura, notas: NotasPorFactura): boolean {
 // Lo que queda por cobrar al cliente: neto (total − detracción) menos las NC parciales.
 export const saldoDe = (f: Factura, notas: NotasPorFactura) => (anuladaPorNc(f, notas) ? 0 : Math.max(0, r2(netoDe(f) - creditoDe(f, notas))));
 export const docDe = (f: Factura) => `${f.serie}-${f.correlativo}`;
+
+// Lo cobrado: la suma de los pagos registrados (uno si se pagó completa, varios si fueron a cuenta).
+export const cobradoDe = (f: Factura) => r2((f.abonos || []).reduce((s, a) => s + a.monto, 0));
+// Lo que falta cobrar: el saldo (neto menos notas de crédito) menos lo ya pagado a cuenta.
+export const pendienteDe = (f: Factura, notas: NotasPorFactura) => (f.pagada ? 0 : Math.max(0, r2(saldoDe(f, notas) - cobradoDe(f))));

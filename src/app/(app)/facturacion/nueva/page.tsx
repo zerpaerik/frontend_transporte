@@ -183,6 +183,8 @@ export default function NuevoComprobantePage() {
         if (v.greTransporte) setGuiaTransportista((g) => addCsv(g, String(v.greTransporte)));
         setViajes((vs) => (vs.includes(c.toUpperCase()) ? vs : [...vs, c.toUpperCase()]));
         if (cli && cliente.trim() && cli !== cliente.trim()) setMsg(`Ojo: el viaje ${c} es de otro cliente (${cli}). Se agregó igual.`);
+        const monV = v.moneda === "USD" ? "USD" : "PEN";
+        if (monV !== moneda) setMsg(`Ojo: la tarifa del viaje ${c} está en ${monV === "USD" ? "dólares" : "soles"} y el comprobante en ${moneda === "USD" ? "dólares" : "soles"}. Revisa el valor de esa línea.`);
         setCodigo("");
         return;
       }
@@ -202,6 +204,8 @@ export default function NuevoComprobantePage() {
       setOrigen(String(v.origen || ""));
       setDestino(String(v.destino || ""));
       setLineas([linea]);
+      // La moneda del comprobante sigue a la de la tarifa del viaje (en dólares falta el T.C.).
+      setMoneda(v.moneda === "USD" ? "USD" : "PEN");
       setViajes([c.toUpperCase()]);
       // El comprobante arranca de cero: también el valor referencial del anterior.
       setServiciosVR([]);

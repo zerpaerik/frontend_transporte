@@ -321,6 +321,19 @@ export const apiCobranzas = {
   subir: (id: string, body: { base64: string; nombre: string; mime: string }) => api.post<unknown>(`/facturas/${id}/comprobantes-pago`, body),
   descargar: (id: string, cid: string) => api.get<{ nombre: string; mime: string; base64: string }>(`/facturas/${id}/comprobantes-pago/${cid}`),
   quitar: (id: string, cid: string) => api.del<unknown>(`/facturas/${id}/comprobantes-pago/${cid}`),
+  // Pago completo o a cuenta; cerrar = con este pago la factura queda cancelada.
+  abono: (id: string, body: { fecha: string; monto: number; nota?: string; cerrar?: boolean; detraccionResponsable?: "Cliente" | "Empresa" }) => api.post<unknown>(`/facturas/${id}/abonos`, body),
+  quitarAbono: (id: string, aid: string) => api.del<unknown>(`/facturas/${id}/abonos/${aid}`),
+};
+
+// Archivos planos de pago masivo de detracciones (formato SUNAT).
+export interface DetraccionLote { id: string; numero: string; total: number; cantidad: number; facturas: string[]; createdAt: string }
+export const apiDetracciones = {
+  lotes: () => api.get<DetraccionLote[]>("/detracciones/lotes"),
+  siguiente: () => api.get<{ numero: string }>("/detracciones/lotes/siguiente"),
+  generar: (numero: string, facturaIds: string[]) => api.post<{ id: string; numero: string; total: number; cantidad: number; nombre: string; mime: string; base64: string }>("/detracciones/lotes", { numero, facturaIds }),
+  archivo: (id: string) => api.get<{ nombre: string; mime: string; base64: string }>(`/detracciones/lotes/${id}/archivo`),
+  eliminar: (id: string) => api.del<{ ok: boolean }>(`/detracciones/lotes/${id}`),
 };
 
 // Acciones de facturación electrónica sobre un comprobante ya registrado.
@@ -334,6 +347,8 @@ export const apiFacturasE = {
   anular: (id: string, motivo: string) => api.post<unknown>(`/facturas/${id}/anular`, { motivo }),
   correo: (id: string, correo: string) => api.post<{ ok: boolean; mensaje: string }>(`/facturas/${id}/correo`, { correo }),
   revisarNumeracion: () => api.get<RevisionNumeracion>("/facturas/revisar-numeracion"),
+  // Solo borradores que nunca se enviaron a SUNAT (el backend lo valida).
+  eliminarBorrador: (id: string) => api.del<{ ok: boolean }>(`/facturas/${id}`),
 };
 // Comprobantes que existen en MiFact/SUNAT pero no en el sistema (huecos de numeración).
 export interface RevisionNumeracion {

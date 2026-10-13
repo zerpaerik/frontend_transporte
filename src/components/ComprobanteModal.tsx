@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Send, FileDown, RefreshCw, Ban, Mail, X, Pencil, Eye } from "lucide-react";
+import { Plus, Send, FileDown, RefreshCw, Ban, Mail, X, Pencil, Eye, Trash2 } from "lucide-react";
 import { Badge } from "./ui";
 import { apiFacturasE, downloadBase64, type EmisorConfig, type CuentaBancaria } from "@/lib/api";
 import { soles, dinero, fecha } from "@/lib/format";
@@ -81,6 +81,12 @@ export function ComprobanteModal({ f, listo, emisor = null, cuentas = [], onClos
     catch (e) { alert((e as Error).message || "No se pudo completar la operación."); }
     finally { setBusy(""); }
   }
+  // Un borrador que nunca se envió a SUNAT (sin número) se puede borrar; uno enviado se anula.
+  const borrador = !f.correlativo && !f.estadoDocumento;
+  const eliminar = () => {
+    if (!confirm(`¿Eliminar este borrador de ${f.cliente}? No se envió a SUNAT; se borra del sistema.`)) return;
+    correr("eliminar", async () => { await apiFacturasE.eliminarBorrador(f.id); onClose(); });
+  };
   const guardarLineas = () => correr("lineas", () => apiFacturasE.actualizar(f.id, { items: lineasPayload(), monto: gravadoL }));
   const emitir = () => correr("emitir", async () => {
     // SUNAT no acepta precios unitarios en 0: se avisa antes de enviar.
@@ -195,6 +201,7 @@ export function ComprobanteModal({ f, listo, emisor = null, cuentas = [], onClos
           ) : (
             <button disabled={!!busy} onClick={pdf} className={`${btn} flex-1 justify-center bg-brand-500 text-white hover:bg-brand-600`}><FileDown size={15} /> {busy === "pdf" ? "…" : "Descargar PDF"}</button>
           )}
+          {borrador ? <button disabled={!!busy} onClick={eliminar} title="Eliminar borrador (no se envió a SUNAT)" className={`${btn} border border-slate-300 bg-white text-slate-500 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-600`}><Trash2 size={15} /> {busy === "eliminar" ? "…" : "Eliminar"}</button> : null}
           {emitido ? <button disabled={!!busy} onClick={estado} className={`${btn} border border-slate-300 bg-white text-slate-600 hover:border-brand-300`}><RefreshCw size={15} /> Estado</button> : null}
           {aceptado ? <button disabled={!!busy} onClick={xml} className={`${btn} border border-slate-300 bg-white text-slate-600 hover:border-brand-300`}><FileDown size={15} /> {busy === "xml" ? "…" : "XML"}</button> : null}
           {aceptado ? <button disabled={!!busy} onClick={correo} className={`${btn} border border-slate-300 bg-white text-slate-600 hover:border-brand-300`}><Mail size={15} /> Correo</button> : null}

@@ -1,12 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Landmark, Users, Building2, CheckCircle2, X, Save, Trash2, TriangleAlert } from "lucide-react";
+import { Landmark, Users, Building2, CheckCircle2, X, Save, Trash2, TriangleAlert, FileDown, FileText } from "lucide-react";
 import { PageHeader, StatCard, Badge } from "@/components/ui";
 import { DataTable, type Column, type Filter } from "@/components/DataTable";
 import { useData } from "@/lib/store";
-import { apiCobranzas } from "@/lib/api";
+import { apiCobranzas, apiDetracciones, downloadBase64, type DetraccionLote } from "@/lib/api";
 import { dinero, fecha, fechaISO, hoyPeru, soles } from "@/lib/format";
 import { totalDe, detraccionDe, aDepositarSoles, responsableDe, etiquetaResponsable, detraccionDepositada, notasCreditoPorFactura, notasDe, anuladaPorNc, docDe, type Responsable } from "@/lib/detraccion";
 import type { Factura } from "@/lib/types";
@@ -21,8 +21,12 @@ function BadgeResponsable({ f }: { f: Factura }) {
 
 export default function DetraccionesPage() {
   const { facturas, reload } = useData();
-  const [vista, setVista] = useState<"pendientes" | "depositadas">("pendientes");
+  const [vista, setVista] = useState<"pendientes" | "depositadas" | "lotes">("pendientes");
   const [selId, setSelId] = useState<string | null>(null);
+  const [lotes, setLotes] = useState<DetraccionLote[]>([]);
+  const [generar, setGenerar] = useState(false);
+  const cargarLotes = () => apiDetracciones.lotes().then(setLotes).catch(() => setLotes([]));
+  useEffect(() => { cargarLotes(); }, []);
 
   // Facturas y boletas aceptadas por SUNAT que llevan detracción (lo anulado no se deposita).
   const sujetas = useMemo(
@@ -40,13 +44,14 @@ export default function DetraccionesPage() {
   const nuestras = pendientes.filter((f) => responsableDe(f) === "Empresa");
 
   const sel = facturas.find((f) => f.id === selId) || null;
-  const filas = vista === "pendientes" ? pendientes : depositadas;
+  const filas = vista === "depositadas" ? depositadas : pendientes;
 
   const colDoc: Column<Factura> = {
     key: "doc", header: "Comprobante", sortable: true, value: doc,
     render: (f) => (
       <span className="block whitespace-nowrap">
         <span className="font-semibold text-slate-900">{doc(f)}</span>
+        {f.detraccionLote && !detraccionDepositada(f) ? <span className="block text-[11px] font-semibold text-steel-700">En archivo {f.detraccionLote}</span> : null}
         {anulada(f) ? <span className="block text-[11px] font-semibold text-rose-600">Anulada · NC {notasDe(f, notas).map(docDe).join(", ")}</span> : null}
       </span>
     ),
@@ -102,7 +107,7 @@ export default function DetraccionesPage() {
     { key: "cliente", label: "Cliente", value: (f) => f.cliente },
   ];
 
-  const tab = (v: "pendientes" | "depositadas", txt: string, n: number) => (
+  const tab = (v: "pendientes" | "depositadas" | "lotes", txt: string, n: number) => (
     <button onClick={() => setVista(v)} className={`rounded-lg px-3.5 py-2 text-sm font-semibold transition ${vista === v ? "bg-brand-500 text-white" : "border border-slate-300 bg-white text-slate-600 hover:border-brand-300 hover:text-brand-600"}`}>
       {txt} <span className={`ml-1 rounded-full px-1.5 text-xs ${vista === v ? "bg-white/25" : "bg-slate-100"}`}>{n}</span>
     </button>
@@ -126,12 +131,19 @@ export default function DetraccionesPage() {
       <div className="mb-4 flex flex-wrap items-center gap-2">
         {tab("pendientes", "Por depositar", pendientes.length)}
         {tab("depositadas", "Depositadas", depositadas.length)}
+        {tab("lotes", "Archivos de pago", lotes.length)}
+        <button onClick={() => setGenerar(true)} className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-600 hover:border-brand-300 hover:text-brand-600">
+          <FileText size={16} /> Generar archivo de pago (TXT)
+        </button>
         <span className="ml-auto text-xs text-slate-400">
           Por norma la deposita el cliente; si el cliente pagó el total, nos toca a nosotros. Se define al registrar el cobro en{" "}
           <Link href="/cobranzas" className="font-semibold text-brand-600 hover:text-brand-700">Cobranzas</Link>.
         </span>
       </div>
 
+      {vista === "lotes" ? (
+        <LotesTabla lotes={lotes} onChanged={async () => { await cargarLotes(); await reload(); }} />
+      ) : (
       <DataTable
         title={vista === "pendientes" ? "Detracciones por depositar" : "Detracciones depositadas"}
         exportName={vista === "pendientes" ? "detracciones-por-depositar" : "detracciones-depositadas"}
@@ -149,7 +161,15 @@ export default function DetraccionesPage() {
           </button>
         )}
       />
+      )}
 
+      {generar ? (
+        <GenerarLoteModal
+          candidatas={pendientes.filter((f) => !f.detraccionLote)}
+          onClose={() => setGenerar(false)}
+          onDone={async () => { setGenerar(false); setVista("lotes"); await cargarLotes(); await reload(); }}
+        />
+      ) : null}
       {sel ? <DetraccionModal f={sel} todas={sujetas} notasCredito={notasDe(sel, notas).map(docDe)} anulada={anulada(sel)} onClose={() => setSelId(null)} onChanged={reload} /> : null}
     </div>
   );
@@ -262,6 +282,133 @@ function DetraccionModal({ f, todas, notasCredito, anulada, onClose, onChanged }
             ) : null}
             <button disabled={busy} onClick={guardar} className={`${btn} ml-auto bg-brand-500 text-white hover:bg-brand-600`}><Save size={15} /> {busy ? "Guardando…" : "Guardar"}</button>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Archivos planos de pago masivo ya generados (como el historial de lotes de la otra herramienta).
+function LotesTabla({ lotes, onChanged }: { lotes: DetraccionLote[]; onChanged: () => Promise<void> }) {
+  const [busy, setBusy] = useState("");
+  async function bajar(l: DetraccionLote) {
+    setBusy(l.id);
+    try { const a = await apiDetracciones.archivo(l.id); downloadBase64(a.nombre, a.mime, a.base64); }
+    catch (e) { alert((e as Error).message || "No se pudo descargar el archivo."); }
+    finally { setBusy(""); }
+  }
+  async function eliminar(l: DetraccionLote) {
+    if (!confirm(`¿Eliminar el archivo ${l.numero}? Sus ${l.cantidad} factura(s) vuelven a quedar disponibles para otro archivo. Hazlo solo si NO lo subiste a SUNAT.`)) return;
+    setBusy(l.id);
+    try { await apiDetracciones.eliminar(l.id); await onChanged(); }
+    catch (e) { alert((e as Error).message || "No se pudo eliminar el archivo."); }
+    finally { setBusy(""); }
+  }
+  return (
+    <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+      <table className="w-full min-w-[620px] text-sm">
+        <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+          <tr><th className="px-4 py-3 text-left font-semibold">N° de lote</th><th className="px-4 py-3 text-left font-semibold">Generado</th><th className="px-4 py-3 text-right font-semibold">Facturas</th><th className="px-4 py-3 text-right font-semibold">Total</th><th className="px-4 py-3 text-right font-semibold">Opciones</th></tr>
+        </thead>
+        <tbody>
+          {lotes.length ? lotes.map((l) => (
+            <tr key={l.id} className="border-t border-slate-100">
+              <td className="px-4 py-3 font-semibold tabular text-slate-900">{l.numero}</td>
+              <td className="px-4 py-3 tabular">{fecha(l.createdAt)}</td>
+              <td className="px-4 py-3 text-right tabular">{l.cantidad}</td>
+              <td className="px-4 py-3 text-right font-semibold tabular">{soles(l.total)}</td>
+              <td className="px-4 py-3 text-right">
+                <div className="flex justify-end gap-1.5">
+                  <button disabled={!!busy} onClick={() => bajar(l)} className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:border-brand-300 hover:text-brand-600 disabled:opacity-50"><FileDown size={14} /> Descargar</button>
+                  <button disabled={!!busy} onClick={() => eliminar(l)} title="Eliminar (solo si no se subió a SUNAT)" className="rounded-lg border border-slate-300 p-1.5 text-slate-500 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50"><Trash2 size={14} /></button>
+                </div>
+              </td>
+            </tr>
+          )) : (
+            <tr><td colSpan={5} className="px-4 py-10 text-center text-slate-400">Aún no se generaron archivos de pago.</td></tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// Arma el archivo plano de SUNAT con las detracciones elegidas. Por defecto se marcan las que
+// nos toca depositar a nosotros (el cliente nos pagó el total).
+function GenerarLoteModal({ candidatas, onClose, onDone }: { candidatas: Factura[]; onClose: () => void; onDone: () => Promise<void> }) {
+  const [numero, setNumero] = useState("");
+  const [sel, setSel] = useState<Set<string>>(() => new Set(candidatas.filter((f) => responsableDe(f) === "Empresa").map((f) => f.id)));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  useEffect(() => { apiDetracciones.siguiente().then((r) => setNumero(r.numero)).catch(() => {}); }, []);
+
+  const elegidas = candidatas.filter((f) => sel.has(f.id));
+  const sinTc = elegidas.filter((f) => aDepositarSoles(f) === null);
+  const total = sumaSoles(elegidas, aDepositarSoles);
+  const toggle = (id: string) => setSel((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+
+  async function generarArchivo() {
+    setError("");
+    if (!/^\d{6}$/.test(numero)) { setError("El número de lote son 6 dígitos: año + correlativo (p. ej. 202623)."); return; }
+    if (!elegidas.length) { setError("Elige al menos una factura."); return; }
+    setBusy(true);
+    try {
+      const r = await apiDetracciones.generar(numero, elegidas.map((f) => f.id));
+      downloadBase64(r.nombre, r.mime, r.base64);
+      await onDone();
+    } catch (e) {
+      setError((e as Error).message || "No se pudo generar el archivo.");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 sm:p-6" onClick={onClose}>
+      <div className="mt-8 w-full max-w-3xl rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-4">
+          <div>
+            <h2 className="text-lg font-bold text-slate-900">Archivo de pago masivo de detracciones</h2>
+            <p className="mt-0.5 text-sm text-slate-500">Genera el TXT con el formato de SUNAT para pagar varias detracciones de una vez (SUNAT Operaciones en Línea → pago masivo de detracciones).</p>
+          </div>
+          <button onClick={onClose} className="rounded-md p-1 text-slate-400 hover:bg-slate-100"><X size={20} /></button>
+        </div>
+        <div className="space-y-4 px-6 py-4 text-sm">
+          <label className="block max-w-xs">
+            <span className="mb-1 block font-medium text-slate-700">N° de lote</span>
+            <input value={numero} onChange={(e) => setNumero(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="202623" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm tabular outline-none focus:border-brand-500" />
+            <span className="mt-1 block text-xs text-slate-400">Año + correlativo de 2 dígitos. Debe seguir al último que subieron a SUNAT.</span>
+          </label>
+          <div className="overflow-x-auto rounded-xl border border-slate-200">
+            <table className="w-full min-w-[600px]">
+              <thead className="bg-slate-50 text-xs text-slate-500">
+                <tr><th className="w-10 px-3 py-2 text-center"><input type="checkbox" title="Marcar todas" checked={candidatas.length > 0 && elegidas.length === candidatas.length} onChange={(e) => setSel(new Set(e.target.checked ? candidatas.map((f) => f.id) : []))} /></th><th className="px-3 py-2 text-left font-semibold">Comprobante</th><th className="px-3 py-2 text-left font-semibold">Cliente</th><th className="px-3 py-2 text-left font-semibold">Le corresponde</th><th className="px-3 py-2 text-right font-semibold">A depositar</th></tr>
+              </thead>
+              <tbody>
+                {candidatas.length ? candidatas.map((f) => (
+                  <tr key={f.id} onClick={() => toggle(f.id)} className="cursor-pointer border-t border-slate-100 hover:bg-slate-50">
+                    <td className="px-3 py-2 text-center"><input type="checkbox" checked={sel.has(f.id)} onChange={() => toggle(f.id)} onClick={(e) => e.stopPropagation()} /></td>
+                    <td className="px-3 py-2 font-semibold tabular">{doc(f)}</td>
+                    <td className="px-3 py-2"><span className="block max-w-[220px] truncate" title={f.cliente}>{f.cliente}</span><span className="text-xs tabular text-slate-400">{f.ruc}</span></td>
+                    <td className="px-3 py-2"><BadgeResponsable f={f} /></td>
+                    <td className="px-3 py-2 text-right font-semibold tabular">{aDepositarSoles(f) === null ? <span className="text-amber-600">sin T.C.</span> : soles(aDepositarSoles(f)!)}</td>
+                  </tr>
+                )) : (
+                  <tr><td colSpan={5} className="px-3 py-8 text-center text-slate-400">No hay detracciones por depositar que no estén ya en un archivo.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-50 px-4 py-3">
+            <span className="text-slate-600">{elegidas.length} factura(s) elegida(s)</span>
+            <span className="font-bold tabular text-slate-900">Total a depositar: {soles(total)}</span>
+          </div>
+          {sinTc.length ? <p className="text-xs text-amber-700">Hay facturas en dólares sin tipo de cambio ({sinTc.map(doc).join(", ")}): no se pueden incluir.</p> : null}
+          <p className="text-xs text-slate-400">Al generarlo, las facturas quedan marcadas &quot;En archivo&quot; para no pagarlas dos veces. Cuando SUNAT confirme el pago, registra en cada una el N° de constancia (botón Registrar).</p>
+          {error ? <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-rose-700">{error}</div> : null}
+        </div>
+        <div className="flex justify-end gap-2 border-t border-slate-200 px-6 py-4">
+          <button onClick={onClose} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">Cancelar</button>
+          <button onClick={generarArchivo} disabled={busy || !elegidas.length || sinTc.length > 0} className="inline-flex items-center gap-1.5 rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-50"><FileDown size={15} /> {busy ? "Generando…" : "Generar y descargar TXT"}</button>
         </div>
       </div>
     </div>

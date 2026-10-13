@@ -118,6 +118,7 @@ export interface Viaje {
   greTransporte: string;
   factura: string;
   tarifa?: number;
+  moneda?: "PEN" | "USD"; // moneda de la tarifa
   clienteRuc?: string;
   clienteDireccion?: string;
 }
@@ -193,6 +194,8 @@ export interface Factura {
   notaPago?: string;
   montoCobrado?: number; // lo que entró a la cuenta (moneda del comprobante); 0 = sin dato
   comprobantesPago?: { id: string; nombre: string; mime: string; createdAt: string }[];
+  abonos?: { id: string; fecha: string; monto: number; nota: string }[]; // pagos recibidos (completo o a cuenta)
+  detraccionLote?: string; // lote del archivo de pago masivo de detracciones en que se incluyó
   // Detracción: quién la deposita y la constancia del depósito (en soles)
   detraccionResponsable?: "" | "Cliente" | "Empresa";
   detraccionFecha?: string | null;
